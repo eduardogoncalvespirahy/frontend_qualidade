@@ -31,24 +31,21 @@ export class FormularioComponent {
   protected readonly total = signal(0);
   protected readonly totalPages = signal(0);
 
-  protected readonly formularioId = signal('');
-  protected readonly secaoId = signal('');
-  protected readonly localId = signal('');
-
   constructor() {
     this.setContext();
   }
 
   private setContext(): void {
-    this.navigationContext.formnId.set(this.route.snapshot.paramMap.get('formulario_id')!);
-    this.formularioId.set(this.navigationContext.formnId() ?? '');
-    this.secaoId.set(this.navigationContext.sectionId() ?? '');
-    this.localId.set(this.navigationContext.locationId() ?? '');
+    this.navigationContext.update({
+      locationId: this.route.snapshot.paramMap.get('local_id')!,      
+      sectionId: this.route.snapshot.paramMap.get('secao_id')!,      
+      formId: this.route.snapshot.paramMap.get('formulario_id')!,
+    });
   }
 
   protected readonly formResource = rxResource<Form, { id: string }>({
     params: () => ({
-      id: this.formularioId(),
+      id: this.navigationContext.context().formId,
     }),
     stream: ({ params }) => this.formService.getById(params.id),
   });
@@ -67,7 +64,7 @@ export class FormularioComponent {
   });
 
   protected readonly answers = computed(() => {
-    const formId = this.formularioId();
+    const formId = this.navigationContext.context().formId;
 
     return this.answersResource.value()?.data.filter((answers) => answers.formId === formId) ?? [];
   });

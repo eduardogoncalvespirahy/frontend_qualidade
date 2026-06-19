@@ -29,20 +29,19 @@ export class LocalComponent {
   protected readonly total = signal(0);
   protected readonly totalPages = signal(0);
 
-  protected readonly localId = signal('');
-
   constructor() {
     this.setContext();
   }
 
   protected setContext(): void {
-    this.navigationContext.locationId.set(this.route.snapshot.paramMap.get('local_id')!);
-    this.localId.set(this.navigationContext.locationId()!);
+    this.navigationContext.update({
+      locationId: this.route.snapshot.paramMap.get('local_id')!,
+    });
   }
 
   protected readonly locationResource = rxResource<Location, { id: string }>({
     params: () => ({
-      id: this.localId(),
+      id: this.navigationContext.context().locationId,
     }),
     stream: ({ params }) => this.locationService.getById(params.id),
   });

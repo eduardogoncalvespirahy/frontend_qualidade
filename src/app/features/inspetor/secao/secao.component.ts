@@ -31,21 +31,19 @@ export class SecaoComponent {
   protected readonly total = signal(0);
   protected readonly totalPages = signal(0);
 
-  protected readonly secaoId = signal('');
-  protected readonly localId = signal('');
-
   constructor() {
     this.setContext();
   }
 
   protected setContext(): void {
-    this.navigationContext.sectionId.set(this.route.snapshot.paramMap.get('secao_id')!);
-    this.secaoId.set(this.navigationContext.sectionId() ?? '');
-    this.localId.set(this.navigationContext.locationId() ?? '');
+    this.navigationContext.update({
+      locationId: this.route.snapshot.paramMap.get('local_id')!,      
+      sectionId: this.route.snapshot.paramMap.get('secao_id')!,
+    });
   }
   protected readonly sectionResource = rxResource<Section, { id: string }>({
     params: () => ({
-      id: this.secaoId(),
+      id: this.navigationContext.context().sectionId,
     }),
     stream: ({ params }) => this.sectionService.getById(params.id),
   });

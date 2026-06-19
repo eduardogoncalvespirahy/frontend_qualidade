@@ -1,20 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { Section } from '../../../core/models/section.model';
-import { SectionService } from '../../../core/services/section.service';
 import { ActivatedRoute, RouterLink, RouterModule } from '@angular/router';
-import { FormService } from '../../../core/services/form.service';
+
+import { Section } from '../../../core/models/section.model';
 import { PaginatedResult } from '../../../core/models/paginated.model';
-import { Form } from '../../../core/models/form.model';
+
+import { SectionService } from '../../../core/services/section.service';
 import { NavigationContextService } from '../../../core/services/navigation-context.service';
+import { FormService } from '../../../core/services/form.service';
+import { Form } from '../../../core/models/form.model';
 
 @Component({
   selector: 'app-secao',
-  standalone: true,  
-  imports: [RouterModule,RouterLink],
+  standalone: true,
+  imports: [RouterModule, RouterLink],
   templateUrl: './secao.component.html',
   styleUrl: './secao.component.css',
-  changeDetection: ChangeDetectionStrategy.OnPush,  
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SecaoComponent {
   private readonly route = inject(ActivatedRoute);
@@ -25,21 +27,21 @@ export class SecaoComponent {
   protected readonly query = signal('');
 
   protected readonly page = signal(1);
-  protected readonly limit = signal(undefined);
+  protected readonly limit = signal(10);
   protected readonly total = signal(0);
   protected readonly totalPages = signal(0);
 
   protected readonly secaoId = signal('');
   protected readonly localId = signal('');
-  
+
   constructor() {
-    this.setSectionId();
+    this.setContext();
   }
 
-  protected setSectionId(): void {
+  protected setContext(): void {
     this.navigationContext.sectionId.set(this.route.snapshot.paramMap.get('secao_id')!);
-    this.secaoId.set(this.navigationContext.sectionId()!);
-    this.localId.set(this.navigationContext.locationId()!);
+    this.secaoId.set(this.navigationContext.sectionId() ?? '');
+    this.localId.set(this.navigationContext.locationId() ?? '');
   }
   protected readonly sectionResource = rxResource<Section, { id: string }>({
     params: () => ({

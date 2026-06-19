@@ -8,7 +8,7 @@
   </nav>
 </div>
 
-<h2>Local {{location()?.nome}}</h2>
+<h2>Local {{ location()?.nome }}</h2>
 
 @if (sectionsResource.isLoading()) {
   <div class="text-center py-5">
@@ -39,7 +39,7 @@
         <a
           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3"
           [title]="section.descricao"
-          [routerLink]="['/inspetor/local',localId(),'secao',section.id]"
+          [routerLink]="['/inspetor/local', localId(), 'secao', section.id]"
         >
           <div>
             <span class="badge bg-primary me-2"> #{{ section.id }} </span>
@@ -55,5 +55,3 @@
     </div>
   }
 }
-
-  <!-- <router-outlet></router-outlet> -->

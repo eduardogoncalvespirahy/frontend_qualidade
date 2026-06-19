@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 
 export const ConfigRoutes: Routes = [
   {
-    path: 'config',
+    path: '',
     title: 'config',
     loadComponent: () => import('./config.component').then((c) => c.ConfigComponent),
     children: [

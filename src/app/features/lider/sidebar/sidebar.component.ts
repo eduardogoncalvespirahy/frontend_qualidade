@@ -1,35 +1,34 @@
-import { Component } from '@angular/core';
-import { NgFor } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
+import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [NgFor, RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive],
   templateUrl: './sidebar.component.html',
-  styleUrls: ['./sidebar.component.css']
+  styleUrl: './sidebar.component.css',
 })
-export class Sidebar {
-  menuItems = [
-    {
-      label: 'Início',
-      icon: '🏠',
-      route: '/home'
-    },
-    {
-      label: 'Painel de Inspeção',
-      icon: '📋',
-      route: '/painel-inspecao'
-    },
-    {
-      label: 'Histórico de Envios',
-      icon: '📊',
-      route: '/historico-envios'
-    },
-    {
-      label: 'Configurações',
-      icon: '⚙️',
-      route: '/config'
-    }
-  ];
+export class SidebarComponent {
+  private readonly auth = inject(AuthService);   
+
+  collapsed = signal(false);
+  mobileOpen = signal(false);
+  configOpen = signal(false);
+
+  toggleSidebar() {
+    this.collapsed.update((v) => !v);
+  }
+
+  toggleMobile() {
+    this.mobileOpen.update((v) => !v);
+  }
+
+  toggleConfig() {
+    this.configOpen.update((v) => !v);
+  }
+
+  logout() {
+    this.auth.logout();   
+  }
 }

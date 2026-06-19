@@ -9,9 +9,11 @@ import { environment } from '../../../environments/environment';
 import { LoginIdentifierType, LoginRequest } from '../../core/models/auth.model';
 
 import { AuthService } from '../../core/services/auth.service';
+import { CookieService } from '../../core/services/cookie.service';
 
 @Component({
   selector: 'app-login',
+  standalone: true,
   imports: [FormsModule, RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css',
@@ -19,6 +21,11 @@ import { AuthService } from '../../core/services/auth.service';
 export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly cookieService = inject(CookieService);
+
+  constructor() {
+    this.recuperarAcesso();
+  }
 
   protected readonly types = [
     { value: 'email', label: 'E-mail' },
@@ -31,7 +38,8 @@ export class LoginComponent {
   protected readonly identifier = signal('');
   protected readonly password = signal('');
   protected readonly showPassword = signal(false);
-  
+  protected readonly rememberAccess = signal(false);
+
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
@@ -48,8 +56,8 @@ export class LoginComponent {
   }
 
   protected togglePasswordVisibility(): void {
-    this.showPassword.update(value => !value);
-  }  
+    this.showPassword.update((value) => !value);
+  }
 
   protected submit(): void {
     this.error.set(null);
@@ -86,6 +94,10 @@ export class LoginComponent {
 
     this.loading.set(true);
 
+    if (this.rememberAccess()) {
+      this.lembrarAcesso();
+    }
+
     this.auth
       .login(request)
       .pipe(
@@ -101,5 +113,26 @@ export class LoginComponent {
           this.error.set(err?.error?.message ?? 'Não foi possível entrar. Verifique os dados.');
         },
       });
+  }
+
+  protected lembrarAcesso(): void {
+    const data = {
+      identifierType: this.identifierType(),
+      identifier: this.identifier().trim(),
+      password: this.password(),
+    };
+
+    this.cookieService.set('acesso', JSON.stringify(data));
+  }
+
+  protected recuperarAcesso(): void {
+    const acessoCookie = this.cookieService.get('acesso');
+
+    if (acessoCookie) {
+      const data = JSON.parse(acessoCookie);
+      this.identifierType.set(data.identifierType);
+      this.identifier.set(data.identifier);
+      this.password.set(data.password);
+    }
   }
 }

@@ -1,12 +1,11 @@
 .content {
-  min-height: 100vh;
-  background: #f8f9fa;
-  padding: 1rem;
+  margin-left: 280px;
+  padding: 1.5rem;
+  transition: all .25s ease;
 }
 
-@media (min-width: 768px) {
+@media (max-width: 991px) {
   .content {
-    margin-left: 260px;
-    padding: 1.5rem;
+    margin-left: 0;
   }
 }

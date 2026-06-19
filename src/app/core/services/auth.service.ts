@@ -5,6 +5,7 @@ import { CookieService } from './cookie.service';
 
 import { environment } from '../../../environments/environment';
 import { LoginRequest, LoginResponse } from '../models/auth.model';
+import { Router } from '@angular/router';
 
 const TOKEN_KEY = 'aq_token';
 const REFRESH_KEY = 'aq_refresh';
@@ -13,6 +14,7 @@ const REFRESH_KEY = 'aq_refresh';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly cookie = inject(CookieService);
+  private readonly router = inject(Router);   
 
   private readonly _token = signal<string | null>(this.read(TOKEN_KEY));
   readonly token = this._token.asReadonly();
@@ -26,7 +28,8 @@ export class AuthService {
 
   logout(): void {
     this.clear();
-    this._token.set(null);
+    this._token.set(null); 
+    this.router.navigate(['/login']);  
   }
 
   private setSession(res: LoginResponse): void {

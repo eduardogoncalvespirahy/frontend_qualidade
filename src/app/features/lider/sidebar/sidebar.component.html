@@ -1,87 +1,112 @@
-<!-- Botão mobile -->
-<nav class="navbar navbar-dark bg-dark d-md-none px-3">
-  <button
-    class="btn btn-outline-light"
-    type="button"
-    data-bs-toggle="offcanvas"
-    data-bs-target="#mobileSidebar"
-    aria-controls="mobileSidebar"
-  >
-    ☰
-  </button>
+<!-- BOTÃO MOBILE -->
 
-  <span class="navbar-brand mb-0 h1">Qualidade</span>
-</nav>
+<button class="btn btn-primary d-lg-none m-2" (click)="toggleMobile()">☰</button>
 
-<!-- Sidebar desktop -->
-<aside class="sidebar d-none d-md-flex flex-column">
+<!-- BACKDROP MOBILE -->
+
+@if (mobileOpen()) {
+  <div class="sidebar-backdrop" (click)="toggleMobile()"></div>
+}
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar" [class.collapsed]="collapsed()" [class.mobile-open]="mobileOpen()">
+  <!-- HEADER -->
+
   <div class="sidebar-header">
-    <h5>Sistema Qualidade</h5>
-    <small>Beneficiamento</small>
+    @if (!collapsed()) {
+      <h5 class="mb-0 fw-bold">Quality App</h5>
+    }
+
+    <button class="btn btn-sm btn-outline-light" (click)="toggleSidebar()">
+      @if (collapsed()) {
+        <span>›</span>
+      } @else {
+        <span>‹</span>
+      }
+    </button>
   </div>
 
+  <!-- MENU -->
+
   <nav class="sidebar-menu">
-    <a
-      *ngFor="let item of menuItems"
-      class="sidebar-link"
-      [routerLink]="item.route"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-    >
-      <span class="sidebar-icon">{{ item.icon }}</span>
-      <span>{{ item.label }}</span>
+    <a routerLink="/home" routerLinkActive="active" class="menu-item">
+      <i class="bi bi-house"></i>
+
+      @if (!collapsed()) {
+        <span>Home</span>
+      }
     </a>
+
+    <a routerLink="/inspection-panel" routerLinkActive="active" class="menu-item">
+      <i class="bi bi-clipboard-check"></i>
+
+      @if (!collapsed()) {
+        <span>Painel de Inspeção</span>
+      }
+    </a>
+
+    <a routerLink="/history" routerLinkActive="active" class="menu-item">
+      <i class="bi bi-clock-history"></i>
+
+      @if (!collapsed()) {
+        <span>Histórico de Envios</span>
+      }
+    </a>
+
+    <!-- CONFIGURAÇÕES -->
+
+    <div class="menu-group">
+      <button class="menu-item menu-button" (click)="toggleConfig()">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-gear"></i>
+
+          @if (!collapsed()) {
+            <span>Configurações</span>
+          }
+        </div>
+
+        @if (!collapsed()) {
+          <i
+            class="bi"
+            [class.bi-chevron-down]="!configOpen()"
+            [class.bi-chevron-up]="configOpen()"
+          >
+          </i>
+        }
+      </button>
+
+      @if (configOpen() && !collapsed()) {
+        <div class="submenu">
+          <a routerLink="/settings/equipments" routerLinkActive="active" class="submenu-item">
+            Gestão de Equipamentos
+          </a>
+
+          <a routerLink="/settings/rules" routerLinkActive="active" class="submenu-item">
+            Regras e Parâmetros
+          </a>
+
+          <a routerLink="/settings/forms" routerLinkActive="active" class="submenu-item">
+            Formulários Base
+          </a>
+
+          <a routerLink="/settings/users" routerLinkActive="active" class="submenu-item">
+            Gerenciar Usuários
+          </a>
+        </div>
+      }
+    </div>
   </nav>
 
+  <!-- LOGOUT -->
+
   <div class="sidebar-footer">
-    <button class="btn btn-outline-light w-100">
-      Sair
+    <button class="btn btn-danger w-100" (click)="logout()">
+      <i class="bi bi-box-arrow-right"></i>
+
+      @if (!collapsed()) {
+        <span class="ms-2"> Sair </span>
+      }
     </button>
   </div>
 </aside>
-
-<!-- Sidebar mobile com Bootstrap Offcanvas -->
-<div
-  class="offcanvas offcanvas-start text-bg-dark"
-  tabindex="-1"
-  id="mobileSidebar"
-  aria-labelledby="mobileSidebarLabel"
->
-  <div class="offcanvas-header">
-    <div>
-      <h5 class="offcanvas-title" id="mobileSidebarLabel">
-        Sistema Qualidade
-      </h5>
-      <small>Beneficiamento</small>
-    </div>
-
-    <button
-      type="button"
-      class="btn-close btn-close-white"
-      data-bs-dismiss="offcanvas"
-      aria-label="Fechar"
-    ></button>
-  </div>
-
-  <div class="offcanvas-body">
-    <nav class="sidebar-menu">
-      <a
-        *ngFor="let item of menuItems"
-        class="sidebar-link"
-        [routerLink]="item.route"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        data-bs-dismiss="offcanvas"
-      >
-        <span class="sidebar-icon">{{ item.icon }}</span>
-        <span>{{ item.label }}</span>
-      </a>
-    </nav>
-
-    <div class="mt-4">
-      <button class="btn btn-outline-light w-100">
-        Sair
-      </button>
-    </div>
-  </div>
-</div>

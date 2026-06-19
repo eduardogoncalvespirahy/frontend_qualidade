@@ -1,0 +1,19 @@
+<div>
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item active" aria-current="page">
+        <a [routerLink]="['/']">Home</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">
+        <a [routerLink]="['/inspetor/local',localId()]">local</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">
+        <a [routerLink]="['/inspetor/local',localId(),'secao',secaoId()]">secao</a>
+      </li>
+    </ol>
+  </nav>
+</div>
+
+<h2>Formulario {{formularioId()}}</h2>
+
+<router-outlet></router-outlet>

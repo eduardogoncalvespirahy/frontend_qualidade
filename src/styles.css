@@ -1,0 +1,24 @@
+:host {
+/* Cores Pirahy */
+  --bg:             #33201a;
+  --surface:        #4a2c22;
+  --primary:        #8b4b3f;
+  --primary-hover:  #a0574a;
+  --text:           #f5ede8;
+  --muted:          #c4a99e;
+  --accent:         #d4845a;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Roboto', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+}

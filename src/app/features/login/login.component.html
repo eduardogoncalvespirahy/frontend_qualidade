@@ -1,0 +1,158 @@
+<div class="container min-vh-100 d-flex align-items-center justify-content-center py-4">
+  <div class="row justify-content-center w-100">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4">
+      <!-- Card Login -->
+      <div class="card border-0 shadow-lg rounded-4">
+        <div class="card-body p-3 p-md-5">
+          <!-- Barra superior -->
+          <div
+            class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4"
+          >
+            <a class="btn btn-sm btn-outline-secondary" [routerLink]="['/']"> ← Voltar </a>
+
+            <span class="badge text-bg-light"> Área Administrativa </span>
+          </div>
+
+          <!-- Ícone e título -->
+          <div class="text-center mb-4">
+            <div
+              class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+              style="width: 72px; height: 72px"
+            >
+              <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="white">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+            </div>
+
+            <h2 class="h4 fw-bold mb-2">Entrar</h2>
+
+            <p class="text-muted small mb-0">Faça login para acessar o sistema</p>
+          </div>
+
+          <!-- Tipo de login -->
+          <div class="row g-2 mb-4">
+            @for (t of types; track t.value) {
+              <div class="col-12 col-sm">
+                <button
+                  type="button"
+                  class="btn w-100"
+                  [class.btn-primary]="identifierType() === t.value"
+                  [class.btn-outline-primary]="identifierType() !== t.value"
+                  (click)="changeType(t.value)"
+                >
+                  {{ t.label }}
+                </button>
+              </div>
+            }
+          </div>
+
+          <!-- Formulário -->
+          <form (ngSubmit)="submit()">
+            <!-- Identificador -->
+            <div class="mb-3">
+              <label for="identifier" class="form-label fw-semibold">
+                {{ identifierLabel() }}
+              </label>
+
+              <div class="input-group">
+                <span class="input-group-text"> 👤 </span>
+
+                <input
+                  id="identifier"
+                  class="form-control form-control-lg"
+                  name="identifier"
+                  [type]="identifierType() === 'registerNumber' ? 'number' : 'text'"
+                  [ngModel]="identifier()"
+                  (ngModelChange)="identifier.set($event)"
+                  autocomplete="username"
+                  [placeholder]="
+                    identifierType() === 'registerNumber'
+                      ? 'Ex.: 12345'
+                      : 'Digite sua identificação'
+                  "
+                />
+              </div>
+            </div>
+
+            <!-- Senha -->
+            <div class="mb-3">
+              <label for="password" class="form-label fw-semibold"> Senha </label>
+
+              <div class="input-group">
+                <span class="input-group-text"> 🔒 </span>
+
+                <input
+                  id="password"
+                  class="form-control form-control-lg"
+                  name="password"
+                  [type]="showPassword() ? 'text' : 'password'"
+                  [ngModel]="password()"
+                  (ngModelChange)="password.set($event)"
+                  autocomplete="current-password"
+                  placeholder="Digite sua senha"
+                />
+
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary"
+                  (click)="togglePasswordVisibility()"
+                  [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'"
+                >
+                  <span class="d-none d-md-inline">
+                    {{ showPassword() ? 'Ocultar' : 'Mostrar' }}
+                  </span>
+
+                  <span class="d-md-none">
+                    {{ showPassword() ? '🙈' : '👁️' }}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Opções -->
+            <div
+              class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-4"
+            >
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="remember" />
+
+                <label class="form-check-label" for="remember"> Lembrar acesso </label>
+              </div>
+
+              <a href="#" class="small text-decoration-none"> Esqueceu a senha? </a>
+            </div>
+
+            <!-- Erro -->
+            @if (error(); as errorMessage) {
+              <div class="alert alert-danger" role="alert">
+                {{ errorMessage }}
+              </div>
+            }
+
+            <!-- Botão -->
+            <div class="d-grid mt-4">
+              <button type="submit" class="btn btn-primary btn-lg py-3" [disabled]="loading()">
+                @if (loading()) {
+                  <span
+                    class="spinner-border spinner-border-sm me-2"
+                    role="status"
+                    aria-hidden="true"
+                  ></span>
+
+                  Entrando...
+                } @else {
+                  Entrar no sistema
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

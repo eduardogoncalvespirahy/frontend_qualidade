@@ -6,5 +6,20 @@ export const LiderRoutes: Routes = [
     loadComponent: () => import('./dashboard/dashboard.component').then(c => c.DashboardComponent), 
     pathMatch: 'full' 
   },
+  // { 
+  //   path: '', 
+  //   loadComponent: () => import('./dashboard/dashboard.component').then(c => c.DashboardComponent), 
+  //   pathMatch: 'full' 
+  // },
+  // { 
+  //   path: '', 
+  //   loadComponent: () => import('./dashboard/dashboard.component').then(c => c.DashboardComponent), 
+  //   pathMatch: 'full' 
+  // },
+  // { 
+  //   path: '', 
+  //   loadComponent: () => import('./dashboard/dashboard.component').then(c => c.DashboardComponent), 
+  //   pathMatch: 'full' 
+  // },
   { path: '**', redirectTo: '' },
 ];

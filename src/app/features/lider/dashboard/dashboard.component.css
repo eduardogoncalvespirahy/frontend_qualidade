@@ -1,0 +1,12 @@
+.content {
+  min-height: 100vh;
+  background: #f8f9fa;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .content {
+    margin-left: 260px;
+    padding: 1.5rem;
+  }
+}

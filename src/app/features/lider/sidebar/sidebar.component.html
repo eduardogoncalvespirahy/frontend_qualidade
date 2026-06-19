@@ -1,0 +1,87 @@
+<!-- Botão mobile -->
+<nav class="navbar navbar-dark bg-dark d-md-none px-3">
+  <button
+    class="btn btn-outline-light"
+    type="button"
+    data-bs-toggle="offcanvas"
+    data-bs-target="#mobileSidebar"
+    aria-controls="mobileSidebar"
+  >
+    ☰
+  </button>
+
+  <span class="navbar-brand mb-0 h1">Qualidade</span>
+</nav>
+
+<!-- Sidebar desktop -->
+<aside class="sidebar d-none d-md-flex flex-column">
+  <div class="sidebar-header">
+    <h5>Sistema Qualidade</h5>
+    <small>Beneficiamento</small>
+  </div>
+
+  <nav class="sidebar-menu">
+    <a
+      *ngFor="let item of menuItems"
+      class="sidebar-link"
+      [routerLink]="item.route"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      <span class="sidebar-icon">{{ item.icon }}</span>
+      <span>{{ item.label }}</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <button class="btn btn-outline-light w-100">
+      Sair
+    </button>
+  </div>
+</aside>
+
+<!-- Sidebar mobile com Bootstrap Offcanvas -->
+<div
+  class="offcanvas offcanvas-start text-bg-dark"
+  tabindex="-1"
+  id="mobileSidebar"
+  aria-labelledby="mobileSidebarLabel"
+>
+  <div class="offcanvas-header">
+    <div>
+      <h5 class="offcanvas-title" id="mobileSidebarLabel">
+        Sistema Qualidade
+      </h5>
+      <small>Beneficiamento</small>
+    </div>
+
+    <button
+      type="button"
+      class="btn-close btn-close-white"
+      data-bs-dismiss="offcanvas"
+      aria-label="Fechar"
+    ></button>
+  </div>
+
+  <div class="offcanvas-body">
+    <nav class="sidebar-menu">
+      <a
+        *ngFor="let item of menuItems"
+        class="sidebar-link"
+        [routerLink]="item.route"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        data-bs-dismiss="offcanvas"
+      >
+        <span class="sidebar-icon">{{ item.icon }}</span>
+        <span>{{ item.label }}</span>
+      </a>
+    </nav>
+
+    <div class="mt-4">
+      <button class="btn btn-outline-light w-100">
+        Sair
+      </button>
+    </div>
+  </div>
+</div>

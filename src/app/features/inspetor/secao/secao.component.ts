@@ -25,7 +25,7 @@ export class SecaoComponent {
   protected readonly query = signal('');
 
   protected readonly page = signal(1);
-  protected readonly limit = signal(10);
+  protected readonly limit = signal(undefined);
   protected readonly total = signal(0);
   protected readonly totalPages = signal(0);
 

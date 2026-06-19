@@ -20,7 +20,7 @@
             'formulario',
             formularioId(),
           ]"
-          >secao</a
+          >formulario</a
         >
       </li>
     </ol>
@@ -28,6 +28,8 @@
 </div>
 
 <h2>Formulario {{ form()?.nome }}</h2>
+
+<h3>Parametros</h3>
 
 @if (answersResource.isLoading()) {
   <div class="text-center py-5">
@@ -43,28 +45,28 @@
     </div>
   </div>
 } @else {
-  @let forms = filtered();
+  @let answers = filtered();
 
-  @if (forms.length === 0) {
+  @if (answers.length === 0) {
     <div class="alert alert-warning">
       <strong>Nenhum parametro encontrado.</strong>
       <br />
       Ajuste o filtro ou cadastre parametros na tabela
-      <code>forms</code>.
+      <code>answers</code>.
     </div>
   } @else {
     <div class="list-group">
-      @for (form of forms; track form.id) {
+      @for (answer of answers; track answer.id) {
         <a
           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3"
-          [title]="form.descricao"
-          [routerLink]="['/inspetor/local', localId(), 'secao', secaoId(), 'formulario', form.id]"
+          [title]="answer.descricao"
+          [routerLink]="['/inspetor/local', localId(), 'secao', secaoId(), 'formulario', answer.id]"
         >
           <div>
-            <span class="badge bg-success me-2"> #{{ form.id }} </span>
+            <span class="badge bg-success me-2"> #{{ answer.id }} </span>
 
             <span class="fw-semibold">
-              {{ form.nome || 'parametro sem nome' }}
+              {{ answer.nome || 'parametro sem nome' }}
             </span>
           </div>
 

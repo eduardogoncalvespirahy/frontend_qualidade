@@ -27,7 +27,7 @@ export class FormularioComponent {
   protected readonly query = signal('');
 
   protected readonly page = signal(1);
-  protected readonly limit = signal(10);
+  protected readonly limit = signal(undefined);
   protected readonly total = signal(0);
   protected readonly totalPages = signal(0);
 
@@ -40,7 +40,7 @@ export class FormularioComponent {
   }
 
   private setContext(): void {
-    this.navigationContext.sectionId.set(this.route.snapshot.paramMap.get('secao_id')!);
+    this.navigationContext.formnId.set(this.route.snapshot.paramMap.get('formulario_id')!);
     this.formularioId.set(this.navigationContext.formnId() ?? '');
     this.secaoId.set(this.navigationContext.sectionId() ?? '');
     this.localId.set(this.navigationContext.locationId() ?? '');

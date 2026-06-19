@@ -12,7 +12,7 @@ export const InspetorRoutes: Routes = [
     loadComponent: () => import('./secao/secao.component').then((c) => c.SecaoComponent),
   },  
   {
-    path: 'local/:local_id/secao/:secao_id/formulario/:formualario_id',
+    path: 'local/:local_id/secao/:secao_id/formulario/:formulario_id',
     title: 'Formulario',
     loadComponent: () => import('./formulario/formulario.component').then((c) => c.FormularioComponent),
   },  

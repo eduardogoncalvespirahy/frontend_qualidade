@@ -23,7 +23,7 @@ export class HomeComponent {
   protected readonly query = signal('');
 
   protected readonly page = signal<number | undefined>(undefined);
-  protected readonly limit = signal<number | undefined>(10);
+  protected readonly limit = signal<number | undefined>(undefined);
 
   protected readonly locationsResource = rxResource<PaginatedResult<Location>, { page?: number; limit?: number }>({
     params: () => ({

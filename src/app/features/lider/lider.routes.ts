@@ -1,18 +1,15 @@
 import { Routes } from '@angular/router';
+import { DashboardComponent } from './dashboard/dashboard.component';
+import { ConfigComponent } from './config/config.component';
 
 export const LiderRoutes: Routes = [
   {
-    path: '',
-    loadComponent: () => import('./dashboard/dashboard.component').then((c) => c.DashboardComponent),
-    pathMatch: 'full',
-    // children: [
-    //   {
-    //     path: '/config',
-    //     loadChildren: () =>
-    //       import('./config/config.routes').then((c) => c.ConfigRoutes),
-    //     pathMatch: 'full',
-    //   }
-    // ],
-  },
-  { path: '**', redirectTo: '' },
+  path: '',
+  loadComponent: () => DashboardComponent,   // layout shell
+  children: [
+    // { path: '', loadComponent: () => , pathMatch: 'full' },
+    { path: 'config', loadComponent: () => ConfigComponent },
+  ]
+}
+
 ];

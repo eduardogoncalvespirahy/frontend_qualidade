@@ -56,46 +56,13 @@
 
     <!-- CONFIGURAÇÕES -->
 
-    <div class="menu-group">
-      <button class="menu-item menu-button" (click)="toggleConfig()">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-gear"></i>
+    <a routerLink="/lider/config" routerLinkActive="active" class="menu-item">
+      <i class="bi bi-gear"></i>
 
-          @if (!collapsed()) {
-            <span>Configurações</span>
-          }
-        </div>
-
-        @if (!collapsed()) {
-          <i
-            class="bi"
-            [class.bi-chevron-down]="!configOpen()"
-            [class.bi-chevron-up]="configOpen()"
-          >
-          </i>
-        }
-      </button>
-
-      @if (configOpen() && !collapsed()) {
-        <div class="submenu">
-          <a routerLink="/settings/equipments" routerLinkActive="active" class="submenu-item">
-            Gestão de Equipamentos
-          </a>
-
-          <a routerLink="/settings/rules" routerLinkActive="active" class="submenu-item">
-            Regras e Parâmetros
-          </a>
-
-          <a routerLink="/settings/forms" routerLinkActive="active" class="submenu-item">
-            Formulários Base
-          </a>
-
-          <a routerLink="/settings/users" routerLinkActive="active" class="submenu-item">
-            Gerenciar Usuários
-          </a>
-        </div>
+      @if (!collapsed()) {
+        <span>Configurações</span>
       }
-    </div>
+    </a>
   </nav>
 
   <!-- LOGOUT -->

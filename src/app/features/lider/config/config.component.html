@@ -1,4 +1,32 @@
-<h1>
-    configuracoes tops
-</h1>
-<router-outlet></router-outlet>
+<div class="accordion-item">
+  <div class="accordion-header" (click)="toggle('machine')">
+    Máquinas <span>{{ activeSection === 'machine' ? '↑' : '↓' }}</span>
+  </div>
+  @if (activeSection === 'machine') {
+    <div class="accordion-body">
+      <app-machine />
+    </div>
+  }
+</div>
+
+<div class="accordion-item">
+  <div class="accordion-header" (click)="toggle('param')">
+    Parametros <span>{{ activeSection === 'param' ? '↑' : '↓' }}</span>
+  </div>
+  @if (activeSection === 'param') {
+    <div class="accordion-body">
+      <app-param />
+    </div>
+  }
+</div>
+
+<div class="accordion-item">
+  <div class="accordion-header" (click)="toggle('registration')">
+    Cadastro <span>{{ activeSection === 'registration' ? '↑' : '↓' }}</span>
+  </div>
+  @if (activeSection === 'registration') {
+    <div class="accordion-body">
+      <app-registration />
+    </div>
+  }
+</div>

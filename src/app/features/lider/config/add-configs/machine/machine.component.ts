@@ -15,9 +15,6 @@ import { FormService } from '../../../../../core/services/form.service';
 import { MachineService } from '../../../../../core/services/machine.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 
-import { EditMachineComponent, EditMachineResult } from '../../../modal/edit-machine/edit-machine.component';
-import { NewMachineComponent } from '../../../modal/new-machine/new-machine.component';
-
 @Component({
   selector: 'app-machine',
   standalone: true,
@@ -129,32 +126,32 @@ export class MachineComponent {
   }
 
   protected openNew(): void {
-    const ref = this.modalService.open({
-      title: 'Nova Máquina',
-      component: NewMachineComponent,
-      size: 'lg',
-      data: {
-        locations: this.locations(),
-        sections: this.sections(),
-        forms: this.forms(),
-      },
-    });
+    // const ref = this.modalService.open({
+    //   title: 'Nova Máquina',
+    //   component: NewMachineComponent,
+    //   size: 'lg',
+    //   data: {
+    //     locations: this.locations(),
+    //     sections: this.sections(),
+    //     forms: this.forms(),
+    //   },
+    // });
 
-    ref.result.then((created) => {
-      if (created) this.machinesResource.reload();
-    });
+    // ref.result.then((created) => {
+    //   if (created) this.machinesResource.reload();
+    // });
   }
 
   protected openEdit(machine: Machine, form: Form | null, section: Section | null): void {
-    const ref = this.modalService.open({
-      title: 'Editar Máquina',
-      component: EditMachineComponent,
-      size: 'lg',
-      data: { machine, form, section },
-    });
+    // const ref = this.modalService.open({
+    //   title: 'Editar Máquina',
+    //   component: EditMachineComponent,
+    //   size: 'lg',
+    //   data: { machine, form, section },
+    // });
 
-    ref.result.then((result: EditMachineResult | undefined) => {
-      if (result) this.machinesResource.reload();
-    });
+    // ref.result.then((result: EditMachineResult | undefined) => {
+    //   if (result) this.machinesResource.reload();
+    // });
   }
 }

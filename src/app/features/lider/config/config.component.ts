@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
-import { RouterModule, RouterOutlet } from '@angular/router';
+import { RouterModule } from '@angular/router';
 import { MachineComponent } from './add-configs/machine/machine.component';
 import { RegistrationComponent } from "./add-configs/registration/registration.component";
 import { ParamComponent } from "./add-configs/param/param.component";
 
 @Component({
   selector: 'app-config',
-  imports: [RouterModule, RouterOutlet, MachineComponent, RegistrationComponent, ParamComponent],
+  imports: [RouterModule, MachineComponent, RegistrationComponent, ParamComponent],
   templateUrl: './config.component.html',
   styleUrl: './config.component.css',
 })

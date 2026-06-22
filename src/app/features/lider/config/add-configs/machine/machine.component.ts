@@ -13,6 +13,10 @@ import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { FormService } from '../../../../../core/services/form.service';
 import { MachineService } from '../../../../../core/services/machine.service';
+import { ModalService } from '../../../../../core/services/modal.service';
+
+import { EditMachineComponent, EditMachineResult } from '../../../modal/edit-machine/edit-machine.component';
+import { NewMachineComponent } from '../../../modal/new-machine/new-machine.component';
 
 @Component({
   selector: 'app-machine',
@@ -28,6 +32,7 @@ export class MachineComponent {
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
   private readonly machineService = inject(MachineService);
+  private readonly modalService = inject(ModalService);
 
   protected readonly query = signal('');
 
@@ -123,14 +128,33 @@ export class MachineComponent {
     return status === 1 ? 'Ativo' : 'Inativo';
   }
 
-  protected newMachine(){
+  protected openNew(): void {
+    const ref = this.modalService.open({
+      title: 'Nova Máquina',
+      component: NewMachineComponent,
+      size: 'lg',
+      data: {
+        locations: this.locations(),
+        sections: this.sections(),
+        forms: this.forms(),
+      },
+    });
 
+    ref.result.then((created) => {
+      if (created) this.machinesResource.reload();
+    });
   }
-  protected removeMachine(){
 
-  }
-  protected editMachine(){
+  protected openEdit(machine: Machine, form: Form | null, section: Section | null): void {
+    const ref = this.modalService.open({
+      title: 'Editar Máquina',
+      component: EditMachineComponent,
+      size: 'lg',
+      data: { machine, form, section },
+    });
 
+    ref.result.then((result: EditMachineResult | undefined) => {
+      if (result) this.machinesResource.reload();
+    });
   }
-  
 }

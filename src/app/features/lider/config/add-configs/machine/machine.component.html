@@ -9,8 +9,11 @@
         placeholder="Buscar máquina..."
         (input)="onSearch($any($event.target).value)"
       />
-      <button class="btn btn-sm btn-outline-secondary" (click)="reload()">
+      <button class="btn btn-sm btn-outline-secondary" (click)="reload()" title="Recarregar">
         <i class="bi bi-arrow-clockwise"></i>
+      </button>
+      <button class="btn btn-sm btn-primary" (click)="openNew()">
+        <i class="bi bi-plus-lg me-1"></i>Nova Máquina
       </button>
     </div>
   </div>
@@ -43,6 +46,7 @@
                   <th>Formulário</th>
                   <th>Seção</th>
                   <th>Status</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -59,6 +63,15 @@
                       >
                         {{ statusLabel(item.machine.status) }}
                       </span>
+                    </td>
+                    <td>
+                      <button
+                        class="btn btn-sm btn-outline-secondary"
+                        (click)="openEdit(item.machine, item.form, item.section)"
+                        title="Editar"
+                      >
+                        <i class="bi bi-pencil"></i>
+                      </button>
                     </td>
                   </tr>
                 }

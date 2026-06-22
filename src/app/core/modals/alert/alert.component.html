@@ -1,0 +1,9 @@
+<div class="d-flex gap-3 align-items-start">
+  <span class="dialog-icon" [class]="'dialog-icon text-' + variant()">{{ glyph() }}</span>
+  <div>
+    @if (heading()) {
+      <p class="fw-semibold mb-1">{{ heading() }}</p>
+    }
+    <p class="mb-0 text-body-secondary">{{ message() }}</p>
+  </div>
+</div>

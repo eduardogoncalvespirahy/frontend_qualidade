@@ -1,0 +1,9 @@
+<div class="d-flex gap-3 align-items-start">
+  <span class="dialog-icon text-primary">?</span>
+  <div>
+    <p class="mb-0">{{ message() }}</p>
+    @if (details()) {
+      <p class="mb-0 mt-1 small text-body-secondary">{{ details() }}</p>
+    }
+  </div>
+</div>

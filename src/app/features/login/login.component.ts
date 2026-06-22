@@ -93,10 +93,8 @@ export class LoginComponent {
     }
 
     this.loading.set(true);
-
-    if (this.rememberAccess()) {
-      this.lembrarAcesso();
-    }
+    
+    this.lembrarAcesso(this.rememberAccess());
 
     this.auth
       .login(request)
@@ -115,24 +113,53 @@ export class LoginComponent {
       });
   }
 
-  protected lembrarAcesso(): void {
-    const data = {
-      identifierType: this.identifierType(),
-      identifier: this.identifier().trim(),
-      password: this.password(),
-    };
+  protected lembrarAcesso(status: boolean): void {
+    if (!status) {
+      this.rememberAccess.set(false);
+      this.cookieService.delete('acesso');
+      return;
+    }
 
-    this.cookieService.set('acesso', JSON.stringify(data));
+    const identifier = this.identifier().trim();
+
+    if (!identifier) {
+      return;
+    }
+
+    this.cookieService.set(
+      'acesso',
+      JSON.stringify({
+        identifierType: this.identifierType(),
+        identifier,
+        rememberAccess: true,
+      }),
+      {
+        path: '/',
+        sameSite: 'Strict',
+        secure: location.protocol === 'https:',
+      },
+    );
   }
 
   protected recuperarAcesso(): void {
     const acessoCookie = this.cookieService.get('acesso');
 
-    if (acessoCookie) {
+    if (!acessoCookie) {
+      return;
+    }
+
+    try {
       const data = JSON.parse(acessoCookie);
-      this.identifierType.set(data.identifierType);
-      this.identifier.set(data.identifier);
-      this.password.set(data.password);
+
+      this.identifierType.set(data.identifierType ?? '');
+
+      this.identifier.set(data.identifier?.trim() ?? '');
+
+      this.rememberAccess.set(Boolean(data.rememberAccess));
+    } catch (error) {
+      console.error('Cookie de acesso inválido.', error);
+
+      this.cookieService.delete('acesso');
     }
   }
 }

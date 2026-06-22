@@ -54,6 +54,7 @@ export class AuthService {
   }
 
   private clear(): void {
-    this.cookie.clear();
+    this.cookie.delete(TOKEN_KEY);
+    this.cookie.delete(REFRESH_KEY);
   }
 }

@@ -125,33 +125,8 @@ export class MachineComponent {
     return status === 1 ? 'Ativo' : 'Inativo';
   }
 
-  protected openNew(): void {
-    // const ref = this.modalService.open({
-    //   title: 'Nova Máquina',
-    //   component: NewMachineComponent,
-    //   size: 'lg',
-    //   data: {
-    //     locations: this.locations(),
-    //     sections: this.sections(),
-    //     forms: this.forms(),
-    //   },
-    // });
+  protected openNew(): void {}
 
-    // ref.result.then((created) => {
-    //   if (created) this.machinesResource.reload();
-    // });
-  }
+  protected openEdit(): void {}
 
-  protected openEdit(machine: Machine, form: Form | null, section: Section | null): void {
-    // const ref = this.modalService.open({
-    //   title: 'Editar Máquina',
-    //   component: EditMachineComponent,
-    //   size: 'lg',
-    //   data: { machine, form, section },
-    // });
-
-    // ref.result.then((result: EditMachineResult | undefined) => {
-    //   if (result) this.machinesResource.reload();
-    // });
-  }
 }

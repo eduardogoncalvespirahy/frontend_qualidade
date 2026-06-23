@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  output,
+  signal,
+} from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 
 import { Employer } from '../../../../../core/models/employer.model';
@@ -129,7 +136,7 @@ export class MachineComponent {
     return status === 1 ? 'Ativo' : 'Inativo';
   }
 
-  async novo(): Promise<Machine | null> {
+  async novo(): Promise<void> {
     const ref = this.modalService.openComponent(FormComponent, {
       title: 'Nova maquina',
       size: 'lg',
@@ -141,17 +148,54 @@ export class MachineComponent {
       ],
     });
 
-    const confirmado = await ref.result;
-    return confirmado ? ref.instance.value() : null;
+    const confirmed = await ref.result;
+
+    if (!confirmed) {
+      return;
+    }
+
+    const value = ref.instance.value();
+
+    this.machineService
+      .create({
+        formId: value.formId,
+        nome: value.nome,
+        descricao: value.descricao,
+        status: value.status,
+      })
+      .subscribe({
+        next: () => {
+          this.handleMachineChange(true);
+        },
+      });
   }
 
   async detalhar(machine: Machine): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
       title: `Maquina: ${machine.nome} - Id: ${machine.id}`,
       inputs: { machine },
+      outputs: {
+        reload_return: (value: unknown) => {
+          if (typeof value === 'boolean') {
+            if (value) {
+              ref.close();
+            }
+            this.handleMachineChange(value);
+          }
+        },
+      },
       buttons: [{ text: 'Fechar', variant: 'secondary', value: true }],
     });
-    return ref.result.then(() => undefined);
+
+    const confirmed = await ref.result.then(() => undefined);
+
+    return confirmed;
+  }
+
+  handleMachineChange(result: boolean): void {
+    if (result) {
+      this.reload();
+    }
   }
 
   // async editar(machine: Machine): Promise<Machine | null> {

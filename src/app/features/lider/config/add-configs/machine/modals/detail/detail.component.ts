@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { Machine } from '../../../../../../../core/models/machine.model';
 import { CommonModule } from '@angular/common';
 import { ModalService } from '../../../../../../../core/services/modal.service';
@@ -18,6 +18,7 @@ export class DetailComponent {
   private readonly machineService = inject(MachineService);
 
   readonly machine = input.required<Machine>();
+  readonly reload_return = output<boolean>();
 
   protected readonly isActive = computed(() => this.machine().status === 1);
 
@@ -66,7 +67,11 @@ export class DetailComponent {
         descricao: value.descricao,
         status: value.status,
       })
-      .subscribe();
+      .subscribe({
+        next: () => {
+          this.reload_return.emit(true);
+        },
+      });
   }
 
   protected async deletar(machine: Machine): Promise<boolean> {
@@ -95,7 +100,12 @@ export class DetailComponent {
       return false;
     }
 
-    this.machineService.delete(machine.id).subscribe();
+    this.machineService.delete(machine.id).subscribe({
+      next: () => {
+        this.reload_return.emit(true);
+        ref.close();
+      },
+    });
 
     return true;
   }

@@ -1,32 +1,57 @@
-.card {
-  border-radius: 1.25rem;
+.container-card {
+  height: 100%;
+}
+
+.container-card > .card {
+  height: 100%;
+  border-radius: 0;
+  border: none;
+
+  display: flex;
+  flex-direction: column;
 }
 
 .hero-section {
+  flex-shrink: 0;
+
   padding: 2rem;
+
   background: var(--bs-tertiary-bg);
 
   border-bottom: 1px solid var(--bs-border-color);
 }
 
-.hero-label {
-  font-size: 0.875rem;
-  color: var(--bs-secondary-color);
+.card-body {
+  flex: 1;
 
-  margin-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+
+  gap: 1rem;
+
+  overflow: hidden;
 }
 
-.hero-title {
-  margin: 0;
-
-  font-size: 1.75rem;
-  font-weight: 700;
+.detail-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.hero-subtitle {
-  margin-top: 0.5rem;
+.description-panel {
+  flex: 1;
 
-  color: var(--bs-secondary-color);
+  padding: 1.5rem;
+
+  border-radius: 1rem;
+
+  background: var(--bs-tertiary-bg);
+
+  overflow-y: auto;
+}
+
+.card-footer {
+  flex-shrink: 0;
 }
 
 .overview-card {
@@ -34,19 +59,11 @@
   align-items: center;
   gap: 1rem;
 
-  width: 100%;
-
   padding: 1rem;
 
   border-radius: 1rem;
 
   background: var(--bs-tertiary-bg);
-
-  transition: all 0.2s ease;
-}
-
-.overview-card:hover {
-  transform: translateY(-2px);
 }
 
 .overview-icon {
@@ -57,60 +74,11 @@
   align-items: center;
   justify-content: center;
 
-  flex-shrink: 0;
-
   border-radius: 14px;
+
+  flex-shrink: 0;
 
   background: rgba(var(--bs-primary-rgb), 0.1);
 
   color: var(--bs-primary);
-
-  font-size: 1.25rem;
-}
-
-.description-panel {
-  padding: 1.5rem;
-
-  border-radius: 1rem;
-
-  background: var(--bs-tertiary-bg);
-}
-
-.detail-container {
-  height: 100%;
-  max-height: 80vh;
-
-  display: flex;
-  flex-direction: column;
-}
-
-.card-body {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.card-footer {
-  flex-shrink: 0;
-}
-
-.hero-section {
-  flex-shrink: 0;
-}
-
-.btn {
-  border-radius: 0.75rem;
-}
-
-@media (max-width: 768px) {
-  .hero-section {
-    padding: 1.5rem;
-  }
-
-  .hero-title {
-    font-size: 1.35rem;
-  }
-
-  .card-footer .d-flex {
-    flex-direction: column;
-  }
 }

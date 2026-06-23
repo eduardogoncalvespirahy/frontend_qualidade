@@ -172,7 +172,8 @@ export class MachineComponent {
 
   async detalhar(machine: Machine): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
-      title: `Maquina: ${machine.nome} - Id: ${machine.id}`,
+      title: `Detalhe`,
+      size: 'lg',      
       inputs: { machine },
       outputs: {
         reload_return: (value: unknown) => {

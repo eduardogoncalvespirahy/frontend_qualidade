@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { Modal } from 'bootstrap';
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'fullscreen';
 
 /* -------------------------------------------------------------------------- */
 /* Blocos de conteúdo (modo declarativo)                                       */
@@ -278,10 +278,15 @@ export class ModalService {
     dialog.className = 'modal-dialog';
     if (centered) dialog.classList.add('modal-dialog-centered');
     if (scrollable) dialog.classList.add('modal-dialog-scrollable');
-    if (size) dialog.classList.add(`modal-${size}`);
+    if (size === 'fullscreen') {
+      dialog.classList.add('modal-fullscreen');
+    } else if (size) {
+      dialog.classList.add(`modal-${size}`);
+    }
 
     const contentEl = doc.createElement('div');
     contentEl.className = 'modal-content';
+    contentEl.style.height = '100%';
 
     if (title || showClose) {
       const header = doc.createElement('div');
@@ -304,7 +309,11 @@ export class ModalService {
     }
 
     const bodyEl = doc.createElement('div');
-    bodyEl.className = 'modal-body';
+    bodyEl.className = 'modal-body p-0';
+    bodyEl.style.display = 'flex';
+    bodyEl.style.flexDirection = 'column';
+    bodyEl.style.minHeight = '0';
+
     contentEl.appendChild(bodyEl);
 
     let footer: HTMLElement | null = null;

@@ -1,1 +1,96 @@
-<p>form works!</p>
+<div class="machine-form">
+  <div class="form-header">
+    <div class="header-icon">
+      <i class="bi bi-cpu"></i>
+    </div>
+
+    <div>
+      <h4 class="mb-1">
+        {{ mode() === 'new' ? 'Nova Máquina' : 'Editar Máquina' }}
+      </h4>
+
+      <p class="text-muted mb-0">Configure as informações da máquina.</p>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="row g-4">
+      <!-- Formulário -->
+
+      <div class="col-lg-6">
+        <label for="formId" class="form-label"> Formulário </label>
+
+        <select id="formId" name="formId" class="form-select" required [(ngModel)]="formId">
+          <option value="">Selecione um formulário</option>
+
+          @for (form of forms(); track form.id) {
+            <option [value]="form.id">
+              {{ form.nome }}
+            </option>
+          }
+        </select>
+      </div>
+
+      <!-- Status -->
+
+      <div class="col-lg-6">
+        <label class="form-label"> Status </label>
+
+        <div class="status-card">
+          <div>
+            <div class="status-title">Máquina</div>
+
+            <div class="status-value">
+              @if (status) {
+                Ativa
+              } @else {
+                Inativa
+              }
+            </div>
+          </div>
+
+          <div class="form-check form-switch">
+            <input
+              id="status"
+              name="status"
+              type="checkbox"
+              class="form-check-input"
+              [(ngModel)]="status"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Nome -->
+
+      <div class="col-12">
+        <label for="nome" class="form-label"> Nome da Máquina </label>
+
+        <input
+          id="nome"
+          name="nome"
+          type="text"
+          class="form-control"
+          required
+          [(ngModel)]="nome"
+          placeholder="Informe o nome da máquina"
+        />
+      </div>
+
+      <!-- Descrição -->
+
+      <div class="col-12">
+        <label for="descricao" class="form-label"> Descrição </label>
+
+        <textarea
+          id="descricao"
+          name="descricao"
+          class="form-control"
+          rows="5"
+          [(ngModel)]="descricao"
+          placeholder="Descrição da máquina"
+        ></textarea>
+      </div>
+    </div>
+  </div>
+</div>

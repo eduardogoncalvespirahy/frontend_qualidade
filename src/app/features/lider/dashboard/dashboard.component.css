@@ -1,11 +1,126 @@
-.content {
-  margin-left: 280px;
-  padding: 1.5rem;
-  transition: all .25s ease;
+:host {
+  display: block;
+  height: 100vh;
 }
 
-@media (max-width: 991px) {
-  .content {
-    margin-left: 0;
+/* ==========================================================
+   LAYOUT
+========================================================== */
+
+.app-layout {
+  display: flex;
+
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(var(--bs-primary-rgb), 0.03),
+      transparent 25%
+    ),
+    var(--bs-body-tertiary-bg);
+}
+
+/* ==========================================================
+   CONTEÚDO
+========================================================== */
+
+.page-content {
+  flex: 1;
+
+  min-width: 0;
+
+  height: 100vh;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  padding: 2rem;
+
+  transition: all 0.25s ease;
+}
+
+/* ==========================================================
+   CONTAINER PADRÃO
+========================================================== */
+
+.page-container {
+  width: 100%;
+  max-width: 1600px;
+
+  margin: 0 auto;
+}
+
+/* ==========================================================
+   SCROLLBAR
+========================================================== */
+
+.page-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.page-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+
+  border-radius: 999px;
+}
+
+.page-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ==========================================================
+   NOTEBOOK
+========================================================== */
+
+@media (max-width: 1400px) {
+  .page-content {
+    padding: 1.75rem;
+  }
+}
+
+/* ==========================================================
+   TABLET
+========================================================== */
+
+@media (max-width: 992px) {
+  .page-content {
+    padding: 1.5rem;
+  }
+}
+
+/* ==========================================================
+   MOBILE
+========================================================== */
+
+@media (max-width: 768px) {
+  .page-content {
+    padding:
+      calc(70px + 1rem)
+      1rem
+      1rem
+      1rem;
+  }
+
+  .page-container {
+    max-width: 100%;
+  }
+}
+
+/* ==========================================================
+   MOBILE PEQUENO
+========================================================== */
+
+@media (max-width: 480px) {
+  .page-content {
+    padding:
+      calc(70px + 0.75rem)
+      0.75rem
+      0.75rem
+      0.75rem;
   }
 }

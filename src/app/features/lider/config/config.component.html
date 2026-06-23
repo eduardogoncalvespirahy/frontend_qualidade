@@ -1,32 +1,107 @@
-<div class="accordion-item">
-  <div class="accordion-header" (click)="toggle('machine')">
-    Máquinas <span>{{ activeSection === 'machine' ? '↑' : '↓' }}</span>
-  </div>
-  @if (activeSection === 'machine') {
-    <div class="accordion-body">
-      <app-machine />
-    </div>
-  }
-</div>
+<div class="config-page">
 
-<div class="accordion-item">
-  <div class="accordion-header" (click)="toggle('param')">
-    Parametros <span>{{ activeSection === 'param' ? '↑' : '↓' }}</span>
-  </div>
-  @if (activeSection === 'param') {
-    <div class="accordion-body">
-      <app-param />
-    </div>
-  }
-</div>
+  <div class="config-card">
 
-<div class="accordion-item">
-  <div class="accordion-header" (click)="toggle('registration')">
-    Cadastro <span>{{ activeSection === 'registration' ? '↑' : '↓' }}</span>
+    <!-- SIDEBAR -->
+
+    <aside class="config-sidebar">
+
+      <div class="sidebar-header">
+
+        <div class="sidebar-logo">
+          <i class="bi bi-gear-fill"></i>
+        </div>
+
+        <div>
+          <h5 class="mb-0 fw-bold">
+            Configurações
+          </h5>
+
+          <small class="text-muted">
+            Administração do sistema
+          </small>
+        </div>
+
+      </div>
+
+      <nav class="config-nav">
+
+        @for (section of sections; track section.key) {
+
+          <button
+            type="button"
+            class="config-nav-item"
+            [class.active]="activeSection() === section.key"
+            (click)="activeSection.set(section.key)"
+          >
+
+            <i
+              class="bi"
+              [class]="section.icon"
+            ></i>
+
+            <div>
+
+              <div class="nav-title">
+                {{ section.label }}
+              </div>
+
+              <div class="nav-description">
+                {{ section.description }}
+              </div>
+
+            </div>
+
+          </button>
+
+        }
+
+      </nav>
+
+    </aside>
+
+    <!-- CONTEÚDO -->
+
+    <main class="config-content">
+
+      <div class="content-header">
+
+        <div>
+
+          <h2 class="content-title">
+            {{ pageTitles[activeSection()] }}
+          </h2>
+
+          <p class="content-description">
+            {{ pageDescriptions[activeSection()] }}
+          </p>
+
+        </div>
+
+      </div>
+
+      <div class="content-body">
+
+        @switch (activeSection()) {
+
+          @case ('machine') {
+            <app-machine />
+          }
+
+          @case ('param') {
+            <app-param />
+          }
+
+          @case ('registration') {
+            <app-registration />
+          }
+
+        }
+
+      </div>
+
+    </main>
+
   </div>
-  @if (activeSection === 'registration') {
-    <div class="accordion-body">
-      <app-registration />
-    </div>
-  }
+
 </div>

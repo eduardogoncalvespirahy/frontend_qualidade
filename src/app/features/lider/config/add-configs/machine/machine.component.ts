@@ -14,6 +14,9 @@ import { SectionService } from '../../../../../core/services/section.service';
 import { FormService } from '../../../../../core/services/form.service';
 import { MachineService } from '../../../../../core/services/machine.service';
 import { ModalService } from '../../../../../core/services/modal.service';
+import { FormComponent } from './modals/form/form.component';
+import { DetailComponent } from './modals/detail/detail.component';
+import { ListComponent } from './modals/list/list.component';
 
 @Component({
   selector: 'app-machine',
@@ -63,8 +66,7 @@ export class MachineComponent {
     if (!term) return this.machines();
     return this.machines().filter(
       (m) =>
-        m.nome.toLowerCase().includes(term) ||
-        (m.descricao ?? '').toLowerCase().includes(term),
+        m.nome.toLowerCase().includes(term) || (m.descricao ?? '').toLowerCase().includes(term),
     );
   });
 
@@ -85,7 +87,9 @@ export class MachineComponent {
         .filter((m) => formIds.has(m.formId))
         .map((m) => {
           const form = employerForms.find((f) => f.id === m.formId) ?? null;
-          const section = form ? employerSections.find((s) => s.id === form.sectionId) ?? null : null;
+          const section = form
+            ? (employerSections.find((s) => s.id === form.sectionId) ?? null)
+            : null;
           return { machine: m, form, section };
         });
 
@@ -125,8 +129,65 @@ export class MachineComponent {
     return status === 1 ? 'Ativo' : 'Inativo';
   }
 
-  protected openNew(): void {}
+  async novo(): Promise<Machine | null> {
+    const ref = this.modalService.openComponent(FormComponent, {
+      title: 'Nova maquina',
+      size: 'lg',
+      backdrop: 'static',
+      inputs: { mode: 'new' },
+      buttons: [
+        { text: 'Cancelar', variant: 'secondary', value: false },
+        { text: 'Criar', variant: 'primary', value: true, submit: true },
+      ],
+    });
 
-  protected openEdit(): void {}
+    const confirmado = await ref.result;
+    return confirmado ? ref.instance.value() : null;
+  }
 
+  async detalhar(machine: Machine): Promise<void> {
+    const ref = this.modalService.openComponent(DetailComponent, {
+      title: `Maquina: ${machine.nome} - Id: ${machine.id}`,
+      inputs: { machine },
+      buttons: [{ text: 'Fechar', variant: 'secondary', value: true }],
+    });
+    return ref.result.then(() => undefined);
+  }
+
+  // async editar(machine: Machine): Promise<Machine | null> {
+  //   const ref = this.modalService.openComponent(FormComponent, {
+  //     title: `Editar: ${machine.nome} - Id: ${machine.id}`,
+  //     size: 'lg',
+  //     backdrop: 'static',
+  //     inputs: { mode: 'edit', machine },
+  //     buttons: [
+  //       { text: 'Cancelar', variant: 'secondary', value: false },
+  //       { text: 'Salvar', variant: 'primary', value: true, submit: true },
+  //     ],
+  //   });
+
+  //   const confirmado = await ref.result;
+  //   return confirmado ? ref.instance.value() : null;
+  // }
+
+  // async listar(machines: Machine[]): Promise<Machine | null> {
+  //   return new Promise<Machine | null>((resolve) => {
+  //     const ref = this.modalService.openComponent(ListComponent, {
+  //       title: 'Maquinas',
+  //       size: 'lg',
+  //       scrollable: true,
+  //       inputs: { machines },
+  //       outputs: {
+  //         select: (u) => {
+  //           resolve(u as Machine);
+  //           ref.close();
+  //         },
+  //       },
+  //       buttons: [{ text: 'Fechar', variant: 'secondary', value: false }],
+  //     });
+
+  //     // fechou sem selecionar (resolve só tem efeito uma vez)
+  //     ref.result.then(() => resolve(null));
+  //   });
+  // }
 }

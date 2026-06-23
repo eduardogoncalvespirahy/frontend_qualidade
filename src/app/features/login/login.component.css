@@ -1,0 +1,312 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.login-layout {
+  min-height: 100vh;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(420px, 1fr)
+    minmax(420px, 540px);
+
+  background:
+    radial-gradient(circle at top left, rgba(var(--bs-primary-rgb), 0.08), transparent 40%),
+    radial-gradient(circle at bottom right, rgba(var(--bs-primary-rgb), 0.05), transparent 40%),
+    var(--bs-body-bg);
+}
+
+/* ==========================================================
+   PAINEL ESQUERDO
+========================================================== */
+
+.login-brand-panel {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 4rem;
+
+  overflow: hidden;
+}
+
+.login-brand-panel::before {
+  content: '';
+
+  position: absolute;
+  inset: 0;
+
+  background: linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.04), transparent);
+}
+
+.brand-content {
+  position: relative;
+  z-index: 2;
+
+  width: 100%;
+  max-width: 540px;
+}
+
+.brand-logo {
+  width: 90px;
+  height: 90px;
+
+  border-radius: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(var(--bs-primary-rgb), 0.12);
+
+  color: var(--bs-primary);
+
+  font-size: 2.5rem;
+
+  margin-bottom: 2rem;
+}
+
+.brand-content h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.brand-features {
+  margin-top: 2.5rem;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+
+  gap: 1rem;
+
+  padding: 1rem 1.25rem;
+
+  margin-bottom: 1rem;
+
+  border-radius: 1rem;
+
+  background: var(--bs-body-bg);
+
+  border: 1px solid var(--bs-border-color);
+}
+
+.feature-item i {
+  color: var(--bs-success);
+  font-size: 1.1rem;
+}
+
+/* ==========================================================
+   LOGIN
+========================================================== */
+
+.login-form-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 2rem;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 460px;
+
+  padding: 2rem;
+
+  border-radius: 1.75rem;
+
+  background: rgba(255, 255, 255, 0.8);
+
+  backdrop-filter: blur(12px);
+
+  border: 1px solid rgba(255, 255, 255, 0.4);
+
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.08),
+    0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.login-avatar {
+  width: 88px;
+  height: 88px;
+
+  margin: 0 auto;
+
+  border-radius: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(var(--bs-primary-rgb), 0.1);
+
+  color: var(--bs-primary);
+
+  font-size: 2rem;
+}
+
+.login-avatar i {
+  font-size: 2rem;
+}
+
+/* ==========================================================
+   TIPO LOGIN
+========================================================== */
+
+.login-type {
+  display: flex;
+
+  padding: 0.35rem;
+
+  background: var(--bs-tertiary-bg);
+
+  border-radius: 0.9rem;
+}
+
+.login-type-btn {
+  flex: 1;
+
+  border: none;
+
+  background: transparent;
+
+  padding: 0.9rem;
+
+  border-radius: 0.75rem;
+
+  font-size: 0.95rem;
+
+  transition: all 0.25s ease;
+}
+
+.login-type-btn:hover {
+  background: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+.login-type-btn.active {
+  background: white;
+
+  font-weight: 600;
+
+  color: var(--bs-primary);
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ==========================================================
+   INPUTS
+========================================================== */
+
+.form-floating > .form-control {
+  min-height: 58px;
+
+  border-radius: 0.9rem;
+
+  border: 1px solid var(--bs-border-color);
+
+  box-shadow: none;
+}
+
+.form-floating > .form-control:focus {
+  border-color: var(--bs-primary);
+
+  box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.15);
+}
+
+.input-group .btn {
+  border-radius: 0 0.9rem 0.9rem 0;
+}
+
+/* ==========================================================
+   BOTÃO LOGIN
+========================================================== */
+
+.btn-primary {
+  border-radius: 0.9rem;
+
+  font-weight: 600;
+
+  min-height: 54px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+/* ==========================================================
+   ALERT
+========================================================== */
+
+.alert {
+  border-radius: 0.9rem;
+}
+
+/* ==========================================================
+   TABLET
+========================================================== */
+
+@media (max-width: 1200px) {
+  .login-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .login-brand-panel {
+    display: none !important;
+  }
+}
+
+/* ==========================================================
+   MOBILE
+========================================================== */
+
+@media (max-width: 768px) {
+  .login-form-panel {
+    padding: 1rem;
+  }
+
+  .login-container {
+    padding: 1.5rem;
+    border-radius: 1.25rem;
+  }
+
+  .login-avatar {
+    width: 72px;
+    height: 72px;
+  }
+
+  .login-type {
+    flex-direction: column;
+    gap: 0.5rem;
+    background: transparent;
+    padding: 0;
+  }
+
+  .login-type-btn {
+    border: 1px solid var(--bs-border-color);
+  }
+}
+
+/* ==========================================================
+   CELULAR PEQUENO
+========================================================== */
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 1.25rem;
+  }
+
+  .login-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 1.5rem;
+  }
+
+  .btn-primary {
+    min-height: 50px;
+  }
+}

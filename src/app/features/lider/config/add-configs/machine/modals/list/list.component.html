@@ -1,1 +1,137 @@
-<p>list works!</p>
+<div class="container-fluid py-4">
+  <!-- Header -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-3 align-items-center">
+        <div class="col-lg">
+          <h3 class="fw-bold mb-1">Máquinas</h3>
+
+          <div class="text-muted">Gerencie as máquinas cadastradas</div>
+        </div>
+
+        <div class="col-lg-auto">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="bi bi-search"></i>
+            </span>
+
+            <input
+              type="search"
+              class="form-control"
+              placeholder="Buscar máquina..."
+              (input)="onSearch($any($event.target).value)"
+            />
+          </div>
+        </div>
+
+        <div class="col-lg-auto">
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" (click)="reload()">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+
+            <button class="btn btn-primary" (click)="novo()">
+              <i class="bi bi-plus-lg me-1"></i>
+              Nova Máquina
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center py-5">
+      <div class="spinner-border text-primary"></div>
+    </div>
+  } @else if (hasError()) {
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      Erro ao carregar os dados.
+
+      <button class="btn btn-sm btn-outline-danger ms-3" (click)="reload()">
+        Tentar novamente
+      </button>
+    </div>
+  } @else {
+    @for (group of grouped(); track group.location.id) {
+      <div class="mb-5">
+        <!-- Cabeçalho do Local -->
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="d-flex align-items-center">
+            <div
+              class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center me-3"
+              style="width: 48px; height: 48px"
+            >
+              <i class="bi bi-geo-alt-fill"></i>
+            </div>
+
+            <div>
+              <h5 class="mb-0">
+                {{ group.location.nome }}
+              </h5>
+
+              <small class="text-muted"> {{ group.machines.length }} máquinas </small>
+            </div>
+          </div>
+        </div>
+
+        @if (group.machines.length === 0) {
+          <div class="card border-0 bg-light">
+            <div class="card-body text-center text-muted">Nenhuma máquina encontrada</div>
+          </div>
+        } @else {
+          <div class="row g-3">
+            @for (item of group.machines; track item.machine.id) {
+              <div class="col-12 col-md-6 col-xl-4">
+                <div
+                  class="card border-0 shadow-sm h-100 machine-card"
+                  role="button"
+                  (click)="detalhar(item.machine)"
+                >
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                      <h6 class="fw-bold mb-0">
+                        {{ item.machine.nome }}
+                      </h6>
+
+                      <span
+                        class="badge"
+                        [class.text-bg-success]="item.machine.status === 1"
+                        [class.text-bg-secondary]="item.machine.status !== 1"
+                      >
+                        {{ statusLabel(item.machine.status) }}
+                      </span>
+                    </div>
+
+                    <div class="small text-muted mb-2">
+                      <div>
+                        <i class="bi bi-file-earmark-text me-2"></i>
+                        {{ item.form?.nome ?? 'Sem formulário' }}
+                      </div>
+                    </div>
+
+                    <div class="small text-muted">
+                      <div>
+                        <i class="bi bi-diagram-3 me-2"></i>
+                        {{ item.section?.nome ?? 'Sem seção' }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    } @empty {
+      <div class="text-center py-5">
+        <i class="bi bi-inboxes display-4 text-muted"></i>
+
+        <h5 class="mt-3">Nenhum local cadastrado</h5>
+
+        <p class="text-muted">Crie um local e associe máquinas para começar.</p>
+      </div>
+    }
+  }
+</div>

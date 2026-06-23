@@ -1,0 +1,153 @@
+.machine-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* HEADER */
+
+.form-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  padding-bottom: 1rem;
+
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.header-icon {
+  width: 60px;
+  height: 60px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 16px;
+
+  background: rgba(var(--bs-primary-rgb), 0.1);
+
+  color: var(--bs-primary);
+
+  font-size: 1.5rem;
+}
+
+/* SECTION */
+
+.form-section {
+  background: var(--bs-body-bg);
+
+  border: 1px solid var(--bs-border-color);
+
+  border-radius: 18px;
+
+  padding: 1.5rem;
+}
+
+/* INPUTS */
+
+.form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+
+  margin-bottom: 0.5rem;
+}
+
+.form-control,
+.form-select {
+  border-radius: 12px;
+
+  min-height: 48px;
+}
+
+textarea.form-control {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.form-control:focus,
+.form-select:focus {
+  box-shadow: none;
+
+  border-color: var(--bs-primary);
+}
+
+/* STATUS */
+
+.status-card {
+  height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 1rem;
+
+  border-radius: 12px;
+
+  border: 1px solid var(--bs-border-color);
+
+  background: var(--bs-body-bg);
+}
+
+.status-title {
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+}
+
+.status-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.form-check-input {
+  cursor: pointer;
+  transform: scale(1.15);
+}
+
+/* RESPONSIVO */
+
+@media (max-width: 991px) {
+  .form-section {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-header {
+    align-items: flex-start;
+  }
+
+  .header-icon {
+    width: 52px;
+    height: 52px;
+
+    font-size: 1.25rem;
+  }
+
+  .form-section {
+    padding: 1rem;
+  }
+
+  .status-card {
+    height: auto;
+    min-height: 48px;
+    padding: 0.75rem 1rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .machine-form {
+    gap: 1rem;
+  }
+
+  .form-header {
+    gap: 0.75rem;
+  }
+
+  .header-icon {
+    width: 48px;
+    height: 48px;
+  }
+}

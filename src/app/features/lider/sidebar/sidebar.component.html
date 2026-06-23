@@ -1,79 +1,184 @@
-<!-- BOTÃO MOBILE -->
+<!-- Mobile Toggle -->
 
-<button class="btn btn-primary d-lg-none m-2" (click)="toggleMobile()">☰</button>
+<button
+  class="btn btn-primary d-lg-none sidebar-mobile-btn"
+  (click)="toggleMobile()"
+>
+  <i class="bi bi-list"></i>
+</button>
 
-<!-- BACKDROP MOBILE -->
+<!-- Desktop Toggle -->
+
+<button
+  class="sidebar-toggle d-none d-lg-flex"
+  [class.collapsed]="collapsed()"
+  (click)="toggleSidebar()"
+  type="button"
+>
+  <i
+    class="bi"
+    [class.bi-chevron-left]="!collapsed()"
+    [class.bi-chevron-right]="collapsed()"
+  ></i>
+</button>
+
+<!-- Backdrop -->
 
 @if (mobileOpen()) {
-  <div class="sidebar-backdrop" (click)="toggleMobile()"></div>
+  <div
+    class="sidebar-backdrop"
+    (click)="toggleMobile()"
+  ></div>
 }
 
-<!-- SIDEBAR -->
+<!-- Sidebar -->
 
-<aside class="sidebar" [class.collapsed]="collapsed()" [class.mobile-open]="mobileOpen()">
-  <!-- HEADER -->
+<aside
+  class="sidebar"
+  [class.collapsed]="collapsed()"
+  [class.mobile-open]="mobileOpen()"
+>
+  <!-- Brand -->
 
-  <div class="sidebar-header">
+  <div class="sidebar-brand">
+
+    <div class="brand-icon">
+      <i class="bi bi-shield-check"></i>
+    </div>
+
     @if (!collapsed()) {
-      <h5 class="mb-0 fw-bold">Quality App</h5>
+      <div class="brand-info">
+        <div class="brand-title">
+          Quality App
+        </div>
+
+        <div class="brand-subtitle">
+          Quality Management
+        </div>
+      </div>
     }
 
-    <button class="btn btn-sm btn-outline-light" (click)="toggleSidebar()">
-      @if (collapsed()) {
-        <span>›</span>
-      } @else {
-        <span>‹</span>
-      }
-    </button>
   </div>
 
-  <!-- MENU -->
+  <!-- User -->
 
-  <nav class="sidebar-menu">
-    <a routerLink="/home" routerLinkActive="active" class="menu-item">
-      <i class="bi bi-house"></i>
+  <div class="sidebar-user">
 
-      @if (!collapsed()) {
-        <span>Home</span>
-      }
-    </a>
+    <div class="user-avatar">
+      <i class="bi bi-person"></i>
+    </div>
 
-    <a routerLink="/lider/painel" routerLinkActive="active" class="menu-item">
-      <i class="bi bi-clipboard-check"></i>
+    @if (!collapsed()) {
+      <div>
+        <div class="user-name">
+          Administrador
+        </div>
 
-      @if (!collapsed()) {
-        <span>Painel de Inspeção</span>
-      }
-    </a>
+        <div class="user-role">
+          Quality Manager
+        </div>
+      </div>
+    }
 
-    <a routerLink="/history" routerLinkActive="active" class="menu-item">
-      <i class="bi bi-clock-history"></i>
+  </div>
 
-      @if (!collapsed()) {
-        <span>Histórico de Envios</span>
-      }
-    </a>
+  <!-- Body -->
 
-    <!-- CONFIGURAÇÕES -->
+  <div class="sidebar-body">
 
-    <a routerLink="/lider/config" routerLinkActive="active" class="menu-item">
-      <i class="bi bi-gear"></i>
+    <div class="sidebar-section">
 
       @if (!collapsed()) {
-        <span>Configurações</span>
+        <div class="sidebar-section-title">
+          Operação
+        </div>
       }
-    </a>
-  </nav>
 
-  <!-- LOGOUT -->
+      <nav class="sidebar-nav">
+
+        <a
+          routerLink="/home"
+          routerLinkActive="active"
+          class="sidebar-link"
+        >
+          <i class="bi bi-house-door"></i>
+
+          @if (!collapsed()) {
+            <span>Home</span>
+          }
+        </a>
+
+        <a
+          routerLink="/lider/painel"
+          routerLinkActive="active"
+          class="sidebar-link"
+        >
+          <i class="bi bi-clipboard-check"></i>
+
+          @if (!collapsed()) {
+            <span>Painel de Inspeção</span>
+          }
+        </a>
+
+        <a
+          routerLink="/history"
+          routerLinkActive="active"
+          class="sidebar-link"
+        >
+          <i class="bi bi-clock-history"></i>
+
+          @if (!collapsed()) {
+            <span>Histórico</span>
+          }
+        </a>
+
+      </nav>
+
+    </div>
+
+    <div class="sidebar-section">
+
+      @if (!collapsed()) {
+        <div class="sidebar-section-title">
+          Administração
+        </div>
+      }
+
+      <nav class="sidebar-nav">
+
+        <a
+          routerLink="/lider/config"
+          routerLinkActive="active"
+          class="sidebar-link"
+        >
+          <i class="bi bi-gear"></i>
+
+          @if (!collapsed()) {
+            <span>Configurações</span>
+          }
+        </a>
+
+      </nav>
+
+    </div>
+
+  </div>
+
+  <!-- Footer -->
 
   <div class="sidebar-footer">
-    <button class="btn btn-danger w-100" (click)="logout()">
+
+    <button
+      class="btn btn-outline-danger logout-btn"
+      (click)="logout()"
+    >
       <i class="bi bi-box-arrow-right"></i>
 
       @if (!collapsed()) {
-        <span class="ms-2"> Sair </span>
+        <span>Sair</span>
       }
     </button>
+
   </div>
+
 </aside>

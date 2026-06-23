@@ -1,10 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { rxResource } from '@angular/core/rxjs-interop';
 
 import { AuthService } from '../../core/services/auth.service';
 import { LocationService } from '../../core/services/location.service';
+
 import { Location } from '../../core/models/location.model';
 import { PaginatedResult } from '../../core/models/paginated.model';
 
@@ -25,7 +25,10 @@ export class HomeComponent {
   protected readonly page = signal<number | undefined>(undefined);
   protected readonly limit = signal<number | undefined>(undefined);
 
-  protected readonly locationsResource = rxResource<PaginatedResult<Location>, { page?: number; limit?: number }>({
+  protected readonly locationsResource = rxResource<
+    PaginatedResult<Location>,
+    { page?: number; limit?: number }
+  >({
     params: () => ({
       page: this.page(),
       limit: this.limit(),
@@ -43,7 +46,7 @@ export class HomeComponent {
     }
 
     return this.locations().filter(
-      (location: Location) =>
+      (location) =>
         (location.nome ?? '').toLowerCase().includes(term) ||
         location.id.toLowerCase().includes(term),
     );

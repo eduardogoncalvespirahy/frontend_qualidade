@@ -1,0 +1,62 @@
+.scroll-top-btn {
+  position: fixed;
+
+  right: 24px;
+  bottom: 24px;
+
+  width: 52px;
+  height: 52px;
+
+  border: none;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--bs-primary);
+  color: white;
+
+  font-size: 1.2rem;
+
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.18),
+    0 4px 10px rgba(0, 0, 0, 0.12);
+
+  cursor: pointer;
+
+  z-index: 1020;
+
+  animation: fadeInUp 0.25s ease;
+  transition: all 0.2s ease;
+}
+
+.scroll-top-btn:hover {
+  transform: translateY(-3px);
+}
+
+.scroll-top-btn:active {
+  transform: translateY(0);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .scroll-top-btn {
+    right: 16px;
+    bottom: 16px;
+
+    width: 48px;
+    height: 48px;
+  }
+}

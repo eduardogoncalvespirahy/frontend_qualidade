@@ -1,9 +1,6 @@
 <!-- Mobile Toggle -->
 
-<button
-  class="btn btn-primary d-lg-none sidebar-mobile-btn"
-  (click)="toggleMobile()"
->
+<button class="btn btn-primary d-lg-none sidebar-mobile-btn" (click)="toggleMobile()">
   <i class="bi bi-list"></i>
 </button>
 
@@ -25,10 +22,7 @@
 <!-- Backdrop -->
 
 @if (layout.mobileOpen()) {
-  <div
-    class="sidebar-backdrop"
-    (click)="toggleMobile()"
-  ></div>
+  <div class="sidebar-backdrop" (click)="toggleMobile()"></div>
 }
 
 <!-- Sidebar -->
@@ -41,29 +35,22 @@
   <!-- Brand -->
 
   <div class="sidebar-brand">
-
     <div class="brand-icon">
       <i class="bi bi-shield-check"></i>
     </div>
 
     @if (!layout.collapsed()) {
       <div class="brand-info">
-        <div class="brand-title">
-          Quality App
-        </div>
+        <div class="brand-title">Gestão da Qualidade</div>
 
-        <div class="brand-subtitle">
-          Quality Management
-        </div>
+        <div class="brand-subtitle">Sistema Gerenciamento e Controle de Qualidade</div>
       </div>
     }
-
   </div>
 
   <!-- User -->
 
   <div class="sidebar-user">
-
     <div class="user-avatar">
       <i class="bi bi-person"></i>
     </div>
@@ -71,36 +58,24 @@
     @if (!layout.collapsed()) {
       <div>
         <div class="user-name">
-          Administrador
+          {{auth.employee()?.personName}}
         </div>
 
-        <div class="user-role">
-          Quality Manager
-        </div>
+        <div class="user-role">{{auth.user()?.username}}</div>
       </div>
     }
-
   </div>
 
   <!-- Body -->
 
   <div class="sidebar-body">
-
     <div class="sidebar-section">
-
       @if (!layout.collapsed()) {
-        <div class="sidebar-section-title">
-          Operação
-        </div>
+        <div class="sidebar-section-title">Operação</div>
       }
 
       <nav class="sidebar-nav">
-
-        <a
-          routerLink="/home"
-          routerLinkActive="active"
-          class="sidebar-link"
-        >
+        <a routerLink="/home" routerLinkActive="active" class="sidebar-link">
           <i class="bi bi-house-door"></i>
 
           @if (!layout.collapsed()) {
@@ -108,11 +83,7 @@
           }
         </a>
 
-        <a
-          routerLink="/lider/painel"
-          routerLinkActive="active"
-          class="sidebar-link"
-        >
+        <a routerLink="/lider/painel" routerLinkActive="active" class="sidebar-link">
           <i class="bi bi-clipboard-check"></i>
 
           @if (!layout.collapsed()) {
@@ -120,65 +91,42 @@
           }
         </a>
 
-        <a
-          routerLink="/history"
-          routerLinkActive="active"
-          class="sidebar-link"
-        >
+        <a routerLink="/history" routerLinkActive="active" class="sidebar-link">
           <i class="bi bi-clock-history"></i>
 
           @if (!layout.collapsed()) {
             <span>Histórico</span>
           }
         </a>
-
       </nav>
-
     </div>
 
     <div class="sidebar-section">
-
       @if (!layout.collapsed()) {
-        <div class="sidebar-section-title">
-          Administração
-        </div>
+        <div class="sidebar-section-title">Administração</div>
       }
 
       <nav class="sidebar-nav">
-
-        <a
-          routerLink="/lider/config"
-          routerLinkActive="active"
-          class="sidebar-link"
-        >
+        <a routerLink="/lider/config" routerLinkActive="active" class="sidebar-link">
           <i class="bi bi-gear"></i>
 
           @if (!layout.collapsed()) {
             <span>Configurações</span>
           }
         </a>
-
       </nav>
-
     </div>
-
   </div>
 
   <!-- Footer -->
 
   <div class="sidebar-footer">
-
-    <button
-      class="btn btn-outline-danger logout-btn"
-      (click)="logout()"
-    >
+    <button class="btn btn-outline-danger logout-btn" (click)="logout()">
       <i class="bi bi-box-arrow-right"></i>
 
       @if (!layout.collapsed()) {
         <span>Sair</span>
       }
     </button>
-
   </div>
-
 </aside>

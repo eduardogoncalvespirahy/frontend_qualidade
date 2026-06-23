@@ -13,7 +13,7 @@ import { LayoutService } from '../../../core/services/layout.service';
   styleUrl: './sidebar.component.css',
 })
 export class SidebarComponent {
-  private readonly auth = inject(AuthService);
+protected readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
   protected readonly layout = inject(LayoutService);  
 

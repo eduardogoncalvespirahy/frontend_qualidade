@@ -23,12 +23,13 @@ import { MachineService } from '../../../../../core/services/machine.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { FormComponent } from './modals/form/form.component';
 import { DetailComponent } from './modals/detail/detail.component';
-import { ListComponent } from './modals/list/list.component';
+
+import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 
 @Component({
   selector: 'app-machine',
   standalone: true,
-  imports: [],
+  imports: [ScrollTopComponent],
   templateUrl: './machine.component.html',
   styleUrl: './machine.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -158,26 +159,24 @@ export class MachineComponent {
   });
 
   protected readonly grouped = computed(() => {
-  const locations = this.locations();
-  const filtered = this.filtered();
+    const locations = this.locations();
+    const filtered = this.filtered();
 
-  return locations
-    .map((location) => ({
-      location,
-      machines: filtered.filter(
-        (item) => item.location?.id === location.id,
-      ),
-    }))
-    .filter(
-      (group) =>
-        group.machines.length > 0 ||
-        !this.filterMachine() &&
-          !this.filterLocation() &&
-          !this.filterSection() &&
-          !this.filterForm() &&
-          !this.filterStatus(),
-    );
-});
+    return locations
+      .map((location) => ({
+        location,
+        machines: filtered.filter((item) => item.location?.id === location.id),
+      }))
+      .filter(
+        (group) =>
+          group.machines.length > 0 ||
+          (!this.filterMachine() &&
+            !this.filterLocation() &&
+            !this.filterSection() &&
+            !this.filterForm() &&
+            !this.filterStatus()),
+      );
+  });
 
   protected readonly loading = computed(
     () =>
@@ -297,41 +296,4 @@ export class MachineComponent {
       this.reload();
     }
   }
-
-  // async editar(machine: Machine): Promise<Machine | null> {
-  //   const ref = this.modalService.openComponent(FormComponent, {
-  //     title: `Editar: ${machine.nome} - Id: ${machine.id}`,
-  //     size: 'lg',
-  //     backdrop: 'static',
-  //     inputs: { mode: 'edit', machine },
-  //     buttons: [
-  //       { text: 'Cancelar', variant: 'secondary', value: false },
-  //       { text: 'Salvar', variant: 'primary', value: true, submit: true },
-  //     ],
-  //   });
-
-  //   const confirmado = await ref.result;
-  //   return confirmado ? ref.instance.value() : null;
-  // }
-
-  // async listar(machines: Machine[]): Promise<Machine | null> {
-  //   return new Promise<Machine | null>((resolve) => {
-  //     const ref = this.modalService.openComponent(ListComponent, {
-  //       title: 'Maquinas',
-  //       size: 'lg',
-  //       scrollable: true,
-  //       inputs: { machines },
-  //       outputs: {
-  //         select: (u) => {
-  //           resolve(u as Machine);
-  //           ref.close();
-  //         },
-  //       },
-  //       buttons: [{ text: 'Fechar', variant: 'secondary', value: false }],
-  //     });
-
-  //     // fechou sem selecionar (resolve só tem efeito uma vez)
-  //     ref.result.then(() => resolve(null));
-  //   });
-  // }
 }

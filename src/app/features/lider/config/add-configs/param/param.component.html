@@ -1,1 +1,257 @@
-<p>param works!</p>
+<div class="param-page">
+
+  <!-- HEADER -->
+
+  <section class="page-header">
+    <div>
+      <h2 class="page-title">Parâmetros e Regras</h2>
+      <p class="page-description">Gerencie parâmetros e limites vinculados às máquinas e formulários.</p>
+    </div>
+    <div class="page-actions">
+      <div class="search-box">
+        <i class="bi bi-search"></i>
+        <input
+          type="search"
+          class="form-control"
+          placeholder="Pesquisar parâmetro, formulário ou máquina..."
+          [value]="query()"
+          (input)="onSearch($any($event.target).value)"
+        />
+      </div>
+      <button class="btn btn-outline-secondary" (click)="reload()">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+  </section>
+
+  <!-- LOADING -->
+
+  @if (loading()) {
+    <div class="empty-state">
+      <div class="spinner-border text-primary"></div>
+      <p>Carregando informações...</p>
+    </div>
+  }
+
+  <!-- ERRO -->
+
+  @else if (hasError()) {
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      Não foi possível carregar os dados.
+      <button class="btn btn-outline-danger btn-sm ms-3" (click)="reload()">Tentar novamente</button>
+    </div>
+  }
+
+  <!-- DADOS -->
+
+  @else {
+    @for (locGroup of grouped(); track locGroup.location.id) {
+      <section class="location-section">
+
+        <!-- LOCATION HEADER -->
+        <div class="location-header">
+          <div class="location-info">
+            <div class="location-icon">
+              <i class="bi bi-geo-alt-fill"></i>
+            </div>
+            <div>
+              <h4>{{ locGroup.location.nome }}</h4>
+              <span>{{ locGroup.sections.length }} seções</span>
+            </div>
+          </div>
+        </div>
+
+        @for (secGroup of locGroup.sections; track secGroup.section.id) {
+
+          <!-- SECTION LABEL -->
+          <div class="section-label">
+            <i class="bi bi-diagram-3"></i>
+            <span>{{ secGroup.section.nome }}</span>
+          </div>
+
+          @if (secGroup.forms.length === 0) {
+            <div class="empty-card">
+              <i class="bi bi-inboxes"></i>
+              <p>Nenhum formulário encontrado nesta seção.</p>
+            </div>
+          } @else {
+
+            <!-- FORM CARDS -->
+            <div class="machines-grid">
+              @for (fg of secGroup.forms; track fg.form.id) {
+
+                <div class="machine-card" (click)="toggleForm(fg.form.id)">
+                  <div class="machine-card-header">
+                    <div>
+                      <div class="machine-code">#{{ fg.form.id }}</div>
+                      <h5>{{ fg.form.nome }}</h5>
+                    </div>
+                    <span class="status-badge active">
+                      {{ totalFormParams(fg) }} params
+                    </span>
+                  </div>
+
+                  <div class="machine-card-body">
+                    <div class="info-row">
+                      <i class="bi bi-list-check"></i>
+                      <span>{{ fg.answers.length }} parâm. de formulário</span>
+                    </div>
+                    <div class="info-row">
+                      <i class="bi bi-gear"></i>
+                      <span>{{ fg.machines.length }} máquinas</span>
+                    </div>
+                  </div>
+
+                  <div class="machine-card-footer">
+                    <span>{{ expandedFormId() === fg.form.id ? 'Recolher' : 'Ver parâmetros' }}</span>
+                    <i class="bi" [class.bi-chevron-up]="expandedFormId() === fg.form.id" [class.bi-chevron-down]="expandedFormId() !== fg.form.id"></i>
+                  </div>
+                </div>
+
+              }
+            </div>
+
+            <!-- FORM DETAIL EXPANDIDO -->
+            @for (fg of secGroup.forms; track fg.form.id) {
+              @if (expandedFormId() === fg.form.id) {
+                <div class="param-detail">
+
+                  <div class="param-detail-header">
+                    <i class="bi bi-file-earmark-text"></i>
+                    <strong>{{ fg.form.nome }}</strong>
+                  </div>
+
+                  <div class="param-sections">
+
+                    <!-- Parâmetros do Formulário (path 1) -->
+                    <div class="param-section">
+                      <p class="param-section-title">
+                        <i class="bi bi-list-check"></i> Parâmetros do Formulário
+                      </p>
+                      @if (fg.answers.length === 0) {
+                        <p class="text-muted small ms-3">Nenhum.</p>
+                      } @else {
+                        <table class="table table-sm table-hover align-middle mb-0">
+                          <thead class="table-light">
+                            <tr><th>Nome</th><th>Descrição</th><th>Status</th></tr>
+                          </thead>
+                          <tbody>
+                            @for (a of fg.answers; track a.id) {
+                              <tr>
+                                <td class="fw-medium">{{ a.nome }}</td>
+                                <td class="text-muted small">{{ a.descricao ?? '—' }}</td>
+                                <td>
+                                  <span class="badge" [class.text-bg-success]="a.status === 1" [class.text-bg-secondary]="a.status !== 1">
+                                    {{ statusLabel(a.status) }}
+                                  </span>
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      }
+                    </div>
+
+                    <!-- Máquinas (path 2) -->
+                    @for (mg of fg.machines; track mg.machine.id) {
+                      <div class="param-section">
+
+                        <p class="param-section-title">
+                          <i class="bi bi-gear"></i> {{ mg.machine.nome }}
+                          <span class="status-badge ms-2" [class.active]="mg.machine.status === 1">
+                            {{ statusLabel(mg.machine.status) }}
+                          </span>
+                        </p>
+
+                        <!-- Parâmetros da Máquina -->
+                        @if (mg.answerMachines.length > 0) {
+                          <p class="param-subsection-title">Parâmetros da Máquina</p>
+                          <table class="table table-sm table-hover align-middle mb-2">
+                            <thead class="table-light">
+                              <tr><th>Nome</th><th>Descrição</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                              @for (a of mg.answerMachines; track a.id) {
+                                <tr>
+                                  <td class="fw-medium">{{ a.nome }}</td>
+                                  <td class="text-muted small">{{ a.descricao ?? '—' }}</td>
+                                  <td>
+                                    <span class="badge" [class.text-bg-success]="a.status === 1" [class.text-bg-secondary]="a.status !== 1">
+                                      {{ statusLabel(a.status) }}
+                                    </span>
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        }
+
+                        <!-- Limites -->
+                        @if (mg.limitAnswers.length > 0) {
+                          <p class="param-subsection-title">Limites</p>
+                          <table class="table table-sm table-hover align-middle mb-2">
+                            <thead class="table-light">
+                              <tr><th>Nome</th><th>Descrição</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                              @for (a of mg.limitAnswers; track a.id) {
+                                <tr>
+                                  <td class="fw-medium">{{ a.nome }}</td>
+                                  <td class="text-muted small">{{ a.descricao ?? '—' }}</td>
+                                  <td>
+                                    <span class="badge" [class.text-bg-success]="a.status === 1" [class.text-bg-secondary]="a.status !== 1">
+                                      {{ statusLabel(a.status) }}
+                                    </span>
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        }
+
+                        <!-- Limites da Máquina -->
+                        @if (mg.limitAnswerMachines.length > 0) {
+                          <p class="param-subsection-title">Limites da Máquina</p>
+                          <table class="table table-sm table-hover align-middle mb-2">
+                            <thead class="table-light">
+                              <tr><th>Nome</th><th>Descrição</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                              @for (a of mg.limitAnswerMachines; track a.id) {
+                                <tr>
+                                  <td class="fw-medium">{{ a.nome }}</td>
+                                  <td class="text-muted small">{{ a.descricao ?? '—' }}</td>
+                                  <td>
+                                    <span class="badge" [class.text-bg-success]="a.status === 1" [class.text-bg-secondary]="a.status !== 1">
+                                      {{ statusLabel(a.status) }}
+                                    </span>
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        }
+
+                        @if (mg.answerMachines.length === 0 && mg.limitAnswers.length === 0 && mg.limitAnswerMachines.length === 0) {
+                          <p class="text-muted small ms-3">Nenhum parâmetro ou limite cadastrado.</p>
+                        }
+
+                      </div>
+                    }
+
+                  </div>
+                </div>
+              }
+            }
+
+          }
+        }
+
+      </section>
+    } @empty {
+      <p class="text-muted">Nenhum local cadastrado.</p>
+    }
+  }
+
+</div>

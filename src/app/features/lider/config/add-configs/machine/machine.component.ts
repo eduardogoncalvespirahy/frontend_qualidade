@@ -43,6 +43,16 @@ export class MachineComponent {
 
   protected readonly query = signal('');
 
+  protected readonly filterMachine = signal('');
+  protected readonly filterLocation = signal('');
+  protected readonly filterSection = signal('');
+  protected readonly filterForm = signal('');
+  protected readonly filterStatus = signal<string>('');
+  protected readonly filterCreatedStart = signal('');
+  protected readonly filterCreatedEnd = signal('');
+  protected readonly filterUpdatedStart = signal('');
+  protected readonly filterUpdatedEnd = signal('');
+
   protected readonly employersResource = rxResource<PaginatedResult<Employer>, void>({
     stream: () => this.employerService.getAll(),
   });
@@ -69,40 +79,105 @@ export class MachineComponent {
   protected readonly machines = computed(() => this.machinesResource.value()?.data ?? []);
 
   protected readonly filtered = computed(() => {
-    const term = this.query().trim().toLowerCase();
-    if (!term) return this.machines();
-    return this.machines().filter(
-      (m) =>
-        m.nome.toLowerCase().includes(term) || (m.descricao ?? '').toLowerCase().includes(term),
-    );
+    const machineTerm = this.filterMachine().trim().toLowerCase();
+    const locationId = this.filterLocation();
+    const sectionId = this.filterSection();
+    const formId = this.filterForm();
+    const status = this.filterStatus();
+
+    const createdStart = this.filterCreatedStart();
+    const createdEnd = this.filterCreatedEnd();
+
+    const updatedStart = this.filterUpdatedStart();
+    const updatedEnd = this.filterUpdatedEnd();
+
+    return this.machineView().filter((item) => {
+      const machine = item.machine;
+
+      if (
+        machineTerm &&
+        !machine.nome.toLowerCase().includes(machineTerm) &&
+        !(machine.descricao ?? '').toLowerCase().includes(machineTerm)
+      ) {
+        return false;
+      }
+
+      if (locationId && item.location?.id !== locationId) {
+        return false;
+      }
+
+      if (sectionId && item.section?.id !== sectionId) {
+        return false;
+      }
+
+      if (formId && item.form?.id !== formId) {
+        return false;
+      }
+
+      if (status !== '') {
+        if (machine.status !== Number(status)) {
+          return false;
+        }
+      }
+
+      const createdDate = new Date(machine.dataCriacao);
+      const updatedDate = new Date(machine.dataAlteracao);
+
+      if (createdStart) {
+        if (createdDate < new Date(createdStart)) {
+          return false;
+        }
+      }
+
+      if (createdEnd) {
+        const end = new Date(createdEnd);
+        end.setHours(23, 59, 59, 999);
+
+        if (createdDate > end) {
+          return false;
+        }
+      }
+
+      if (updatedStart) {
+        if (updatedDate < new Date(updatedStart)) {
+          return false;
+        }
+      }
+
+      if (updatedEnd) {
+        const end = new Date(updatedEnd);
+        end.setHours(23, 59, 59, 999);
+
+        if (updatedDate > end) {
+          return false;
+        }
+      }
+
+      return true;
+    });
   });
 
   protected readonly grouped = computed(() => {
-    const locations = this.locations();
-    const sections = this.sections();
-    const forms = this.forms();
-    const machines = this.filtered();
+  const locations = this.locations();
+  const filtered = this.filtered();
 
-    return locations.map((location) => {
-      const employerSections = sections.filter((s) => s.employerId === location.employerId);
-      const sectionIds = new Set(employerSections.map((s) => s.id));
-
-      const employerForms = forms.filter((f) => sectionIds.has(f.sectionId));
-      const formIds = new Set(employerForms.map((f) => f.id));
-
-      const locationMachines = machines
-        .filter((m) => formIds.has(m.formId))
-        .map((m) => {
-          const form = employerForms.find((f) => f.id === m.formId) ?? null;
-          const section = form
-            ? (employerSections.find((s) => s.id === form.sectionId) ?? null)
-            : null;
-          return { machine: m, form, section };
-        });
-
-      return { location, machines: locationMachines };
-    });
-  });
+  return locations
+    .map((location) => ({
+      location,
+      machines: filtered.filter(
+        (item) => item.location?.id === location.id,
+      ),
+    }))
+    .filter(
+      (group) =>
+        group.machines.length > 0 ||
+        !this.filterMachine() &&
+          !this.filterLocation() &&
+          !this.filterSection() &&
+          !this.filterForm() &&
+          !this.filterStatus(),
+    );
+});
 
   protected readonly loading = computed(
     () =>
@@ -119,6 +194,30 @@ export class MachineComponent {
       !!this.formsResource.error() ||
       !!this.machinesResource.error(),
   );
+
+  protected readonly machineView = computed(() => {
+    const locations = this.locations();
+    const sections = this.sections();
+    const forms = this.forms();
+    const machines = this.machines();
+
+    return machines.map((machine) => {
+      const form = forms.find((f) => f.id === machine.formId) ?? null;
+
+      const section = form ? (sections.find((s) => s.id === form.sectionId) ?? null) : null;
+
+      const location = section
+        ? (locations.find((l) => l.employerId === section.employerId) ?? null)
+        : null;
+
+      return {
+        machine,
+        form,
+        section,
+        location,
+      };
+    });
+  });
 
   protected onSearch(value: string): void {
     this.query.set(value);
@@ -173,7 +272,7 @@ export class MachineComponent {
   async detalhar(machine: Machine): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
       title: `Detalhe`,
-      size: 'lg',      
+      size: 'lg',
       inputs: { machine },
       outputs: {
         reload_return: (value: unknown) => {

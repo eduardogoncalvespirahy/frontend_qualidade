@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 @Component({
   selector: 'app-exit',
@@ -9,6 +9,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   styleUrl: './exit.component.css',
 })
 export class ExitComponent {
-  readonly message = input<string>('Há alterações não salvas. Se sair agora, elas serão perdidas.');
+  readonly message = input<string>('');
   readonly details = input<string>('');
+
+  readonly hasDetails = computed(() => !!this.details()?.trim());
 }

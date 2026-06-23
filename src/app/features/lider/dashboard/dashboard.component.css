@@ -1,126 +1,76 @@
 :host {
   display: block;
-  height: 100vh;
 }
 
-/* ==========================================================
+/* ==========================================
    LAYOUT
-========================================================== */
+========================================== */
 
 .app-layout {
-  display: flex;
-
-  min-height: 100vh;
+  min-height: 100dvh;
 
   background:
-    radial-gradient(
-      circle at top left,
-      rgba(var(--bs-primary-rgb), 0.03),
-      transparent 25%
-    ),
+    radial-gradient(circle at top left, rgba(var(--bs-primary-rgb), 0.03), transparent 25%),
     var(--bs-body-tertiary-bg);
 }
 
-/* ==========================================================
-   CONTEÚDO
-========================================================== */
+/* ==========================================
+   CONTENT
+========================================== */
 
 .page-content {
-  flex: 1;
+  min-height: 100dvh;
 
-  min-width: 0;
-
-  height: 100vh;
-
-  overflow-y: auto;
-  overflow-x: hidden;
+  margin-left: 280px;
 
   padding: 2rem;
 
-  transition: all 0.25s ease;
+  transition:
+    margin-left 0.25s ease,
+    padding 0.25s ease;
+
+  overflow-x: hidden;
 }
 
-/* ==========================================================
-   CONTAINER PADRÃO
-========================================================== */
+/* quando recolhido */
+
+.page-content.sidebar-collapsed {
+  margin-left: 80px;
+}
+
+/* ==========================================
+   CONTAINER
+========================================== */
 
 .page-container {
   width: 100%;
   max-width: 1600px;
-
   margin: 0 auto;
 }
 
-/* ==========================================================
-   SCROLLBAR
-========================================================== */
-
-.page-content::-webkit-scrollbar {
-  width: 10px;
-}
-
-.page-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.page-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
-
-  border-radius: 999px;
-}
-
-.page-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-/* ==========================================================
+/* ==========================================
    NOTEBOOK
-========================================================== */
+========================================== */
 
 @media (max-width: 1400px) {
   .page-content {
-    padding: 1.75rem;
+    margin-left: 250px;
+  }
+
+  .page-content.sidebar-collapsed {
+    margin-left: 80px;
   }
 }
 
-/* ==========================================================
-   TABLET
-========================================================== */
+/* ==========================================
+   TABLET / MOBILE
+========================================== */
 
-@media (max-width: 992px) {
-  .page-content {
-    padding: 1.5rem;
-  }
-}
+@media (max-width: 991.98px) {
+  .page-content,
+  .page-content.sidebar-collapsed {
+    margin-left: 0;
 
-/* ==========================================================
-   MOBILE
-========================================================== */
-
-@media (max-width: 768px) {
-  .page-content {
-    padding:
-      calc(70px + 1rem)
-      1rem
-      1rem
-      1rem;
-  }
-
-  .page-container {
-    max-width: 100%;
-  }
-}
-
-/* ==========================================================
-   MOBILE PEQUENO
-========================================================== */
-
-@media (max-width: 480px) {
-  .page-content {
-    padding:
-      calc(70px + 0.75rem)
-      0.75rem
-      0.75rem
-      0.75rem;
+    padding: calc(70px + 1rem) 1rem 1rem;
   }
 }

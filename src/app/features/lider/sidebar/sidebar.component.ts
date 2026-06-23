@@ -2,6 +2,8 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ModalService } from '../../../core/services/modal.service';
+import { ExitComponent } from '../../../core/modals/exit/exit.component';
+import { LayoutService } from '../../../core/services/layout.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -13,21 +15,18 @@ import { ModalService } from '../../../core/services/modal.service';
 export class SidebarComponent {
   private readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
-
-  collapsed = signal(false);
-  mobileOpen = signal(false);
-  configOpen = signal(false);
+  protected readonly layout = inject(LayoutService);  
 
   toggleSidebar() {
-    this.collapsed.update((v) => !v);
+    this.layout.toggleSidebar();
   }
 
   toggleMobile() {
-    this.mobileOpen.update((v) => !v);
+    this.layout.toggleMobile();
   }
 
   toggleConfig() {
-    this.configOpen.update((v) => !v);
+    this.layout.configOpen();
   }
 
   async logout() {
@@ -36,18 +35,30 @@ export class SidebarComponent {
     }
   }
 
-  protected async sair(): Promise<boolean | undefined> {
-    const ref = this.modal.open<boolean>({
+  async sair(): Promise<boolean | undefined> {
+    const ref = this.modal.openComponent(ExitComponent, {
       title: 'Sair do Sistema',
-      body: 'Deseja realmente sair do sistema?',
       centered: true,
-      backdrop: 'static',
+      inputs: {
+        message: 'Deseja realmente sair do sistema?',
+        details: 'Sua sessão será encerrada e será necessário realizar login novamente.',
+      },
       buttons: [
-        { text: 'Cancelar', variant: 'secondary', value: false },
-        { text: 'Sair', variant: 'danger', value: true },
+        {
+          text: 'Cancelar',
+          variant: 'secondary',
+          value: false,
+        },
+        {
+          text: 'Sair',
+          variant: 'danger',
+          value: true,
+        },
       ],
     });
 
-    return await ref.result; // true | false | undefined
+    const confirmed = await ref.result;
+
+    return confirmed;
   }
 }

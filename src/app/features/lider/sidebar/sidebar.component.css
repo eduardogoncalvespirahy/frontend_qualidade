@@ -1,19 +1,54 @@
 :host {
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 80px;
+
   display: block;
 }
 
-/* =========================================================
+/* =====================================================
+   SIDEBAR
+===================================================== */
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+
+  width: var(--sidebar-width);
+  height: 100dvh;
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--bs-body-bg);
+
+  border-right: 1px solid var(--bs-border-color);
+
+  overflow: hidden;
+
+  z-index: 1030;
+
+  transition:
+    width .25s ease,
+    transform .25s ease;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* =====================================================
    TOGGLE DESKTOP
-========================================================= */
+===================================================== */
 
 .sidebar-toggle {
   position: fixed;
 
-  top: 24px;
-  left: 260px;
+  top: 20px;
+  left: calc(var(--sidebar-width) - 18px);
 
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
 
   border: none;
 
@@ -28,12 +63,14 @@
   color: var(--bs-body-color);
 
   box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    0 1px 4px rgba(0, 0, 0, 0.04);
+    0 4px 14px rgba(0,0,0,.08),
+    0 1px 4px rgba(0,0,0,.04);
 
-  z-index: 1045;
+  z-index: 1050;
 
-  transition: all 0.25s ease;
+  transition:
+    left .25s ease,
+    transform .2s ease;
 }
 
 .sidebar-toggle:hover {
@@ -41,43 +78,12 @@
 }
 
 .sidebar-toggle.collapsed {
-  left: 64px;
+  left: calc(var(--sidebar-collapsed-width) - 18px);
 }
 
-/* =========================================================
-   SIDEBAR
-========================================================= */
-
-.sidebar {
-  width: 280px;
-  height: 100vh;
-
-  display: flex;
-  flex-direction: column;
-
-  position: sticky;
-  top: 0;
-
-  background: var(--bs-body-bg);
-
-  border-right: 1px solid var(--bs-border-color);
-
-  transition:
-    width 0.25s ease,
-    left 0.25s ease;
-
-  overflow: hidden;
-
-  z-index: 1030;
-}
-
-.sidebar.collapsed {
-  width: 84px;
-}
-
-/* =========================================================
-   HEADER
-========================================================= */
+/* =====================================================
+   BRAND
+===================================================== */
 
 .sidebar-brand {
   min-height: 80px;
@@ -104,7 +110,7 @@
 
   border-radius: 14px;
 
-  background: rgba(var(--bs-primary-rgb), 0.12);
+  background: rgba(var(--bs-primary-rgb), .12);
 
   color: var(--bs-primary);
 
@@ -112,24 +118,23 @@
 }
 
 .brand-title {
-  font-size: 1rem;
   font-weight: 700;
 }
 
 .brand-subtitle {
-  font-size: 0.75rem;
+  font-size: .75rem;
   color: var(--bs-secondary-color);
 }
 
-/* =========================================================
+/* =====================================================
    USER
-========================================================= */
+===================================================== */
 
 .sidebar-user {
   display: flex;
   align-items: center;
 
-  gap: 0.75rem;
+  gap: .75rem;
 
   padding: 1rem 1.25rem;
 
@@ -148,26 +153,23 @@
 
   border-radius: 50%;
 
-  background: rgba(var(--bs-primary-rgb), 0.12);
+  background: rgba(var(--bs-primary-rgb), .12);
 
   color: var(--bs-primary);
-
-  font-size: 1rem;
 }
 
 .user-name {
   font-weight: 600;
-  line-height: 1.2;
 }
 
 .user-role {
-  font-size: 0.8rem;
+  font-size: .8rem;
   color: var(--bs-secondary-color);
 }
 
-/* =========================================================
+/* =====================================================
    BODY
-========================================================= */
+===================================================== */
 
 .sidebar-body {
   flex: 1;
@@ -182,15 +184,17 @@
 }
 
 .sidebar-section-title {
-  padding: 0 0.75rem;
-  margin-bottom: 0.75rem;
+  padding-inline: .75rem;
+
+  margin-bottom: .75rem;
+
+  font-size: .75rem;
+  font-weight: 700;
 
   color: var(--bs-secondary-color);
 
-  font-size: 0.75rem;
-  font-weight: 700;
+  letter-spacing: .08em;
 
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -198,7 +202,7 @@
   display: flex;
   flex-direction: column;
 
-  gap: 0.25rem;
+  gap: .25rem;
 }
 
 .sidebar-link {
@@ -207,17 +211,17 @@
   display: flex;
   align-items: center;
 
-  gap: 0.875rem;
+  gap: .875rem;
 
-  padding: 0.9rem 1rem;
+  padding: .9rem 1rem;
 
-  border-radius: 0.875rem;
+  border-radius: .9rem;
 
   text-decoration: none;
 
   color: inherit;
 
-  transition: all 0.2s ease;
+  transition: all .2s ease;
 }
 
 .sidebar-link:hover {
@@ -225,7 +229,7 @@
 }
 
 .sidebar-link.active {
-  background: rgba(var(--bs-primary-rgb), 0.12);
+  background: rgba(var(--bs-primary-rgb), .12);
 
   color: var(--bs-primary);
 
@@ -254,9 +258,26 @@
   font-size: 1.1rem;
 }
 
-/* =========================================================
+/* =====================================================
+   COLLAPSED
+===================================================== */
+
+.sidebar.collapsed .sidebar-brand,
+.sidebar.collapsed .sidebar-user {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-link {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-section-title {
+  display: none;
+}
+
+/* =====================================================
    FOOTER
-========================================================= */
+===================================================== */
 
 .sidebar-footer {
   padding: 1rem;
@@ -271,85 +292,62 @@
   align-items: center;
   justify-content: center;
 
-  gap: 0.5rem;
+  gap: .5rem;
 }
 
-/* =========================================================
-   MOBILE
-========================================================= */
+/* =====================================================
+   MOBILE BUTTON
+===================================================== */
 
 .sidebar-mobile-btn {
   position: fixed;
 
-  top: 1rem;
-  left: 1rem;
+  top: 16px;
+  left: 16px;
 
   z-index: 1060;
 }
+
+/* =====================================================
+   BACKDROP
+===================================================== */
 
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
 
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0,0,0,.4);
 
   backdrop-filter: blur(3px);
 
-  z-index: 1040;
+  z-index: 1029;
 }
 
-/* =========================================================
-   NOTEBOOK
-========================================================= */
-
-@media (max-width: 1400px) {
-
-  .sidebar {
-    width: 250px;
-  }
-
-  .sidebar-toggle {
-    left: 230px;
-  }
-
-  .sidebar-toggle.collapsed {
-    left: 64px;
-  }
-
-}
-
-/* =========================================================
-   TABLET
-========================================================= */
+/* =====================================================
+   TABLET + MOBILE
+===================================================== */
 
 @media (max-width: 991.98px) {
 
   .sidebar {
-    position: fixed;
-
-    top: 0;
-    left: -300px;
-
+    transform: translateX(-100%);
     width: 280px;
-
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.15);
   }
 
   .sidebar.mobile-open {
-    left: 0;
+    transform: translateX(0);
   }
 
 }
 
-/* =========================================================
+/* =====================================================
    SMARTPHONE
-========================================================= */
+===================================================== */
 
 @media (max-width: 576px) {
 
   .sidebar {
-    width: 100%;
-    max-width: 300px;
+    width: min(85vw, 320px);
   }
 
 }

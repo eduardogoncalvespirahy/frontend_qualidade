@@ -1,9 +1,19 @@
-<div class="d-flex gap-3 align-items-start">
-  <span class="dialog-icon text-warning">⚠</span>
-  <div>
-    <p class="mb-0">{{ message() }}</p>
-    @if (details()) {
-      <p class="mb-0 mt-1 small text-body-secondary">{{ details() }}</p>
+<div class="exit-container">
+  <div class="exit-icon">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+  </div>
+
+  <div class="exit-content">
+    <h5 class="exit-title">Confirmação</h5>
+
+    <p class="exit-message">
+      {{ message() }}
+    </p>
+
+    @if (hasDetails()) {
+      <div class="exit-details">
+        {{ details() }}
+      </div>
     }
   </div>
 </div>

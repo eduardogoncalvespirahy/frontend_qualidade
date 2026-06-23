@@ -1,13 +1,12 @@
 <div class="app-layout">
-
   <app-sidebar />
 
-  <main class="page-content">
-
+  <main
+    class="page-content"
+    [class.sidebar-collapsed]="layout.collapsed()"
+  >
     <div class="page-container">
       <router-outlet />
     </div>
-
   </main>
-
 </div>

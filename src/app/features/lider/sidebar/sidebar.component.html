@@ -11,20 +11,20 @@
 
 <button
   class="sidebar-toggle d-none d-lg-flex"
-  [class.collapsed]="collapsed()"
+  [class.collapsed]="layout.collapsed()"
   (click)="toggleSidebar()"
   type="button"
 >
   <i
     class="bi"
-    [class.bi-chevron-left]="!collapsed()"
-    [class.bi-chevron-right]="collapsed()"
+    [class.bi-chevron-left]="!layout.collapsed()"
+    [class.bi-chevron-right]="layout.collapsed()"
   ></i>
 </button>
 
 <!-- Backdrop -->
 
-@if (mobileOpen()) {
+@if (layout.mobileOpen()) {
   <div
     class="sidebar-backdrop"
     (click)="toggleMobile()"
@@ -35,8 +35,8 @@
 
 <aside
   class="sidebar"
-  [class.collapsed]="collapsed()"
-  [class.mobile-open]="mobileOpen()"
+  [class.collapsed]="layout.collapsed()"
+  [class.mobile-open]="layout.mobileOpen()"
 >
   <!-- Brand -->
 
@@ -46,7 +46,7 @@
       <i class="bi bi-shield-check"></i>
     </div>
 
-    @if (!collapsed()) {
+    @if (!layout.collapsed()) {
       <div class="brand-info">
         <div class="brand-title">
           Quality App
@@ -68,7 +68,7 @@
       <i class="bi bi-person"></i>
     </div>
 
-    @if (!collapsed()) {
+    @if (!layout.collapsed()) {
       <div>
         <div class="user-name">
           Administrador
@@ -88,7 +88,7 @@
 
     <div class="sidebar-section">
 
-      @if (!collapsed()) {
+      @if (!layout.collapsed()) {
         <div class="sidebar-section-title">
           Operação
         </div>
@@ -103,7 +103,7 @@
         >
           <i class="bi bi-house-door"></i>
 
-          @if (!collapsed()) {
+          @if (!layout.collapsed()) {
             <span>Home</span>
           }
         </a>
@@ -115,7 +115,7 @@
         >
           <i class="bi bi-clipboard-check"></i>
 
-          @if (!collapsed()) {
+          @if (!layout.collapsed()) {
             <span>Painel de Inspeção</span>
           }
         </a>
@@ -127,7 +127,7 @@
         >
           <i class="bi bi-clock-history"></i>
 
-          @if (!collapsed()) {
+          @if (!layout.collapsed()) {
             <span>Histórico</span>
           }
         </a>
@@ -138,7 +138,7 @@
 
     <div class="sidebar-section">
 
-      @if (!collapsed()) {
+      @if (!layout.collapsed()) {
         <div class="sidebar-section-title">
           Administração
         </div>
@@ -153,7 +153,7 @@
         >
           <i class="bi bi-gear"></i>
 
-          @if (!collapsed()) {
+          @if (!layout.collapsed()) {
             <span>Configurações</span>
           }
         </a>
@@ -174,7 +174,7 @@
     >
       <i class="bi bi-box-arrow-right"></i>
 
-      @if (!collapsed()) {
+      @if (!layout.collapsed()) {
         <span>Sair</span>
       }
     </button>

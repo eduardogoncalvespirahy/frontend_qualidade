@@ -1,208 +1,240 @@
 <div class="machine-page">
-
   <!-- HEADER -->
 
   <section class="page-header">
+    <section class="filters-card">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Máquina</label>
+
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Nome da máquina"
+            [value]="filterMachine()"
+            (input)="filterMachine.set($any($event.target).value)"
+          />
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Local</label>
+
+          <select
+            class="form-select"
+            [value]="filterLocation()"
+            (change)="filterLocation.set($any($event.target).value)"
+          >
+            <option value="">Todos</option>
+
+            @for (location of locations(); track location.id) {
+              <option [value]="location.id">
+                {{ location.nome }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Seção</label>
+
+          <select
+            class="form-select"
+            [value]="filterSection()"
+            (change)="filterSection.set($any($event.target).value)"
+          >
+            <option value="">Todas</option>
+
+            @for (section of sections(); track section.id) {
+              <option [value]="section.id">
+                {{ section.nome }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Formulário</label>
+
+          <select
+            class="form-select"
+            [value]="filterForm()"
+            (change)="filterForm.set($any($event.target).value)"
+          >
+            <option value="">Todos</option>
+
+            @for (form of forms(); track form.id) {
+              <option [value]="form.id">
+                {{ form.nome }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Status</label>
+
+          <select
+            class="form-select"
+            [value]="filterStatus()"
+            (change)="filterStatus.set($any($event.target).value)"
+          >
+            <option value="">Todos</option>
+            <option value="1">Ativo</option>
+            <option value="0">Inativo</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Criado de</label>
+
+          <input
+            type="date"
+            class="form-control"
+            [value]="filterCreatedStart()"
+            (input)="filterCreatedStart.set($any($event.target).value)"
+          />
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Criado até</label>
+
+          <input
+            type="date"
+            class="form-control"
+            [value]="filterCreatedEnd()"
+            (input)="filterCreatedEnd.set($any($event.target).value)"
+          />
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Alterado até</label>
+
+          <input
+            type="date"
+            class="form-control"
+            [value]="filterUpdatedEnd()"
+            (input)="filterUpdatedEnd.set($any($event.target).value)"
+          />
+        </div>
+      </div>
+    </section>
 
     <div>
-      <h2 class="page-title">
-        Máquinas
-      </h2>
+      <h2 class="page-title">Máquinas</h2>
 
-      <p class="page-description">
-        Gerencie máquinas vinculadas aos formulários e unidades.
-      </p>
+      <p class="page-description">Gerencie máquinas vinculadas aos formulários e unidades.</p>
     </div>
 
     <div class="page-actions">
-
-      <div class="search-box">
-        <i class="bi bi-search"></i>
-
-        <input
-          type="search"
-          class="form-control"
-          placeholder="Pesquisar máquina..."
-          [value]="query()"
-          (input)="onSearch($any($event.target).value)"
-        />
-      </div>
-
-      <button
-        class="btn btn-outline-secondary"
-        (click)="reload()"
-      >
+      <button class="btn btn-outline-secondary" (click)="reload()">
         <i class="bi bi-arrow-clockwise"></i>
       </button>
 
-      <button
-        class="btn btn-primary"
-        (click)="novo()"
-      >
+      <button class="btn btn-primary" (click)="novo()">
         <i class="bi bi-plus-lg"></i>
 
         <span>Nova Máquina</span>
       </button>
-
     </div>
-
   </section>
 
   <!-- LOADING -->
 
   @if (loading()) {
-
     <div class="empty-state">
-
       <div class="spinner-border text-primary"></div>
 
       <p>Carregando informações...</p>
-
     </div>
-
   }
 
   <!-- ERRO -->
 
   @else if (hasError()) {
-
     <div class="alert alert-danger">
-
       <i class="bi bi-exclamation-triangle-fill me-2"></i>
 
       Não foi possível carregar os dados.
 
-      <button
-        class="btn btn-outline-danger btn-sm ms-3"
-        (click)="reload()"
-      >
+      <button class="btn btn-outline-danger btn-sm ms-3" (click)="reload()">
         Tentar novamente
       </button>
-
     </div>
-
   }
 
   <!-- DADOS -->
 
   @else {
-
     @for (group of grouped(); track group.location.id) {
-
       <section class="location-section">
-
         <div class="location-header">
-
           <div class="location-info">
-
             <div class="location-icon">
               <i class="bi bi-geo-alt-fill"></i>
             </div>
 
             <div>
-
               <h4>
                 {{ group.location.nome }}
               </h4>
 
-              <span>
-                {{ group.machines.length }} máquinas cadastradas
-              </span>
-
+              <span> {{ group.machines.length }} máquinas cadastradas </span>
             </div>
-
           </div>
-
         </div>
 
         @if (group.machines.length === 0) {
-
           <div class="empty-card">
-
             <i class="bi bi-inboxes"></i>
 
             <p>Nenhuma máquina encontrada.</p>
-
           </div>
-
         } @else {
-
           <div class="machines-grid">
-
             @for (item of group.machines; track item.machine.id) {
-
-              <div
-                class="machine-card"
-                (click)="detalhar(item.machine)"
-              >
-
+              <div class="machine-card" (click)="detalhar(item.machine)">
                 <div class="machine-card-header">
-
                   <div>
-
-                    <div class="machine-code">
-                      #{{ item.machine.id }}
-                    </div>
+                    <div class="machine-code">#{{ item.machine.id }}</div>
 
                     <h5>
                       {{ item.machine.nome }}
                     </h5>
-
                   </div>
 
-                  <span
-                    class="status-badge"
-                    [class.active]="item.machine.status === 1"
-                  >
+                  <span class="status-badge" [class.active]="item.machine.status === 1">
                     {{ statusLabel(item.machine.status) }}
                   </span>
-
                 </div>
 
                 <div class="machine-card-body">
-
                   <div class="info-row">
-
                     <i class="bi bi-file-earmark-text"></i>
 
                     <span>
                       {{ item.form?.nome ?? 'Sem formulário' }}
                     </span>
-
                   </div>
 
                   <div class="info-row">
-
                     <i class="bi bi-diagram-3"></i>
 
                     <span>
                       {{ item.section?.nome ?? 'Sem seção' }}
                     </span>
-
                   </div>
-
                 </div>
 
                 <div class="machine-card-footer">
-
                   <span>Visualizar detalhes</span>
 
                   <i class="bi bi-arrow-right"></i>
-
                 </div>
-
               </div>
-
             }
-
           </div>
-
         }
-
       </section>
-
     }
-
   }
-
 </div>

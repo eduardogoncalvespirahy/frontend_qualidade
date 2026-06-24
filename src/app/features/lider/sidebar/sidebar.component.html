@@ -50,22 +50,29 @@
 
   <!-- User -->
 
-  <div class="sidebar-user">
-    <div class="user-avatar">
-      <i class="bi bi-person"></i>
-    </div>
+<div class="sidebar-user">
+  <div class="user-avatar">
+    {{ auth.userProfile()?.employeeNome?.charAt(0) }}
+  </div>
 
-    @if (!layout.collapsed()) {
-
-      <div class="user-name">
+  @if (!layout.collapsed()) {
+    <div class="user-info">
+      <div
+        class="user-name"
+        [title]="auth.userProfile()?.employeeNome"
+      >
         {{ auth.userProfile()?.employeeNome }}
       </div>
 
-      <div class="user-role">
+      <div
+        class="user-job"
+        [title]="auth.userProfile()?.jobPositionNome"
+      >
         {{ auth.userProfile()?.jobPositionNome }}
       </div>
-    }
-  </div>
+    </div>
+  }
+</div>
 
   <!-- Body -->
 

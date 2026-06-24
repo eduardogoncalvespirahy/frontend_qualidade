@@ -1,26 +1,20 @@
-export interface Answer { //parametros/perguntas
+export interface Category { //parametros/perguntas
   id: string;
-  formId: string;
   nome: string;
   descricao: string | null;
   status: number;
   dataCriacao: Date;
   dataAlteracao: Date;
-  categoryId: number;
 }
 
-export interface AnswerCreate {
-  formId: string;
+export interface CategoryCreate {
   nome: string;
   descricao?: string | null;
   status?: number;
-  categoryId?: number;
 }
 
-export interface AnswerUpdate {
-  formId?: string;
+export interface CategoryUpdate {
   nome?: string;
   descricao?: string | null;
   status?: number;
-  categoryId?: number;
 }

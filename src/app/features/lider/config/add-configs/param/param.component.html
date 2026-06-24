@@ -1,11 +1,12 @@
 <div class="param-page">
-
   <!-- HEADER -->
 
   <section class="page-header">
     <div>
       <h2 class="page-title">Parâmetros e Regras</h2>
-      <p class="page-description">Gerencie parâmetros e limites vinculados às máquinas e formulários.</p>
+      <p class="page-description">
+        Gerencie parâmetros e limites vinculados às máquinas e formulários.
+      </p>
     </div>
     <div class="page-actions">
       <div class="search-box">
@@ -39,7 +40,9 @@
     <div class="alert alert-danger">
       <i class="bi bi-exclamation-triangle-fill me-2"></i>
       Não foi possível carregar os dados.
-      <button class="btn btn-outline-danger btn-sm ms-3" (click)="reload()">Tentar novamente</button>
+      <button class="btn btn-outline-danger btn-sm ms-3" (click)="reload()">
+        Tentar novamente
+      </button>
     </div>
   }
 
@@ -48,7 +51,6 @@
   @else {
     @for (locGroup of grouped(); track locGroup.location.id) {
       <section class="location-section">
-
         <!-- LOCATION HEADER -->
         <div class="location-header">
           <div class="location-info">
@@ -63,7 +65,6 @@
         </div>
 
         @for (secGroup of locGroup.sections; track secGroup.section.id) {
-
           <!-- SECTION LABEL -->
           <div class="section-label">
             <i class="bi bi-diagram-3"></i>
@@ -76,20 +77,22 @@
               <p>Nenhum formulário encontrado nesta seção.</p>
             </div>
           } @else {
-
             <!-- FORM CARDS -->
             <div class="machines-grid">
               @for (fg of secGroup.forms; track fg.form.id) {
-
                 <div class="machine-card" (click)="listar(fg)">
                   <div class="machine-card-header">
                     <div>
                       <div class="machine-code">#{{ fg.form.id }}</div>
                       <h5>{{ fg.form.nome }}</h5>
                     </div>
-                    <span class="status-badge active">
-                      {{ totalFormParams(fg) }} params
-                    </span>
+                    <span class="status-badge active"> {{ totalFormParams(fg) }} params </span>
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      (click)="$event.stopPropagation(); novo(fg.form.id)"
+                    >
+                      <i class="bi bi-plus"></i>
+                    </button>
                   </div>
 
                   <div class="machine-card-body">
@@ -108,17 +111,13 @@
                     <i class="bi bi-chevron-right"></i>
                   </div>
                 </div>
-
               }
             </div>
-
           }
         }
-
       </section>
     } @empty {
       <p class="text-muted">Nenhum local cadastrado.</p>
     }
   }
-
 </div>

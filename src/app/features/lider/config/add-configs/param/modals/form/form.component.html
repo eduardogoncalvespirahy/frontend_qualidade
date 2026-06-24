@@ -1,1 +1,53 @@
-<p>form works!</p>
+<div>
+  <div>
+    <p class="text-muted mb-0">
+      {{ mode() === 'new' ? 'Novo Parâmetro' : 'Editar Parâmetro' }}
+    </p>
+  </div>
+  <div style="margin-top: 1rem">
+    <label for="nome">Nome</label>
+    <input
+      id="nome"
+      name="nome"
+      type="text"
+      class="form-control"
+      [(ngModel)]="nome"
+      placeholder="Informe o nome do parâmetro"
+    />
+  </div>
+  <div style="margin-top: 1rem">
+    <label for="descricao">Descrição</label>
+    <textarea
+      id="descricao"
+      name="descricao"
+      class="form-control"
+      rows="3"
+      [(ngModel)]="descricao"
+      placeholder="Descrição do parâmetro (opcional)"
+    ></textarea>
+  </div>
+  <div style="margin-top: 1rem">
+    <label>Status</label>
+    <div class="form-check form-switch">
+      <input
+        id="status"
+        name="status"
+        type="checkbox"
+        class="form-check-input"
+        [(ngModel)]="status"
+      />
+      <label class="form-check-label" for="status">
+        {{ status ? 'Ativo' : 'Inativo' }}
+      </label>
+    </div>
+    <div style="margin-top: 1rem">
+      <label for="categoryId">Categoria</label>
+      <select id="categoryId" name="categoryId" class="form-select" [(ngModel)]="categoryId">
+        <option [value]="0">Selecione uma categoria</option>
+        @for (cat of categories(); track cat.id) {
+          <option [value]="+cat.id">{{ cat.nome }}</option>
+        }
+      </select>
+    </div>
+  </div>
+</div>

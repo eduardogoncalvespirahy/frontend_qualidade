@@ -10,6 +10,7 @@ import { LimitAnswerMachine } from '../../../../../../../core/models/limit-answe
 import { ModalService } from '../../../../../../../core/services/modal.service';
 import { AnswerService } from '../../../../../../../core/services/answer.service';
 
+import { FormComponent } from '../form/form.component';
 
 // Os 4 possíveis tipos de parâmetro que este componente pode exibir
 export type ParamType = 'answer' | 'answerMachine' | 'limitAnswer' | 'limitAnswerMachine';
@@ -93,20 +94,36 @@ protected async deletar(item: ParamItem): Promise<void> {
 }
 
 protected async editar(item: ParamItem): Promise<void> {
-  const confirmed = await this.modalService.open<boolean>({
+  const ref = this.modalService.openComponent(FormComponent, {
     title: `Editar: ${item.nome}`,
-    centered: true,
+    size: 'lg',
     backdrop: 'static',
+    inputs: {
+      mode: 'edit',
+      item: item as Answer,
+      parentId: (item as any).formId ?? (item as any).machineId ?? '',
+    },
     buttons: [
       { text: 'Cancelar', variant: 'secondary', value: false },
-      { text: 'Salvar', variant: 'primary', value: true },
+      { text: 'Salvar', variant: 'primary', value: true, submit: true },
     ],
-  }).result;
+  });
 
+  const confirmed = await ref.result;
   if (!confirmed) return;
 
-  this.reload_return.emit(true);
+  const value = ref.instance.value();
+
+  this.answerService.update(value.id, {
+    nome: value.nome,
+    descricao: value.descricao,
+    status: value.status,
+    categoryId: value.categoryId
+  }).subscribe({
+    next: () => this.reload_return.emit(true),
+  });
 }
+
 
 
 

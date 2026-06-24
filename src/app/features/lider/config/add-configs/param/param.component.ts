@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { catchError, of } from 'rxjs';
+import { FormGroupDirective } from '@angular/forms';
 
 import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
@@ -11,6 +12,7 @@ import { AnswerMachine } from '../../../../../core/models/answer-machine.model';
 import { LimitAnswer } from '../../../../../core/models/limit-answer.model';
 import { LimitAnswerMachine } from '../../../../../core/models/limit-answer-machine.model';
 import { PaginatedResult } from '../../../../../core/models/paginated.model';
+import { Category } from '../../../../../core/models/category-answer.model';
 
 import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
@@ -21,10 +23,14 @@ import { AnswerMachineService } from '../../../../../core/services/answer-machin
 import { LimitAnswerService } from '../../../../../core/services/limit-answer.service';
 import { LimitAnswerMachineService } from '../../../../../core/services/limit-answer-machine.service';
 import { ModalService } from '../../../../../core/services/modal.service';
+import { CategoryService } from '../../../../../core/services/category-answer.service';
 
 import { DetailComponent, ParamItem, ParamType } from './modals/detail/detail.component';
 import { ListComponent } from './modals/list/list.component';
-import { FormGroupDirective } from '@angular/forms';
+import { FormComponent } from './modals/form/form.component';
+
+
+
 
 
 // Resultado vazio padrão usado quando a API retorna erro (tabela sem dados ainda).
@@ -54,6 +60,7 @@ export class ParamComponent {
   private readonly answerMachineService = inject(AnswerMachineService);
   private readonly limitAnswerService = inject(LimitAnswerService);
   private readonly limitAnswerMachineService = inject(LimitAnswerMachineService);
+  private readonly categoryService = inject(CategoryService);
 
   private readonly modalService = inject(ModalService)
 
@@ -70,6 +77,10 @@ export class ParamComponent {
   // RECURSOS CRÍTICOS — se falharem, a hierarquia não monta e mostramos erro:
   protected readonly locationsResource = rxResource<PaginatedResult<Location>, void>({
     stream: () => this.locationService.getAll(100),
+  });
+
+  protected readonly categoryResource = rxResource<PaginatedResult<Category>, void>({
+    stream: () => this.categoryService.getAll(100),
   });
 
   protected readonly sectionsResource = rxResource<PaginatedResult<Section>, void>({
@@ -118,6 +129,7 @@ export class ParamComponent {
   protected readonly forms     = computed(() => this.formsResource.value()?.data ?? []);
   protected readonly machines  = computed(() => this.machinesResource.value()?.data ?? []);
   protected readonly answers              = computed(() => this.answersResource.value()?.data ?? []);
+  protected readonly category             = computed(() => this.categoryResource.value()?.data ?? []);
   protected readonly answerMachines       = computed(() => this.answerMachinesResource.value()?.data ?? []);
   protected readonly limitAnswers         = computed(() => this.limitAnswersResource.value()?.data ?? []);
   protected readonly limitAnswerMachines  = computed(() => this.limitAnswerMachinesResource.value()?.data ?? []);
@@ -235,6 +247,11 @@ export class ParamComponent {
     this.limitAnswersResource.reload();
     this.limitAnswerMachinesResource.reload();
   }
+
+  // ============================
+  //    Metodos e etc dos modais
+  // =============================
+
   protected async detalhar( type:ParamType, item:ParamItem): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
       title: `${item.nome}`,
@@ -275,6 +292,37 @@ export class ParamComponent {
 
     await ref.result
   }
+
+  protected async novo(formId: string): Promise<void> {
+  const ref = this.modalService.openComponent(FormComponent, {
+    title: 'Novo Parâmetro',
+    size: 'lg',
+    backdrop: 'static',
+    inputs: {
+      mode: 'new',
+      parentId: formId,
+    },
+    buttons: [
+      { text: 'Cancelar', variant: 'secondary', value: false },
+      { text: 'Criar', variant: 'primary', value: true, submit: true },
+    ],
+  });
+
+  const confirmed = await ref.result;
+  if (!confirmed) return;
+
+  const value = ref.instance.value();
+
+  this.answerService.create({
+    formId: value.formId,
+    nome: value.nome,
+    descricao: value.descricao,
+    status: value.status,
+  }).subscribe({
+    next: () => this.reload(),
+  });
+}
+
 
   protected statusLabel(status: number): string {
     return status === 1 ? 'Ativo' : 'Inativo';

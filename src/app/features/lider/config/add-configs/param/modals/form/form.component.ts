@@ -1,65 +1,69 @@
-// import { ChangeDetectionStrategy, Component, input, OnInit } from '@angular/core';
-// import { FormsModule } from '@angular/forms';
-// import { Answer } from '../../../../../core/models/answer.model';
-// import { AnswerMachine } from '../../../../../core/models/answer-machine.model';
-// import { LimitAnswer } from '../../../../../core/models/limit-answer.model';
-// import { LimitAnswerMachine } from '../../../../../core/models/limit-answer-machine.model';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { rxResource } from '@angular/core/rxjs-interop';
 
-// export type ParamType = 'answer' | 'answerMachine' | 'limitAnswer' | 'limitAnswerMachine';
-// export type ParamItem = Answer | AnswerMachine | LimitAnswer | LimitAnswerMachine;
+import { Answer } from '../../../../../../../core/models/answer.model';
 
-// @Component({
-//   selector: 'app-param-form',
-//   standalone: true,
-//   imports: [FormsModule],
-//   changeDetection: ChangeDetectionStrategy.OnPush,
-//   templateUrl: './form.component.html',
-//   styleUrl: './form.component.css',
-// })
-// export class FormComponent implements OnInit {
-//   readonly paramType = input.required<ParamType>();
-//   readonly mode = input<'new' | 'edit'>('new');
-//   readonly item = input<ParamItem | null>(null);
-//   readonly parentId = input<string>('');
+import { CategoryService } from '../../../../../../../core/services/category-answer.service';
 
-//   protected id = '';
-//   protected nome = '';
-//   protected descricao = '';
-//   protected status = true;
-//   protected dataCriacao: Date = new Date();
-//   protected dataAlteracao: Date = new Date();
+@Component({
+  selector: 'app-form',
+  standalone: true,
+  imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './form.component.html',
+  styleUrl: './form.component.css',
+})
+export class FormComponent implements OnInit {
+  // Modo: 'new' para criar, 'edit' para editar
+  readonly mode = input<'new' | 'edit'>('new');
 
-//   protected readonly paramTypeLabel: Record<ParamType, string> = {
-//     answer: 'Parâmetro do Formulário',
-//     answerMachine: 'Parâmetro da Máquina',
-//     limitAnswer: 'Limite',
-//     limitAnswerMachine: 'Limite da Máquina',
-//   };
+  // Item existente — só passado quando mode = 'edit'
+  readonly item = input<Answer | null>(null);
 
-//   ngOnInit(): void {
-//     const u = this.item();
-//     if (u) {
-//       this.id = u.id;
-//       this.nome = u.nome;
-//       this.descricao = u.descricao || '';
-//       this.status = u.status === 1;
-//       this.dataCriacao = u.dataCriacao;
-//       this.dataAlteracao = u.dataAlteracao;
-//     }
-//   }
+  // ID do formulário pai — passado quando mode = 'new'
+  readonly parentId = input<string>('');
 
-//   value(): ParamItem {
-//     const base = {
-//       id: this.id,
-//       nome: this.nome,
-//       descricao: this.descricao || null,
-//       status: this.status ? 1 : 0,
-//       dataCriacao: this.dataCriacao,
-//       dataAlteracao: this.dataAlteracao,
-//     };
-//     if (this.paramType() === 'answer') {
-//       return { ...base, formId: this.parentId() } as Answer;
-//     }
-//     return { ...base, machineId: this.parentId() } as AnswerMachine;
-//   }
-// }
+  // traz categoria
+  private readonly categoryService = inject(CategoryService);
+
+  // para fazer as pesquisas 
+  protected readonly categoriesResource = rxResource({
+    stream: () => this.categoryService.getAll(),
+  });
+
+  protected readonly categories = computed(() => this.categoriesResource.value()?.data ?? []);
+
+  // Campos do formulário
+  protected id = '';
+  protected nome = '';
+  protected descricao = '';
+  protected status = true;
+  protected dataCriacao: Date = new Date(); // só usada no create
+  protected categoryId: number = 1;
+
+  ngOnInit(): void {
+    const u = this.item();
+    if (u) {
+      this.id = u.id;
+      this.nome = u.nome;
+      this.descricao = u.descricao || '';
+      this.status = u.status === 1;
+      this.dataCriacao = u.dataCriacao; // preserva a data original
+      this.categoryId = u.categoryId;
+    }
+  }
+
+  value(): Answer {
+    return {
+      id: this.id,
+      formId: this.parentId(),
+      nome: this.nome,
+      descricao: this.descricao || null,
+      status: this.status ? 1 : 0,
+      dataCriacao: this.dataCriacao, // retorna a original
+      dataAlteracao: new Date(), // sempre atualiza
+      categoryId: this.categoryId,
+    };
+  }
+}

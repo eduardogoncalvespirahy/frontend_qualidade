@@ -11,7 +11,7 @@ import { LimitAnswerMachine, LimitAnswerMachineCreate, LimitAnswerMachineUpdate 
 export class LimitAnswerMachineService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl = `${environment.apiUrl}limits-answers-machine`;
+  private readonly apiUrl = `${environment.apiUrl}/limits-machine-answers`;
 
   private readonly httpOptions = {
     headers: new HttpHeaders({

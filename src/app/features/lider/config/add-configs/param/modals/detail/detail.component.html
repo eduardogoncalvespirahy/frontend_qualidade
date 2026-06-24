@@ -1,0 +1,39 @@
+@if (item(); as item) {
+  <div>
+    <div>
+      <div>
+        <small> {{ typeLabel() }} </small>
+        <h5>{{ item.nome }}</h5>
+      </div>
+      <span> {{ statusLabel() }} </span>
+    </div>
+
+    <div>
+      <div>
+        <small>Vinculo: </small>
+        <strong> {{ parentLabel() }} </strong>
+      </div>
+      <div>
+        <small>Descricao: </small>
+        <p>{{ item.descricao || 'Nenhuma descrição informada.' }}</p>
+      </div>
+      <div>
+        <small>Criado em: </small>
+        <strong> {{ item.dataCriacao | date: 'dd/MM/yyyy HH:mm' }} </strong>
+      </div>
+      <div>
+        <small>Alterado em: </small>
+        <strong> {{ item.dataAlteracao | date: 'dd/MM/yyyy HH:mm' }} </strong>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 1rem; display: flex; gap: 0.5rem">
+    <button class="btn btn-outline-primary" (click)="editar(item)">
+      <i class="bi bi-pencil me-2"></i>Editar
+    </button>
+    <button class="btn btn-outline-danger" (click)="deletar(item)">
+      <i class="bi bi-trash me-2"></i>Deletar
+    </button>
+  </div>
+}

@@ -20,6 +20,12 @@ import { AnswerService } from '../../../../../core/services/answer.service';
 import { AnswerMachineService } from '../../../../../core/services/answer-machine.service';
 import { LimitAnswerService } from '../../../../../core/services/limit-answer.service';
 import { LimitAnswerMachineService } from '../../../../../core/services/limit-answer-machine.service';
+import { ModalService } from '../../../../../core/services/modal.service';
+
+import { DetailComponent, ParamItem, ParamType } from './modals/detail/detail.component';
+import { ListComponent } from './modals/list/list.component';
+import { FormGroupDirective } from '@angular/forms';
+
 
 // Resultado vazio padrão usado quando a API retorna erro (tabela sem dados ainda).
 // Isso impede que um endpoint vazio bloqueie a exibição de toda a tela.
@@ -49,11 +55,12 @@ export class ParamComponent {
   private readonly limitAnswerService = inject(LimitAnswerService);
   private readonly limitAnswerMachineService = inject(LimitAnswerMachineService);
 
+  private readonly modalService = inject(ModalService)
+
   // ─── Estado local ─────────────────────────────────────────────────────────
   // signal() cria uma variável reativa: quando muda, o Angular re-renderiza
   // apenas os trechos do template que a utilizam.
   protected readonly query = signal('');                      // texto da busca
-  protected readonly expandedFormId = signal<string | null>(null); // qual card está expandido
 
   // ─── Recursos (chamadas HTTP) ─────────────────────────────────────────────
   // rxResource faz a chamada HTTP e expõe .value(), .isLoading(), .error().
@@ -217,11 +224,6 @@ export class ParamComponent {
     this.query.set(value);
   }
 
-  // Abre/fecha o painel de detalhes de um formulário ao clicar no card
-  protected toggleForm(id: string): void {
-    this.expandedFormId.update((current) => (current === id ? null : id));
-  }
-
   // Recarrega todos os recursos (botão de refresh no header)
   protected reload(): void {
     this.locationsResource.reload();
@@ -232,6 +234,46 @@ export class ParamComponent {
     this.answerMachinesResource.reload();
     this.limitAnswersResource.reload();
     this.limitAnswerMachinesResource.reload();
+  }
+  protected async detalhar( type:ParamType, item:ParamItem): Promise<void> {
+    const ref = this.modalService.openComponent(DetailComponent, {
+      title: `${item.nome}`,
+      size:'lg',
+      inputs: {item, paramType: type},
+      outputs: {
+        reload_return: (value: unknown) => {
+          if (value) {
+            ref.close();
+            this.reload();
+          }
+        }
+      },
+      buttons: [{ text: 'Fechar', variant: 'secondary', value: true}],
+    })
+
+    await ref.result
+  }
+
+  protected async listar( fg: FormGroup): Promise<void> {
+    const ref = this.modalService.openComponent(ListComponent, {
+      title: `Parametros: ${fg.form.nome}`,
+      size:'lg',
+      scrollable: true,
+      inputs: {
+        answers: fg.answers,
+        formNome: fg.form.nome
+      },
+      outputs: {
+        selecionado: (item: unknown) => {
+          ref.close();
+          const answer = item as Answer
+          this.detalhar('answer', answer);
+        }
+      },
+      buttons: [{ text: 'Fechar', variant: 'secondary', value: true}],
+    })
+
+    await ref.result
   }
 
   protected statusLabel(status: number): string {

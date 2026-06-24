@@ -11,7 +11,7 @@ import { PaginatedResult } from '../models/paginated.model';
 export class LimitAnswerService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl = `${environment.apiUrl}limits-answers`;
+  private readonly apiUrl = `${environment.apiUrl}/limits-answers`;
 
   private readonly httpOptions = {
     headers: new HttpHeaders({

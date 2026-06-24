@@ -1,0 +1,30 @@
+<div>
+  <p class="text-muted mb-3">Parâmetros do formulário: <strong>{{ formNome() }}</strong></p>
+
+  @if (answers().length === 0) {
+    <p class="text-muted">Nenhum parâmetro cadastrado.</p>
+  } @else {
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Nome</th>
+          <th>Descrição</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (a of answers(); track a.id) {
+          <tr style="cursor:pointer" (click)="selecionar(a)">
+            <td class="fw-medium">{{ a.nome }}</td>
+            <td class="text-muted small">{{ a.descricao ?? '—' }}</td>
+            <td>
+              <span class="badge" [class.text-bg-success]="a.status === 1" [class.text-bg-secondary]="a.status !== 1">
+                {{ a.status === 1 ? 'Ativo' : 'Inativo' }}
+              </span>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

@@ -2,17 +2,15 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 
-import { Observable, EMPTY, finalize, switchMap, tap } from 'rxjs';
+import { Observable, EMPTY, catchError, finalize, switchMap, tap, throwError } from 'rxjs';
 
 import { CookieService } from './cookie.service';
 import { UserService } from './user.service';
-import { EmployeeService } from './employee.service';
 
 import { environment } from '../../../environments/environment';
 
 import { LoginRequest, LoginResponse } from '../models/auth.model';
-import { User } from '../models/user.model';
-import { Employee } from '../models/employee.model';
+import { UserProfile } from '../models/user-profile.model';
 
 const TOKEN_KEY = 'aq_token';
 const REFRESH_KEY = 'aq_refresh';
@@ -28,7 +26,6 @@ export class AuthService {
   private readonly router = inject(Router);
 
   private readonly userService = inject(UserService);
-  private readonly employeeService = inject(EmployeeService);
 
   // =====================================================
   // AUTH
@@ -49,35 +46,123 @@ export class AuthService {
   readonly credentialId = this._credentialId.asReadonly();
 
   // =====================================================
-  // SESSION
+  // PROFILE
   // =====================================================
 
-  private readonly _user = signal<User | null>(null);
-  private readonly _employee = signal<Employee | null>(null);
+  private readonly _userProfile = signal<UserProfile | null>(null);
+
   private readonly _loading = signal(false);
 
-  readonly user = this._user.asReadonly();
-  readonly employee = this._employee.asReadonly();
+  readonly userProfile = this._userProfile.asReadonly();
+
   readonly loading = this._loading.asReadonly();
 
-  readonly fullName = computed(() => this._employee()?.personName ?? '');
+  readonly isProfileLoaded = computed(() => this._userProfile() !== null);
 
-  readonly isProfileLoaded = computed(() => !!this._user() && !!this._employee());
+  constructor() {}
 
-  constructor() {
-    const userId = this._userId();
+  // =====================================================
+  // LOGIN
+  // =====================================================
 
-    if (userId && this._token()) {
-      this.loadProfile();
-    }
-  }
-
-  login(request: LoginRequest): Observable<LoginResponse> {
+  login(request: LoginRequest): Observable<UserProfile> {
     return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, request).pipe(
-      tap((res) => this.insert(res)),
-      tap(() => this.loadProfile()),
+      tap((response) => {
+        this.insert(response);
+      }),
+
+      switchMap(() => {
+        const userId = this.userId();
+
+        if (!userId) {
+          return throwError(() => new Error('UserId não encontrado'));
+        }
+
+        return this.userService.getByIdUserProfile(userId);
+      }),
+
+      tap((profile) => {
+        this._userProfile.set(profile);
+      }),
     );
   }
+
+  // =====================================================
+  // SESSION RESTORE
+  // =====================================================
+
+  restoreSession(): void {
+    const token = this._token();
+    const userId = this._userId();
+
+    if (!token || !userId) {
+      return;
+    }
+
+    this.loadProfile().subscribe({
+      error: (error) => {
+        console.error('Erro ao restaurar sessão:', error);
+      },
+    });
+  }
+
+  // =====================================================
+  // PROFILE
+  // =====================================================
+
+  loadProfile(): Observable<UserProfile> {
+    const userId = this.userId();
+
+    if (!userId) {
+      return throwError(() => new Error('UserId não encontrado'));
+    }
+
+    if (this._loading()) {
+      return EMPTY;
+    }
+
+    this._loading.set(true);
+
+    return this.userService.getByIdUserProfile(userId).pipe(
+      tap((profile) => {
+        this._userProfile.set(profile);
+      }),
+
+      finalize(() => {
+        this._loading.set(false);
+      }),
+
+      catchError((error) => {
+        console.error('Erro ao carregar perfil:', error);
+
+        this.clearProfile();
+
+        return throwError(() => error);
+      }),
+    );
+  }
+
+  refreshProfile(): void {
+    this.clearProfile();
+
+    this.loadProfile().subscribe({
+      error: (error) => {
+        console.error(error);
+      },
+    });
+  }
+
+  forceReloadProfile(): void {
+    this.refreshProfile();
+  }
+
+  private clearProfile(): void {
+    this._userProfile.set(null);
+  }
+
+  // =====================================================
+  // LOGOUT
+  // =====================================================
 
   logout(): void {
     this.clearProfile();
@@ -86,64 +171,19 @@ export class AuthService {
     this.router.navigate(['/login']);
   }
 
-  loadProfile(): void {
-    if (this.isProfileLoaded()) {
-      return;
-    }
+  // =====================================================
+  // COOKIE MANAGEMENT
+  // =====================================================
 
-    const userId = this.userId();
+  private insert(response: LoginResponse): void {
+    this.write(TOKEN_KEY, response.token);
+    this.write(REFRESH_KEY, response.refreshToken);
+    this.write(USER_ID, response.userId);
+    this.write(CREDENTIAL_ID, response.credentialId);
 
-    if (!userId) {
-      return;
-    }
-
-    if (this._loading()) {
-      return;
-    }
-
-    this._loading.set(true);
-
-    this.userService
-      .getById(userId)
-      .pipe(
-        tap((user) => this._user.set(user)),
-        switchMap((user) => this.employeeService.getById(user.employeeId)),
-        finalize(() => this._loading.set(false)),
-      )
-      .subscribe({
-        next: (employee) => {
-          this._employee.set(employee);
-        },
-        error: () => {
-          this.clearProfile();
-        },
-      });
-  }
-
-  refreshProfile(): void {
-    this.clearProfile();
-    this.loadProfile();
-  }
-
-  private clearProfile(): void {
-    this._user.set(null);
-    this._employee.set(null);
-  }
-
-  forceReloadProfile(): void {
-    this.clearProfile();
-    this.loadProfile();
-  }
-
-  private insert(res: LoginResponse): void {
-    this.write(TOKEN_KEY, res.token);
-    this.write(REFRESH_KEY, res.refreshToken);
-    this.write(USER_ID, res.userId);
-    this.write(CREDENTIAL_ID, res.credentialId);
-
-    this._token.set(res.token);
-    this._userId.set(res.userId);
-    this._credentialId.set(res.credentialId);
+    this._token.set(response.token);
+    this._userId.set(response.userId);
+    this._credentialId.set(response.credentialId);
   }
 
   private read(key: string): string | null {

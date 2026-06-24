@@ -4,6 +4,7 @@ import { User, UserCreate, UserUpdate } from '../models/user.model';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { PaginatedResult } from '../models/paginated.model';
+import { UserProfile } from '../models/user-profile.model';
 
 @Injectable({
   providedIn: 'root',
@@ -23,8 +24,8 @@ export class UserService {
     return this.http.post<User>(this.apiUrl, user);
   }
 
-  getByIdUserProfile(id: string): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/profile/${id}`);
+  getByIdUserProfile(id: string): Observable<UserProfile> {
+    return this.http.get<UserProfile>(`${this.apiUrl}/profile/${id}`);
   }
 
   getById(id: string): Observable<User> {

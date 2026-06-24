@@ -1,9 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ModalService } from '../../../core/services/modal.service';
 import { ExitComponent } from '../../../core/modals/exit/exit.component';
 import { LayoutService } from '../../../core/services/layout.service';
+import { UserProfile } from '../../../core/models/user-profile.model';
 
 @Component({
   selector: 'app-sidebar',
@@ -13,9 +14,11 @@ import { LayoutService } from '../../../core/services/layout.service';
   styleUrl: './sidebar.component.css',
 })
 export class SidebarComponent {
-protected readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly modal = inject(ModalService);
-  protected readonly layout = inject(LayoutService);  
+  protected readonly layout = inject(LayoutService);
+
+  protected readonly profile = signal<UserProfile | null>(null);
 
   toggleSidebar() {
     this.layout.toggleSidebar();

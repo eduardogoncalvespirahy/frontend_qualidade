@@ -56,12 +56,13 @@
     </div>
 
     @if (!layout.collapsed()) {
-      <div>
-        <div class="user-name">
-          {{auth.employee()?.personName}}
-        </div>
 
-        <div class="user-role">{{auth.user()?.username}}</div>
+      <div class="user-name">
+        {{ auth.userProfile()?.employeeNome }}
+      </div>
+
+      <div class="user-role">
+        {{ auth.userProfile()?.jobPositionNome }}
       </div>
     }
   </div>

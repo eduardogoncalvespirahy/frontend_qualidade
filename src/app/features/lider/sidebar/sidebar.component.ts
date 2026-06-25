@@ -1,10 +1,11 @@
 import { Component, effect, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { ModalService } from '../../../core/services/modal.service';
 import { ExitComponent } from '../../../core/modals/exit/exit.component';
 import { LayoutService } from '../../../core/services/layout.service';
 import { UserProfile } from '../../../core/models/user-profile.model';
+import { filter } from 'rxjs';
 
 @Component({
   selector: 'app-sidebar',
@@ -14,11 +15,20 @@ import { UserProfile } from '../../../core/models/user-profile.model';
   styleUrl: './sidebar.component.css',
 })
 export class SidebarComponent {
-  protected readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly modal = inject(ModalService);
+  protected readonly auth = inject(AuthService);
   protected readonly layout = inject(LayoutService);
 
   protected readonly profile = signal<UserProfile | null>(null);
+
+  constructor() {
+    this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe(() => {
+      if (window.innerWidth <= 991.98) {
+        this.layout.closeMobile();
+      }
+    });
+  }
 
   toggleSidebar() {
     this.layout.toggleSidebar();
@@ -30,6 +40,12 @@ export class SidebarComponent {
 
   toggleConfig() {
     this.layout.configOpen();
+  }
+
+  closeMobileMenu(): void {
+    if (window.innerWidth <= 991.98) {
+      this.layout.closeMobile();
+    }
   }
 
   async logout() {

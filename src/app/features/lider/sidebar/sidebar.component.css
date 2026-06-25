@@ -140,26 +140,32 @@
 
   border-bottom: 1px solid var(--bs-border-color);
 
-  min-height: 72px;
+  min-height: 76px;
+
+  overflow: hidden;
+
+  transition: all 0.25s ease;
 }
 
 .user-avatar {
   width: 48px;
   height: 48px;
 
-  border-radius: 50%;
+  flex-shrink: 0;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  font-weight: 700;
+  border-radius: 50%;
+
   font-size: 1rem;
+  font-weight: 700;
 
   background: linear-gradient(
     135deg,
-    rgba(var(--bs-primary-rgb), 0.9),
-    rgba(var(--bs-primary-rgb), 0.6)
+    rgba(var(--bs-primary-rgb), 0.95),
+    rgba(var(--bs-primary-rgb), 0.65)
   );
 
   color: white;
@@ -173,19 +179,21 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+
+  overflow: hidden;
 }
 
 .user-name {
   font-size: 0.95rem;
   font-weight: 600;
 
+  line-height: 1.2;
+
   color: var(--bs-body-color);
 
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-
-  line-height: 1.2;
 }
 
 .user-job {
@@ -199,6 +207,87 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* =====================================================
+   COLLAPSED
+===================================================== */
+
+.sidebar.collapsed .sidebar-user {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar.collapsed .user-avatar {
+  width: 44px;
+  height: 44px;
+}
+
+/* =====================================================
+   NOTEBOOKS PEQUENOS
+===================================================== */
+
+@media (max-width: 1366px) {
+  .sidebar-user {
+    padding: 0.875rem 1rem;
+  }
+
+  .user-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .user-name {
+    font-size: 0.9rem;
+  }
+
+  .user-job {
+    font-size: 0.72rem;
+  }
+}
+
+/* =====================================================
+   TABLETS
+===================================================== */
+
+@media (max-width: 991.98px) {
+  .sidebar-user {
+    min-height: 72px;
+  }
+
+  .user-avatar {
+    width: 46px;
+    height: 46px;
+  }
+
+  .user-name {
+    font-size: 0.92rem;
+  }
+}
+
+/* =====================================================
+   SMARTPHONES
+===================================================== */
+
+@media (max-width: 576px) {
+  .sidebar-user {
+    padding: 0.875rem 1rem;
+  }
+
+  .user-avatar {
+    width: 42px;
+    height: 42px;
+
+    font-size: 0.9rem;
+  }
+
+  .user-name {
+    font-size: 0.88rem;
+  }
+
+  .user-job {
+    font-size: 0.7rem;
+  }
 }
 
 /* =====================================================

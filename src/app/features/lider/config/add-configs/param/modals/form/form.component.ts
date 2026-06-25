@@ -61,8 +61,8 @@ export class FormComponent implements OnInit {
 limitValue() {
   if (!this.limitMin() && !this.limitMax()) return null;
   return {
-    limit_min: this.limitMin() || null,
-    limit_max: this.limitMax() || null,
+    limitMin: this.limitMin() || null,
+    limitMax: this.limitMax() || null,
   };
 }
 

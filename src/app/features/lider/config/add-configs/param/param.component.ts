@@ -327,10 +327,12 @@ export class ParamComponent {
     if (limit) {
       this.limitAnswerService.create({
         answerId: created.id,
-        limit_min: limit.limit_min,
-        limit_max: limit.limit_max,
+        limitMin: limit.limitMin,
+        limitMax: limit.limitMax,
       }).subscribe({
-        next: () => this.reload(),
+        next: (limit) => {
+          this.reload();
+        },
       });
     } else {
       this.reload();

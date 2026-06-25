@@ -1,14 +1,20 @@
 .home-page {
+  width: 100%;
   max-width: 1600px;
+
   margin: 0 auto;
+
   padding: 1rem;
 
   display: flex;
   flex-direction: column;
+
   gap: 2rem;
 }
 
-/* HERO */
+/* =====================================================
+   HERO
+===================================================== */
 
 .hero-card {
   background: linear-gradient(
@@ -24,10 +30,21 @@
   padding: 2rem;
 }
 
+.hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 2rem;
+}
+
 .hero-content {
   display: flex;
   align-items: center;
+
   gap: 1.5rem;
+
+  flex: 1;
 }
 
 .hero-logo {
@@ -49,8 +66,13 @@
   flex-shrink: 0;
 }
 
+.hero-text {
+  min-width: 0;
+}
+
 .hero-title {
   font-size: clamp(2rem, 4vw, 3.5rem);
+
   font-weight: 700;
 
   margin-bottom: 0.5rem;
@@ -72,6 +94,10 @@
   margin: 0;
 }
 
+.admin-access {
+  flex-shrink: 0;
+}
+
 .hero-metrics {
   margin-top: 2rem;
 }
@@ -79,11 +105,13 @@
 .metric-card {
   width: fit-content;
 
+  min-width: 220px;
+
   padding: 1rem 1.5rem;
 
   border-radius: 1rem;
 
-  background: white;
+  background: var(--bs-body-bg);
 
   border: 1px solid var(--bs-border-color);
 }
@@ -97,10 +125,12 @@
   color: var(--bs-secondary-color);
 }
 
-/* CONTENT */
+/* =====================================================
+   CONTENT
+===================================================== */
 
 .content-card {
-  background: white;
+  background: var(--bs-body-bg);
 
   border: 1px solid var(--bs-border-color);
 
@@ -147,7 +177,9 @@
   border-radius: 0.9rem;
 }
 
-/* LOCATION */
+/* =====================================================
+   LOCATION CARD
+===================================================== */
 
 .location-card {
   display: flex;
@@ -168,9 +200,9 @@
 
   border: 1px solid var(--bs-border-color);
 
-  background: white;
+  background: var(--bs-body-bg);
 
-  transition: 0.25s;
+  transition: all 0.25s ease;
 }
 
 .location-card:hover {
@@ -196,10 +228,14 @@
   color: var(--bs-primary);
 
   font-size: 1.25rem;
+
+  flex-shrink: 0;
 }
 
 .location-content {
   flex: 1;
+
+  min-width: 0;
 }
 
 .location-code {
@@ -209,43 +245,81 @@
 
 .location-title {
   margin: 0.25rem 0;
+
   font-weight: 600;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .location-description {
   margin: 0;
+
   color: var(--bs-secondary-color);
+
   font-size: 0.875rem;
 }
 
 .location-arrow {
   color: var(--bs-primary);
+
   font-size: 1.75rem;
+
+  flex-shrink: 0;
 }
 
-/* STATES */
+/* =====================================================
+   STATES
+===================================================== */
 
 .loading-state,
 .empty-state,
 .error-state {
   text-align: center;
+
   padding: 4rem 1rem;
 }
 
 .empty-state i,
 .error-state i {
   font-size: 3rem;
+
   margin-bottom: 1rem;
 }
 
-.admin-access {
-  display: flex;
-  justify-content: center;
+/* =====================================================
+   NOTEBOOK
+===================================================== */
+
+@media (max-width: 1200px) {
+  .hero-card {
+    padding: 1.75rem;
+  }
+
+  .hero-logo {
+    width: 80px;
+    height: 80px;
+  }
 }
 
-/* RESPONSIVO */
+/* =====================================================
+   TABLET
+===================================================== */
 
-@media (max-width: 991px) {
+@media (max-width: 991.98px) {
+  .hero-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-access {
+    width: 100%;
+  }
+
+  .admin-access .btn {
+    width: 100%;
+  }
+
   .content-header {
     flex-direction: column;
     align-items: stretch;
@@ -254,34 +328,67 @@
   .search-box {
     max-width: 100%;
   }
+
+  .metric-card {
+    width: 100%;
+  }
 }
 
-@media (max-width: 768px) {
+/* =====================================================
+   SMARTPHONE
+===================================================== */
+
+@media (max-width: 767.98px) {
+  .home-page {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+
+  .hero-card,
+  .content-card {
+    padding: 1.25rem;
+  }
+
   .hero-content {
     flex-direction: column;
     text-align: center;
   }
 
-  .hero-card {
-    padding: 1.5rem;
-  }
-
-  .content-card {
-    padding: 1rem;
-  }
-}
-
-@media (max-width: 576px) {
-  .home-page {
-    padding: 0.75rem;
-  }
-
   .hero-logo {
     width: 72px;
     height: 72px;
+
+    font-size: 1.5rem;
   }
 
-  .admin-access .btn {
-    width: 100%;
+  .hero-description {
+    max-width: 100%;
+  }
+
+  .location-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .location-arrow {
+    display: none;
+  }
+}
+
+/* =====================================================
+   MOBILE PEQUENO
+===================================================== */
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .metric-value {
+    font-size: 1.75rem;
+  }
+
+  .location-card {
+    padding: 1rem;
   }
 }

@@ -3,20 +3,29 @@
 
   <section class="hero-section">
     <div class="hero-card">
-      <div class="hero-content">
-        <div class="hero-logo">
-          <i class="bi bi-shield-check"></i>
+      <div class="hero-top">
+        <div class="hero-content">
+          <div class="hero-logo">
+            <i class="bi bi-shield-check"></i>
+          </div>
+
+          <div class="hero-text">
+            <h1 class="hero-title">PIRAHY</h1>
+
+            <p class="hero-subtitle">Sistema de Controle de Qualidade</p>
+
+            <p class="hero-description">
+              Plataforma para inspeções, rastreabilidade, monitoramento operacional e gestão da
+              qualidade.
+            </p>
+          </div>
         </div>
 
-        <div>
-          <h1 class="hero-title">PIRAHY</h1>
-
-          <p class="hero-subtitle">Sistema de Controle de Qualidade</p>
-
-          <p class="hero-description">
-            Plataforma para inspeções, rastreabilidade, monitoramento operacional e gestão da
-            qualidade.
-          </p>
+        <div class="admin-access">
+          <a class="btn btn-primary btn-lg" [routerLink]="['/login']">
+            <i class="bi bi-shield-lock me-2"></i>
+            Área Administrativa
+          </a>
         </div>
       </div>
 
@@ -109,13 +118,6 @@
           </div>
         }
       }
-    </div>
-
-    <div class="admin-access">
-      <a class="btn btn-primary btn-lg" [routerLink]="['/login']">
-        <i class="bi bi-shield-lock me-2"></i>
-        Área Administrativa
-      </a>
     </div>
   </section>
 </div>

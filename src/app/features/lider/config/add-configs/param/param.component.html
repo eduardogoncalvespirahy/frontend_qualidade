@@ -100,10 +100,12 @@
                       <i class="bi bi-list-check"></i>
                       <span>{{ fg.answers.length }} parâm. de formulário</span>
                     </div>
-                    <div class="info-row">
-                      <i class="bi bi-gear"></i>
-                      <span>{{ fg.machines.length }} máquinas</span>
-                    </div>
+                    @if (fg.machines.length > 0) {
+                      <div class="info-row">
+                        <i class="bi bi-gear"></i>
+                        <span>{{ fg.machines.length }} máquinas</span>
+                      </div>
+                    }
                   </div>
 
                   <div class="machine-card-footer">

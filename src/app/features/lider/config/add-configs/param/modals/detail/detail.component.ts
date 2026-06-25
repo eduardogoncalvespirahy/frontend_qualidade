@@ -39,6 +39,11 @@ export class DetailComponent {
   // Qual dos 4 tipos é esse item — obrigatório também
   readonly paramType = input.required<ParamType>();
 
+  // Hierarquia de onde este parâmetro pertence — passada pelo param.component ao abrir o modal
+  readonly formNome     = input('');
+  readonly sectionNome  = input('');
+  readonly locationNome = input('');
+
   //identificar se está ativo
   protected readonly isActive = computed(() => this.item().status ===1 )
 
@@ -90,7 +95,7 @@ private readonly answerService = inject(AnswerService);
 protected async deletar(item: ParamItem): Promise<void> {
   const ref = this.modalService.open<boolean>({
     title: `Deletar Parâmetro`,
-    // body: `Deseja realmente deletar "${item.nome}"?`,
+    body: `Deseja realmente deletar "${item}"?`,
     centered: true,
     backdrop: 'static',
     buttons: [
@@ -102,23 +107,37 @@ protected async deletar(item: ParamItem): Promise<void> {
   const confirmed = await ref.result;
   if (!confirmed) return;
 
-  this.answerService.delete(item.id).subscribe({
-    next: () => {
-      this.reload_return.emit(true);
-      ref.close();
-    },
-  });
+  this.LimitAnswerService.getAll(100).subscribe({
+  next: (result) => {
+    const limites = result.data.filter(l => l.answerId === item.id);
+    const deletes = limites.map(l => this.LimitAnswerService.delete(l.id).toPromise());
+    
+    Promise.all(deletes).then(() => {
+      this.answerService.delete(item.id).subscribe({
+        next: () => {
+          this.reload_return.emit(true);
+          ref.close();
+        },
+      });
+    });
+  }
+});
+
 }
 
 protected async editar(item: ParamItem): Promise<void> {
+  // Pega o limite atual deste parâmetro (se existir) para pré-preencher o form
+  const existingLimit = this.limits()[0] ?? null;
+
   const ref = this.modalService.openComponent(FormComponent, {
-   // title: `Editar: ${item.nome}`,
+    title: `Editar: ${(item as any).nome}`,
     size: 'lg',
     backdrop: 'static',
     inputs: {
       mode: 'edit',
       item: item as Answer,
       parentId: (item as any).formId ?? (item as any).machineId ?? '',
+      existingLimit,
     },
     buttons: [
       { text: 'Cancelar', variant: 'secondary', value: false },
@@ -129,15 +148,34 @@ protected async editar(item: ParamItem): Promise<void> {
   const confirmed = await ref.result;
   if (!confirmed) return;
 
-  const value = ref.instance.value();
+  const value      = ref.instance.value();
+  const limitValue = ref.instance.limitValue();
 
   this.answerService.update(value.id, {
     nome: value.nome,
     descricao: value.descricao,
     status: value.status,
-    categoryId: value.categoryId
+    categoryId: value.categoryId,
   }).subscribe({
-    next: () => this.reload_return.emit(true),
+    next: () => {
+      if (existingLimit && limitValue) {
+        // Limite já existe → atualiza
+        this.LimitAnswerService.update(existingLimit.id, {
+          answerId: value.id,
+          limitMin: limitValue.limitMin,
+          limitMax: limitValue.limitMax,
+        }).subscribe({ next: () => this.reload_return.emit(true) });
+      } else if (!existingLimit && limitValue) {
+        // Não havia limite → cria
+        this.LimitAnswerService.create({
+          answerId: value.id,
+          limitMin: limitValue.limitMin,
+          limitMax: limitValue.limitMax,
+        }).subscribe({ next: () => this.reload_return.emit(true) });
+      } else {
+        this.reload_return.emit(true);
+      }
+    },
   });
 }
 

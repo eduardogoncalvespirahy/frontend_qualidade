@@ -255,45 +255,61 @@ export class ParamComponent {
   //    Metodos e etc dos modais
   // =============================
 
-  protected async detalhar( type:ParamType, item:ParamItem): Promise<void> {
+  protected async detalhar(
+    type: ParamType,
+    item: ParamItem,
+    context?: { formNome: string; sectionNome: string; locationNome: string },
+  ): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
-      // title: `${item.nome}`,
-      size:'lg',
-      inputs: {item, paramType: type},
+      title: (item as any).nome ?? '',
+      size: 'lg',
+      inputs: {
+        item,
+        paramType: type,
+        formNome:     context?.formNome     ?? '',
+        sectionNome:  context?.sectionNome  ?? '',
+        locationNome: context?.locationNome ?? '',
+      },
       outputs: {
         reload_return: (value: unknown) => {
           if (value) {
             ref.close();
             this.reload();
           }
-        }
+        },
       },
-      buttons: [{ text: 'Fechar', variant: 'secondary', value: true}],
-    })
+      buttons: [{ text: 'Fechar', variant: 'secondary', value: true }],
+    });
 
-    await ref.result
+    await ref.result;
   }
 
-  protected async listar( fg: FormGroup): Promise<void> {
+  protected async listar(fg: FormGroup): Promise<void> {
     const ref = this.modalService.openComponent(ListComponent, {
-      title: `Parametros: ${fg.form.nome}`,
-      size:'lg',
-      scrollable: true,
+      title: `Parâmetros: ${fg.form.nome}`,
+      size: 'lg',
       inputs: {
         answers: fg.answers,
-        formNome: fg.form.nome
+        formNome: fg.form.nome,
+        limitAnswers: this.limitAnswers(),
       },
       outputs: {
         selecionado: (item: unknown) => {
           ref.close();
-          const answer = item as Answer
-          this.detalhar('answer', answer);
-        }
+          const answer = item as Answer;
+          const section  = this.sections().find(s => s.id === (fg.form as any).sectionId);
+          const location = this.locations().find(l => l.employerId === section?.employerId);
+          this.detalhar('answer', answer, {
+            formNome:     fg.form.nome,
+            sectionNome:  section?.nome  ?? '',
+            locationNome: location?.nome ?? '',
+          });
+        },
       },
-      buttons: [{ text: 'Fechar', variant: 'secondary', value: true}],
-    })
+      buttons: [{ text: 'Fechar', variant: 'secondary', value: true }],
+    });
 
-    await ref.result
+    await ref.result;
   }
 
   protected async novo(formId: string): Promise<void> {

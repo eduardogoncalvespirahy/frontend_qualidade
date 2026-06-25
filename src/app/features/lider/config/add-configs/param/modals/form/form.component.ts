@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { rxResource } from '@angular/core/rxjs-interop';
 
 import { Answer } from '../../../../../../../core/models/answer.model';
+import { LimitAnswer } from '../../../../../../../core/models/limit-answer.model';
 
 import { CategoryService } from '../../../../../../../core/services/category-answer.service';
 
@@ -20,6 +21,9 @@ export class FormComponent implements OnInit {
 
   // Item existente — só passado quando mode = 'edit'
   readonly item = input<Answer | null>(null);
+
+  // Limite existente — passado quando mode = 'edit', para pré-preencher os campos de limite
+  readonly existingLimit = input<LimitAnswer | null>(null);
 
   // ID do formulário pai — passado quando mode = 'new'
   readonly parentId = input<string>('');
@@ -53,8 +57,14 @@ export class FormComponent implements OnInit {
       this.nome = u.nome;
       this.descricao = u.descricao || '';
       this.status = u.status === 1;
-      this.dataCriacao = u.dataCriacao; // preserva a data original
+      this.dataCriacao = u.dataCriacao;
       this.categoryId.set(Number(u.categoryId));
+    }
+
+    const l = this.existingLimit();
+    if (l) {
+      this.limitMin.set(l.limitMin ?? '');
+      this.limitMax.set(l.limitMax ?? '');
     }
   }
 

@@ -1,30 +1,52 @@
-<div>
-  <p class="text-muted mb-3">Parâmetros do formulário: <strong>{{ formNome() }}</strong></p>
+<div class="d-flex flex-column gap-3">
+
+  <p class="text-muted small mb-0">
+    <i class="bi bi-list-check me-1"></i>
+    Parâmetros de <strong>{{ formNome() }}</strong> — clique em um para ver detalhes.
+  </p>
 
   @if (answers().length === 0) {
-    <p class="text-muted">Nenhum parâmetro cadastrado.</p>
+    <div class="text-center py-4 text-muted">
+      <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+      Nenhum parâmetro cadastrado.
+    </div>
   } @else {
-    <table class="table table-sm table-hover align-middle mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>Nome</th>
-          <th>Descrição</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (a of answers(); track a.id) {
-          <tr style="cursor:pointer" (click)="selecionar(a)">
-            <td class="fw-medium">{{ a.nome }}</td>
-            <td class="text-muted small">{{ a.descricao ?? '—' }}</td>
-            <td>
-              <span class="badge" [class.text-bg-success]="a.status === 1" [class.text-bg-secondary]="a.status !== 1">
-                {{ a.status === 1 ? 'Ativo' : 'Inativo' }}
-              </span>
-            </td>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nome</th>
+            <th class="d-none d-md-table-cell">Descrição</th>
+            <th class="text-center">Limite</th>
+            <th class="text-center">Status</th>
           </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (a of answers(); track a.id) {
+            <tr style="cursor: pointer" (click)="selecionar(a)">
+              <td class="fw-medium">{{ a.nome }}</td>
+              <td class="text-muted small d-none d-md-table-cell">{{ a.descricao ?? '—' }}</td>
+              <td class="text-center">
+                @if (hasLimit(a.id)) {
+                  <i class="bi bi-check-circle-fill text-success"></i>
+                } @else {
+                  <i class="bi bi-dash-circle text-secondary"></i>
+                }
+              </td>
+              <td class="text-center">
+                <span
+                  class="badge"
+                  [class.text-bg-success]="a.status === 1"
+                  [class.text-bg-secondary]="a.status !== 1"
+                >
+                  {{ a.status === 1 ? 'Ativo' : 'Inativo' }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
   }
+
 </div>

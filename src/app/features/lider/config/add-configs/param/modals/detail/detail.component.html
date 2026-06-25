@@ -1,58 +1,79 @@
 @if (item(); as item) {
-  <div>
-    <div>
-      <div>
-        <small> {{ typeLabel() }} </small>
-      </div>
-      <span> {{ statusLabel() }} </span>
+  <div class="d-flex flex-column gap-3">
+
+    <!-- Badges de tipo e status lado a lado -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="badge text-bg-secondary">{{ typeLabel() }}</span>
+      <span class="badge" [class]="statusClass()">{{ statusLabel() }}</span>
     </div>
 
-    <div>
-      <div>
-        <small>Vinculo: </small>
-        <strong> {{ parentLabel() }} </strong>
-      </div>
-      <!-- <div>
-        <small>Descricao: </small>
-        <p>{{ item.descricao || 'Nenhuma descrição informada.' }}</p>
-      </div> -->
-      <div>
-        <small>Criado em: </small>
-        <strong> {{ item.dataCriacao | date: 'dd/MM/yyyy HH:mm' }} </strong>
-      </div>
-      <div>
-        <small>Alterado em: </small>
-        <strong> {{ item.dataAlteracao | date: 'dd/MM/yyyy HH:mm' }} </strong>
-      </div>
-    </div>
-  </div>
-
-  <div style="margin-top: 1rem; display: flex; gap: 0.5rem">
-    <button class="btn btn-outline-primary" (click)="editar(item)">
-      <i class="bi bi-pencil me-2"></i>Editar
-    </button>
-    <button class="btn btn-outline-danger" (click)="deletar(item)">
-      <i class="bi bi-trash me-2"></i>Deletar
-    </button>
-  </div>
-  <div style="margin-top: 1rem;">
-  <strong>Limites</strong>
-
-  @if (limits().length === 0) {
-    <p class="text-muted small">Nenhum limite cadastrado.</p>
-  } @else {
-    @for (l of limits(); track l.id) {
-      <div>
-        <span>{{ l.nome }}</span>
-        <span>Min: {{ l.limit_min ?? '—' }}</span>
-        <span>Max: {{ l.limit_max ?? '—' }}</span>
-      </div>
+    <!-- Breadcrumb: Local → Seção → Formulário -->
+    @if (locationNome() || sectionNome() || formNome()) {
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 small">
+          @if (locationNome()) {
+            <li class="breadcrumb-item text-muted">
+              <i class="bi bi-geo-alt me-1"></i>{{ locationNome() }}
+            </li>
+          }
+          @if (sectionNome()) {
+            <li class="breadcrumb-item text-muted">{{ sectionNome() }}</li>
+          }
+          @if (formNome()) {
+            <li class="breadcrumb-item active fw-semibold">{{ formNome() }}</li>
+          }
+        </ol>
+      </nav>
     }
-  }
 
-  <button class="btn btn-sm btn-outline-primary" style="margin-top: 0.5rem;">
-    <i class="bi bi-plus"></i> Novo Limite
-  </button>
-</div>
+    <!-- Datas -->
+    <div class="card border-0 bg-light">
+      <div class="card-body py-2 px-3">
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="small text-muted">Criado em</div>
+            <div class="small">{{ item.dataCriacao | date: 'dd/MM/yyyy HH:mm' }}</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Alterado em</div>
+            <div class="small">{{ item.dataAlteracao | date: 'dd/MM/yyyy HH:mm' }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
+    <!-- Limites de inspeção -->
+    <div>
+      <div class="small text-muted mb-2">
+        <i class="bi bi-sliders me-1"></i>Limites de inspeção
+      </div>
+      @if (limits().length === 0) {
+        <p class="text-muted small mb-0">Nenhum limite cadastrado para este parâmetro.</p>
+      } @else {
+        @for (l of limits(); track l.id) {
+          <div class="d-flex gap-2">
+            <div class="flex-fill text-center border rounded p-2">
+              <div class="small text-muted">Mínimo</div>
+              <div class="fw-bold fs-5">{{ l.limitMin ?? '—' }}</div>
+            </div>
+            <div class="flex-fill text-center border rounded p-2">
+              <div class="small text-muted">Máximo</div>
+              <div class="fw-bold fs-5">{{ l.limitMax ?? '—' }}</div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Ações -->
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-primary btn-sm" (click)="editar(item)">
+        <i class="bi bi-pencil me-1"></i>Editar
+      </button>
+      <button class="btn btn-outline-danger btn-sm" (click)="deletar(item)">
+        <i class="bi bi-trash me-1"></i>Deletar
+      </button>
+    </div>
+
+  </div>
 }

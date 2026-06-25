@@ -77,7 +77,12 @@
       }
 
       <nav class="sidebar-nav">
-        <a routerLink="/home" routerLinkActive="active" class="sidebar-link">
+        <a
+          routerLink="/lider"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
           <i class="bi bi-house-door"></i>
 
           @if (!layout.collapsed()) {
@@ -85,7 +90,12 @@
           }
         </a>
 
-        <a routerLink="/lider/painel" routerLinkActive="active" class="sidebar-link">
+        <a
+          routerLink="/lider/painel"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
           <i class="bi bi-clipboard-check"></i>
 
           @if (!layout.collapsed()) {
@@ -93,7 +103,12 @@
           }
         </a>
 
-        <a routerLink="/history" routerLinkActive="active" class="sidebar-link">
+        <a
+          routerLink="/lider/historico"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
           <i class="bi bi-clock-history"></i>
 
           @if (!layout.collapsed()) {
@@ -109,7 +124,12 @@
       }
 
       <nav class="sidebar-nav">
-        <a routerLink="/lider/config" routerLinkActive="active" class="sidebar-link">
+        <a
+          routerLink="/lider/config"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
           <i class="bi bi-gear"></i>
 
           @if (!layout.collapsed()) {

@@ -321,18 +321,26 @@ export class ParamComponent {
     nome: value.nome,
     descricao: value.descricao,
     status: value.status,
+    categoryId: value.categoryId,
   }).subscribe({
   next: (created) => {
     const limit = ref.instance.limitValue();
     if (limit) {
       this.limitAnswerService.create({
         answerId: created.id,
+<<<<<<< Updated upstream
         limitMin: limit.limitMin,
         limitMax: limit.limitMax,
       }).subscribe({
         next: (limit) => {
           this.reload();
         },
+=======
+        limit_min: limit.limit_min,
+        limit_max: limit.limit_max,
+      }).subscribe({
+        next: () => this.reload(),
+>>>>>>> Stashed changes
       });
     } else {
       this.reload();

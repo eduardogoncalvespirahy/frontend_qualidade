@@ -44,7 +44,7 @@ export class FormComponent implements OnInit {
 
   protected status = true;
   protected dataCriacao: Date = new Date(); // só usada no create
-  protected categoryId: number = 1;
+  protected categoryId = signal<number>(0);
 
   ngOnInit(): void {
     const u = this.item();
@@ -54,15 +54,20 @@ export class FormComponent implements OnInit {
       this.descricao = u.descricao || '';
       this.status = u.status === 1;
       this.dataCriacao = u.dataCriacao; // preserva a data original
-      this.categoryId = u.categoryId;
+      this.categoryId.set(Number(u.categoryId));
     }
   }
 
 limitValue() {
   if (!this.limitMin() && !this.limitMax()) return null;
   return {
+<<<<<<< Updated upstream
     limitMin: this.limitMin() || null,
     limitMax: this.limitMax() || null,
+=======
+    limit_min: this.limitMin() || null,
+    limit_max: this.limitMax() || null,
+>>>>>>> Stashed changes
   };
 }
 
@@ -77,7 +82,7 @@ limitValue() {
       status: this.status ? 1 : 0,
       dataCriacao: this.dataCriacao, // retorna a original
       dataAlteracao: new Date(), // sempre atualiza
-      categoryId: this.categoryId,
+      categoryId: this.categoryId(),
     };
   }
 }

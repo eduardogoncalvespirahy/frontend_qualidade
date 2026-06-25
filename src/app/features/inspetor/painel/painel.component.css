@@ -1,0 +1,231 @@
+:host {
+  display: block;
+}
+
+/* ==========================================================
+   PAGE
+========================================================== */
+
+.config-page {
+  width: 100%;
+}
+
+/* ==========================================================
+   CARD
+========================================================== */
+
+.config-card {
+  display: flex;
+
+  min-height: 720px;
+
+  overflow: hidden;
+
+  border-radius: 1.5rem;
+
+  background: var(--bs-body-bg);
+
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+/* ==========================================================
+   SIDEBAR
+========================================================== */
+
+.config-sidebar {
+  width: 300px;
+  min-width: 300px;
+
+  border-right: 1px solid var(--bs-border-color);
+
+  background: var(--bs-body-bg);
+
+  padding: 1.5rem;
+}
+
+.sidebar-header {
+  display: flex;
+
+  align-items: center;
+
+  gap: 1rem;
+
+  margin-bottom: 2rem;
+
+  padding-bottom: 1.5rem;
+
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.sidebar-logo {
+  width: 56px;
+  height: 56px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 16px;
+
+  background: rgba(var(--bs-primary-rgb), 0.1);
+
+  color: var(--bs-primary);
+
+  font-size: 1.5rem;
+}
+
+.config-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.config-nav-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: 1rem;
+
+  width: 100%;
+
+  padding: 1rem;
+
+  border: 0;
+
+  border-radius: 1rem;
+
+  background: transparent;
+
+  text-align: left;
+
+  transition: all 0.2s ease;
+}
+
+.config-nav-item:hover {
+  background: var(--bs-tertiary-bg);
+}
+
+.config-nav-item.active {
+  background: rgba(var(--bs-primary-rgb), 0.1);
+
+  color: var(--bs-primary);
+}
+
+.config-nav-item i {
+  font-size: 1.35rem;
+}
+
+.nav-title {
+  font-weight: 600;
+}
+
+.nav-description {
+  font-size: 0.85rem;
+
+  color: var(--bs-secondary-color);
+}
+
+.config-nav-item.active .nav-description {
+  color: var(--bs-primary);
+}
+
+/* ==========================================================
+   CONTENT
+========================================================== */
+
+.config-content {
+  flex: 1;
+
+  min-width: 0;
+
+  padding: 2rem;
+}
+
+.content-header {
+  margin-bottom: 2rem;
+
+  padding-bottom: 1.5rem;
+
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.content-title {
+  margin: 0;
+
+  font-size: 1.75rem;
+
+  font-weight: 700;
+}
+
+.content-description {
+  margin: 0.5rem 0 0;
+
+  color: var(--bs-secondary-color);
+}
+
+.content-body {
+  min-height: 500px;
+}
+
+/* ==========================================================
+   TABLET
+========================================================== */
+
+@media (max-width: 992px) {
+  .config-card {
+    flex-direction: column;
+  }
+
+  .config-sidebar {
+    width: 100%;
+    min-width: 100%;
+
+    border-right: 0;
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+
+  .config-nav {
+    flex-direction: row;
+
+    overflow-x: auto;
+
+    padding-bottom: 0.5rem;
+  }
+
+  .config-nav::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .config-nav-item {
+    min-width: 240px;
+  }
+
+  .config-content {
+    padding: 1.5rem;
+  }
+}
+
+/* ==========================================================
+   MOBILE
+========================================================== */
+
+@media (max-width: 768px) {
+  .config-sidebar {
+    padding: 1rem;
+  }
+
+  .config-content {
+    padding: 1rem;
+  }
+
+  .content-title {
+    font-size: 1.35rem;
+  }
+
+  .config-nav-item {
+    min-width: 220px;
+  }
+}

@@ -1,0 +1,76 @@
+:host {
+  display: block;
+}
+
+/* ==========================================
+   LAYOUT
+========================================== */
+
+.app-layout {
+  min-height: 100dvh;
+
+  background:
+    radial-gradient(circle at top left, rgba(var(--bs-primary-rgb), 0.03), transparent 25%),
+    var(--bs-body-tertiary-bg);
+}
+
+/* ==========================================
+   CONTENT
+========================================== */
+
+.page-content {
+  min-height: 100dvh;
+
+  margin-left: 280px;
+
+  padding: 2rem;
+
+  transition:
+    margin-left 0.25s ease,
+    padding 0.25s ease;
+
+  overflow-x: hidden;
+}
+
+/* quando recolhido */
+
+.page-content.sidebar-collapsed {
+  margin-left: 80px;
+}
+
+/* ==========================================
+   CONTAINER
+========================================== */
+
+.page-container {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ==========================================
+   NOTEBOOK
+========================================== */
+
+@media (max-width: 1400px) {
+  .page-content {
+    margin-left: 250px;
+  }
+
+  .page-content.sidebar-collapsed {
+    margin-left: 80px;
+  }
+}
+
+/* ==========================================
+   TABLET / MOBILE
+========================================== */
+
+@media (max-width: 991.98px) {
+  .page-content,
+  .page-content.sidebar-collapsed {
+    margin-left: 0;
+
+    padding: calc(70px + 1rem) 1rem 1rem;
+  }
+}

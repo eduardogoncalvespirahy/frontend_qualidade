@@ -1,0 +1,128 @@
+<!-- Mobile Toggle -->
+
+<button class="btn btn-primary d-lg-none sidebar-mobile-btn" (click)="toggleMobile()">
+  <i class="bi bi-list"></i>
+</button>
+
+<!-- Desktop Toggle -->
+
+<button
+  class="sidebar-toggle d-none d-lg-flex"
+  [class.collapsed]="layout.collapsed()"
+  (click)="toggleSidebar()"
+  type="button"
+>
+  <i
+    class="bi"
+    [class.bi-chevron-left]="!layout.collapsed()"
+    [class.bi-chevron-right]="layout.collapsed()"
+  ></i>
+</button>
+
+<!-- Backdrop -->
+
+@if (layout.mobileOpen()) {
+  <div class="sidebar-backdrop" (click)="toggleMobile()"></div>
+}
+
+<!-- Sidebar -->
+
+<aside
+  class="sidebar"
+  [class.collapsed]="layout.collapsed()"
+  [class.mobile-open]="layout.mobileOpen()"
+>
+  <!-- Brand -->
+
+  <div class="sidebar-brand">
+    <div class="brand-icon">
+      <i class="bi bi-shield-check"></i>
+    </div>
+
+    @if (!layout.collapsed()) {
+      <div class="brand-info">
+        <div class="brand-title">Gestão da Qualidade</div>
+
+        <div class="brand-subtitle">Sistema Gerenciamento e Controle de Qualidade</div>
+      </div>
+    }
+  </div>
+
+  <!-- User -->
+
+  <div class="sidebar-user">
+    <div class="user-avatar">Inspetor</div>
+  </div>
+
+  <!-- Body -->
+
+  <div class="sidebar-body">
+    <div class="sidebar-section">
+      @if (!layout.collapsed()) {
+        <div class="sidebar-section-title">Operação</div>
+      }
+
+      <nav class="sidebar-nav">
+        <a
+          routerLink="/inspetor"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
+          <i class="bi bi-house-door"></i>
+
+          @if (!layout.collapsed()) {
+            <span>Home</span>
+          }
+        </a>
+
+        <a
+          routerLink="/inspetor/painel"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
+          <i class="bi bi-clipboard-check"></i>
+
+          @if (!layout.collapsed()) {
+            <span>Painel da Industria</span>
+          }
+        </a>
+
+        <a
+          routerLink="/inspetor/historico"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
+          <i class="bi bi-clock-history"></i>
+
+          @if (!layout.collapsed()) {
+            <span>Histórico</span>
+          }
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-section">
+      @if (!layout.collapsed()) {
+        <div class="sidebar-section-title">Administração</div>
+      }
+
+      <nav class="sidebar-nav">
+        <a
+          routerLink="/inspetor/config"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
+          <i class="bi bi-gear"></i>
+
+          @if (!layout.collapsed()) {
+            <span>Configurações</span>
+          }
+        </a>
+      </nav>
+    </div>
+  </div>
+</aside>

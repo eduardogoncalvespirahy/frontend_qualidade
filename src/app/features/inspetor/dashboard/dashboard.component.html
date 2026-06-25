@@ -1,0 +1,13 @@
+<div class="app-layout">
+  <app-sidebar />
+
+  <main class="page-content" [class.sidebar-collapsed]="layout.collapsed()">
+    <div class="page-container">
+      <router-outlet (activate)="onActivate($event)" (deactivate)="onDeactivate()" />
+
+      @if (!activeComponent()) {
+        <h1>texto de home de sessão autenticada</h1>
+      }
+    </div>
+  </main>
+</div>

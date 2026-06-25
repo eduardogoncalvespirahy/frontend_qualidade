@@ -1,23 +1,23 @@
 export interface LimitAnswer { //parametros/perguntas
   id: string;
-  machineId: string;
-  nome: string;
-  descricao: string | null;
+  answerId: string;
+  limit_max?: string | null;
+  limit_min?: string | null;
   status: number;
   dataCriacao: Date;
   dataAlteracao: Date;
 }
 
 export interface LimitAnswerCreate {
-  machineId: string;
-  nome: string;
-  descricao?: string | null;
+  answerId: string;
+  limit_max?: string | null;
+  limit_min?: string | null;
   status?: number;
 }
 
 export interface LimitAnswerUpdate {
-  machineId?: string;
-  nome?: string;
-  descricao?: string | null;
+  answerId?: string;
+  limit_max?: string | null;
+  limit_min?: string | null;
   status?: number;
 }

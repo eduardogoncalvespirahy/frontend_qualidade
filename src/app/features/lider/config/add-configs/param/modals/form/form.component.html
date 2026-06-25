@@ -49,5 +49,36 @@
         }
       </select>
     </div>
+    <div style="margin-top: 1.5rem;">
+  <strong>Limite (opcional)</strong>
+
+  <div style="margin-top: 0.5rem;">
+  <label for="limitMin">Mínimo</label>
+  <input
+    id="limitMin"
+    name="limitMin"
+    type="text"
+    class="form-control"
+    [value]="limitMin()"
+    (input)="limitMin.set($any($event.target).value)"
+    placeholder="Valor mínimo"
+  />
+</div>
+
+<div style="margin-top: 0.5rem;">
+  <label for="limitMax">Máximo</label>
+  <input
+    id="limitMax"
+    name="limitMax"
+    type="text"
+    class="form-control"
+    [value]="limitMax()"
+    (input)="limitMax.set($any($event.target).value)"
+    placeholder="Valor máximo"
+  />
+</div>
+
+</div>
+
   </div>
 </div>

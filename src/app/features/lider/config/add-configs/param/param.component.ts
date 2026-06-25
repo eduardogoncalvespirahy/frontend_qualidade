@@ -144,9 +144,10 @@ export class ParamComponent {
   //                 └── Machine[] (máquinas do formulário) — vinculadas pelo formId
   //                       ├── AnswerMachine[] (parâmetros da máquina) — pelo machineId ── LimitAnswerMachine[] (limites da máquina) — pelo machineId
   //                       
-  //                       
+
   protected readonly grouped = computed((): LocationGroup[] => {
     const locations        = this.locations();
+    const category         = this.category();
     const sections         = this.sections();
     const forms            = this.forms();
     const machines         = this.machines();
@@ -168,6 +169,8 @@ export class ParamComponent {
           // Parâmetros diretos do formulário (sem máquina)
           const formAnswers = answers.filter((a) => a.formId === form.id);
 
+
+
           // Máquinas vinculadas a este formulário
           const formMachines = machines.filter((m) => m.formId === form.id);
 
@@ -175,7 +178,7 @@ export class ParamComponent {
           const machineGroups: MachineGroup[] = formMachines.map((machine) => ({
             machine,
             answerMachines:      answerMachines.filter((a) => a.machineId === machine.id),
-            limitAnswers:        limitAnswers.filter((a) => a.machineId === machine.id),
+            // limitAnswers:        limitAnswers.filter((a) => a.formId === form.id),
             limitAnswerMachines: limitAnswerMachines.filter((a) => a.machineId === machine.id),
           }));
 
@@ -193,7 +196,7 @@ export class ParamComponent {
                   (mg) =>
                     mg.machine.nome.toLowerCase().includes(term) ||
                     mg.answerMachines.some((a) => a.nome.toLowerCase().includes(term)) ||
-                    mg.limitAnswers.some((a) => a.nome.toLowerCase().includes(term)) ||
+                    // mg.limitAnswers.some((a) => a.nome.toLowerCase().includes(term)) ||
                     mg.limitAnswerMachines.some((a) => a.nome.toLowerCase().includes(term)),
                 ),
             );
@@ -254,7 +257,7 @@ export class ParamComponent {
 
   protected async detalhar( type:ParamType, item:ParamItem): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
-      title: `${item.nome}`,
+      // title: `${item.nome}`,
       size:'lg',
       inputs: {item, paramType: type},
       outputs: {
@@ -319,8 +322,22 @@ export class ParamComponent {
     descricao: value.descricao,
     status: value.status,
   }).subscribe({
-    next: () => this.reload(),
-  });
+  next: (created) => {
+    const limit = ref.instance.limitValue();
+    if (limit) {
+      this.limitAnswerService.create({
+        answerId: created.id,
+        limit_min: limit.limit_min,
+        limit_max: limit.limit_max,
+      }).subscribe({
+        next: () => this.reload(),
+      });
+    } else {
+      this.reload();
+    }
+  },
+});
+
 }
 
 
@@ -334,7 +351,9 @@ export class ParamComponent {
       fg.answers.length +
       fg.machines.reduce(
         (acc, mg) =>
-          acc + mg.answerMachines.length + mg.limitAnswers.length + mg.limitAnswerMachines.length,
+          acc + mg.answerMachines.length + 
+          // mg.limitAnswers.length + 
+          mg.limitAnswerMachines.length,
         0,
       )
     );
@@ -348,7 +367,7 @@ export class ParamComponent {
 interface MachineGroup {
   machine: Machine;
   answerMachines: AnswerMachine[];       // parâmetros específicos desta máquina
-  limitAnswers: LimitAnswer[];           // limites vinculados a esta máquina
+  // limitAnswers: LimitAnswer[];           // limites vinculados a esta máquina
   limitAnswerMachines: LimitAnswerMachine[]; // limites de máquina
 }
 

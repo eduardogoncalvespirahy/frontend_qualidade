@@ -1,16 +1,19 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-
+import { rxResource } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 
 import { Answer } from '../../../../../../../core/models/answer.model';
 import { AnswerMachine } from '../../../../../../../core/models/answer-machine.model';
 import { LimitAnswer } from '../../../../../../../core/models/limit-answer.model';
 import { LimitAnswerMachine } from '../../../../../../../core/models/limit-answer-machine.model';
+import { PaginatedResult } from '../../../../../../../core/models/paginated.model';
 
 import { ModalService } from '../../../../../../../core/services/modal.service';
 import { AnswerService } from '../../../../../../../core/services/answer.service';
 
 import { FormComponent } from '../form/form.component';
+import { LimitAnswerService } from '../../../../../../../core/services/limit-answer.service';
+import { catchError, of } from 'rxjs';
 
 // Os 4 possíveis tipos de parâmetro que este componente pode exibir
 export type ParamType = 'answer' | 'answerMachine' | 'limitAnswer' | 'limitAnswerMachine';
@@ -28,6 +31,8 @@ export type ParamItem = Answer | AnswerMachine | LimitAnswer | LimitAnswerMachin
 })
 export class DetailComponent {
 
+  private readonly LimitAnswerService = inject(LimitAnswerService);
+
   // Dados do parâmetro que será exibido — obrigatório, quem abrir o modal deve passar
   readonly item = input.required<ParamItem>();
 
@@ -42,6 +47,18 @@ export class DetailComponent {
 
   // Brincar com classe CSS
   protected readonly statusClass = computed(() => this.isActive() ? 'text-bg-success' : 'text-bg-secondary') 
+
+  protected readonly limitsResource = rxResource({
+  params: () => this.item().id,
+  stream: ({ params: answerId }) => this.LimitAnswerService.getAll(100).pipe(
+    catchError(() => of({ data: [], total: 0, page: 1, limit: 100, totalPages: 0 } as any))
+  ),
+});
+
+protected readonly limits = computed(() => 
+  (this.limitsResource.value()?.data ?? []).filter(((l:any) => l.answerId === this.item().id)
+));
+
 
   // Avisa o pai (param.component.ts) que algo mudou e precisa recarregar
   readonly reload_return = output<boolean>();
@@ -73,7 +90,7 @@ private readonly answerService = inject(AnswerService);
 protected async deletar(item: ParamItem): Promise<void> {
   const ref = this.modalService.open<boolean>({
     title: `Deletar Parâmetro`,
-    body: `Deseja realmente deletar "${item.nome}"?`,
+    // body: `Deseja realmente deletar "${item.nome}"?`,
     centered: true,
     backdrop: 'static',
     buttons: [
@@ -95,7 +112,7 @@ protected async deletar(item: ParamItem): Promise<void> {
 
 protected async editar(item: ParamItem): Promise<void> {
   const ref = this.modalService.openComponent(FormComponent, {
-    title: `Editar: ${item.nome}`,
+   // title: `Editar: ${item.nome}`,
     size: 'lg',
     backdrop: 'static',
     inputs: {

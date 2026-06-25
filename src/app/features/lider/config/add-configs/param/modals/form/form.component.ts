@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { rxResource } from '@angular/core/rxjs-interop';
 
@@ -38,6 +38,10 @@ export class FormComponent implements OnInit {
   protected id = '';
   protected nome = '';
   protected descricao = '';
+  
+  protected limitMin = signal('');
+  protected limitMax = signal('');
+
   protected status = true;
   protected dataCriacao: Date = new Date(); // só usada no create
   protected categoryId: number = 1;
@@ -53,6 +57,16 @@ export class FormComponent implements OnInit {
       this.categoryId = u.categoryId;
     }
   }
+
+limitValue() {
+  if (!this.limitMin() && !this.limitMax()) return null;
+  return {
+    limit_min: this.limitMin() || null,
+    limit_max: this.limitMax() || null,
+  };
+}
+
+
 
   value(): Answer {
     return {

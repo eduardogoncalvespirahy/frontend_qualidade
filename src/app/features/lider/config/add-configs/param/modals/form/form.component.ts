@@ -61,13 +61,8 @@ export class FormComponent implements OnInit {
 limitValue() {
   if (!this.limitMin() && !this.limitMax()) return null;
   return {
-<<<<<<< Updated upstream
     limitMin: this.limitMin() || null,
     limitMax: this.limitMax() || null,
-=======
-    limit_min: this.limitMin() || null,
-    limit_max: this.limitMax() || null,
->>>>>>> Stashed changes
   };
 }
 

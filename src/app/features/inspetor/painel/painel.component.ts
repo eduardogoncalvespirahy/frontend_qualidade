@@ -1,51 +1,114 @@
-import { Component, signal } from '@angular/core';
-import { RouterModule } from '@angular/router';
-import { LocalComponent } from './itens/local/local.component';
-import { SecaoComponent } from './itens/secao/secao.component';
-import { FormularioComponent } from './itens/formulario/formulario.component';
+import {
+  Component,
+  inject,
+  signal,
+  computed
+} from '@angular/core';
 
-type ConfigSection = 'location' | 'section' | 'form';
+import { firstValueFrom } from 'rxjs';
+
+import { Location } from '../../../core/models/location.model';
+import { Section } from '../../../core/models/section.model';
+import { Form } from '../../../core/models/form.model';
+import { Answer } from '../../../core/models/answer.model';
+
+import { AnswerService } from '../../../core/services/answer.service';
+import { FormService } from '../../../core/services/form.service';
+import { LocationService } from '../../../core/services/location.service';
+import { SectionService } from '../../../core/services/section.service';
 
 @Component({
   selector: 'app-painel',
   standalone: true,
-  imports: [RouterModule, LocalComponent, SecaoComponent, FormularioComponent],
+  imports: [],
   templateUrl: './painel.component.html',
   styleUrl: './painel.component.css',
 })
 export class PainelComponent {
-  readonly sections = [
-    {
-      key: 'location' as const,
-      label: 'Locais',
-      icon: 'bi-cpu',
-      description: 'Gerenciamento dos Locais',
-    },
-    {
-      key: 'section' as const,
-      label: 'Seções',
-      icon: 'bi-sliders',
-      description: 'Gerenciamento das Seções',
-    },
-    {
-      key: 'form' as const,
-      label: 'Formularios',
-      icon: 'bi-person-vcard',
-      description: 'Gerenciamento dos Formularios',
-    },
-  ];
 
-  readonly activeSection = signal<ConfigSection>('location');
+  private readonly locationService = inject(LocationService);
+  private readonly sectionService = inject(SectionService);
+  private readonly formService = inject(FormService);
+  private readonly answerService = inject(AnswerService);
 
-  readonly pageTitles: Record<ConfigSection, string> = {
-    location: 'Locais',
-    section: 'Seções',
-    form: 'Formularios',
-  };
+  readonly loading = signal(false);
 
-  readonly pageDescriptions: Record<ConfigSection, string> = {
-    location: 'Gerencie os locais vinculados ao sistema.',
-    section: 'Gerencie os seções vinculados ao sistema.',
-    form: 'Gerencie os formularios vinculados ao sistema.',
-  };
+  readonly locations = signal<Location[]>([]);
+  readonly sections = signal<Section[]>([]);
+  readonly forms = signal<Form[]>([]);
+  readonly answers = signal<Answer[]>([]);
+
+  readonly selectedLocation = signal<Location | null>(null);
+  readonly selectedSection = signal<Section | null>(null);
+  readonly selectedForm = signal<Form | null>(null);
+
+  constructor() {
+    this.loadLocations();
+  }
+
+  async loadLocations() {
+
+    this.loading.set(true);
+
+    const result = await firstValueFrom(
+      this.locationService.getAll(500,1)
+    );
+
+    this.locations.set(result.data);
+
+    this.loading.set(false);
+
+  }
+
+  async selectLocation(location: Location) {
+
+    this.selectedLocation.set(location);
+
+    this.selectedSection.set(null);
+    this.selectedForm.set(null);
+
+    this.answers.set([]);
+
+    const result = await firstValueFrom(
+      this.sectionService.getAll(500,1)
+    );
+
+    this.sections.set(
+      result.data.filter(x=>x.employerId===location.employerId)
+    );
+
+  }
+
+  async selectSection(section: Section){
+
+    this.selectedSection.set(section);
+
+    this.selectedForm.set(null);
+
+    this.answers.set([]);
+
+    const result = await firstValueFrom(
+      this.formService.getAll(500,1)
+    );
+
+    this.forms.set(
+      result.data.filter(x=>x.sectionId===section.id)
+    );
+
+  }
+
+  async selectForm(form: Form){
+
+    this.selectedForm.set(form);
+
+    const result = await firstValueFrom(
+      this.answerService.getAll(500,1)
+    );
+
+    this.answers.set(
+      result.data.filter(x=>x.formId===form.id)
+    );
+
+  }
+
 }

@@ -1,74 +1,176 @@
-<div class="config-page">
-  <div class="config-card">
-    <!-- SIDEBAR -->
+<div class="container-fluid">
 
-    <aside class="config-sidebar">
-      <div class="sidebar-header">
-        <div class="sidebar-logo">
-          <i class="bi bi-gear-fill"></i>
+    <!-- LOCAIS -->
+
+    <div class="mb-5">
+
+        <h3>Locais</h3>
+
+        <div class="row g-3">
+
+            @for(location of locations(); track location.id){
+
+                <div class="col-md-4">
+
+                    <div
+                        class="card selectable"
+
+                        [class.active]="selectedLocation()?.id===location.id"
+
+                        (click)="selectLocation(location)"
+                    >
+
+                        <div class="card-body">
+
+                            <h5>{{location.nome}}</h5>
+
+                            <small>
+
+                                {{location.descricao}}
+
+                            </small>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            }
+
         </div>
 
-        <div>
-          <h5 class="mb-0 fw-bold">Painel Industria</h5>
+    </div>
 
-          <small class="text-muted"> Itens da Qualidade </small>
-        </div>
-      </div>
+    @if(selectedLocation()){
 
-      <nav class="config-nav">
-        @for (section of sections; track section.key) {
-          <button
-            type="button"
-            class="config-nav-item"
-            [class.active]="activeSection() === section.key"
-            (click)="activeSection.set(section.key)"
-          >
-            <i class="bi" [class]="section.icon"></i>
+        <div class="mb-5">
 
-            <div>
-              <div class="nav-title">
-                {{ section.label }}
-              </div>
+            <h3>Seções</h3>
 
-              <div class="nav-description">
-                {{ section.description }}
-              </div>
+            <div class="row g-3">
+
+                @for(section of sections(); track section.id){
+
+                    <div class="col-md-4">
+
+                        <div
+                            class="card selectable"
+
+                            [class.active]="selectedSection()?.id===section.id"
+
+                            (click)="selectSection(section)"
+                        >
+
+                            <div class="card-body">
+
+                                <h5>{{section.nome}}</h5>
+
+                                <small>
+
+                                    {{section.descricao}}
+
+                                </small>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                }
+
             </div>
-          </button>
-        }
-      </nav>
-    </aside>
 
-    <!-- CONTEÚDO -->
-
-    <main class="config-content">
-      <div class="content-header">
-        <div>
-          <h2 class="content-title">
-            {{ pageTitles[activeSection()] }}
-          </h2>
-
-          <p class="content-description">
-            {{ pageDescriptions[activeSection()] }}
-          </p>
         </div>
-      </div>
 
-      <div class="content-body">
-        @switch (activeSection()) {
-          @case ('location') {
-            <app-local />
-          }
+    }
 
-          @case ('section') {
-            <app-secao />
-          }
+    @if(selectedSection()){
 
-          @case ('form') {
-            <app-formulario />
-          }
-        }
-      </div>
-    </main>
-  </div>
+        <div class="mb-5">
+
+            <h3>Formulários</h3>
+
+            <div class="row g-3">
+
+                @for(form of forms(); track form.id){
+
+                    <div class="col-md-4">
+
+                        <div
+                            class="card selectable"
+
+                            [class.active]="selectedForm()?.id===form.id"
+
+                            (click)="selectForm(form)"
+                        >
+
+                            <div class="card-body">
+
+                                <h5>{{form.nome}}</h5>
+
+                                <small>
+
+                                    {{form.descricao}}
+
+                                </small>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                }
+
+            </div>
+
+        </div>
+
+    }
+
+    @if(selectedForm()){
+
+        <div class="card shadow-sm">
+
+            <div class="card-header">
+
+                <h4>Parâmetros</h4>
+
+            </div>
+
+            <div class="card-body">
+
+                @for(answer of answers(); track answer.id){
+
+                    <div class="mb-4">
+
+                        <label class="form-label">
+
+                            {{answer.nome}}
+
+                        </label>
+
+                        <input
+                            type="text"
+                            class="form-control"
+                        >
+
+                    </div>
+
+                }
+
+                <button class="btn btn-primary">
+
+                    Salvar Inspeção
+
+                </button>
+
+            </div>
+
+        </div>
+
+    }
+
 </div>

@@ -21,6 +21,7 @@ export class AnswerResultService {
 
   // Registra uma nova resposta para um parâmetro
   create(data: AnswerResultCreate): Observable<AnswerResult> {
+    console.log("data: ",data);
     return this.http.post<AnswerResult>(this.apiUrl, data, this.httpOptions);
   }
 

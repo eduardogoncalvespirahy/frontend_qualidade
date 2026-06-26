@@ -147,7 +147,7 @@
           </label>
 
           <!-- employerId (Locais e Seções) -->
-          <!-- @if (step() === 'location' || step() === 'section') {
+          @if (step() === 'location' || step() === 'section') {
             <label class="ff">
               <span class="ff__label">Employer ID</span>
               <select
@@ -162,10 +162,10 @@
                 }
               </select>
             </label>
-          } -->
+          }
 
           <!-- sectionId (Formulários) -->
-          <!-- @if (step() === 'form') {
+          @if (step() === 'form') {
             <label class="ff">
               <span class="ff__label">Seção</span>
               <select
@@ -180,7 +180,7 @@
                 }
               </select>
             </label>
-          } -->
+          }
 
           <!-- Status -->
           <label class="ff">
@@ -375,10 +375,25 @@
                     @if (!isAtivo(a.status)) {
                       <span class="badge field__badge">Inativo</span>
                     }
+                    @if (isChanged(a.id)) {
+                      <span class="badge badge--change">alterado</span>
+                    }
                   </label>
                   @if (a.descricao) {
                     <span class="field__hint">{{ a.descricao }}</span>
                   }
+
+                  @if (currentValue(a.id) !== null) {
+                    <span class="field__current">
+                      <i class="bi bi-clock-history"></i>
+                      Valor atual: <strong>{{ currentValue(a.id) }}</strong>
+                    </span>
+                  } @else {
+                    <span class="field__current field__current--empty">
+                      <i class="bi bi-dash-circle"></i> Sem valor registrado
+                    </span>
+                  }
+
                   <input
                     class="field__input"
                     [id]="'p-' + a.id"
@@ -394,13 +409,18 @@
 
             <div class="formpanel__footer">
               <span class="formpanel__count">
-                {{ filledCount() }} de {{ answers().length }} preenchido(s)
+                {{ changedCount() }} alteração(ões) pendente(s)
               </span>
-              <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="save()">
+              <button
+                type="button"
+                class="btn btn--primary"
+                [disabled]="saving() || changedCount() === 0"
+                (click)="save()"
+              >
                 @if (saving()) {
                   <i class="bi bi-arrow-repeat spin"></i> Salvando…
                 } @else {
-                  <i class="bi bi-check-lg"></i> Salvar respostas
+                  <i class="bi bi-check-lg"></i> Salvar alterações
                 }
               </button>
             </div>

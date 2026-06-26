@@ -1,13 +1,14 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 import { Location } from '../../../core/models/location.model';
 import { Section } from '../../../core/models/section.model';
 import { Form } from '../../../core/models/form.model';
 import { Answer } from '../../../core/models/answer.model';
-import { AnswerResultCreate } from '../../../core/models/answer-result.model';
+import { AnswerResult } from '../../../core/models/answer-result.model';
 
 import { LocationService } from '../../../core/services/location.service';
 import { SectionService } from '../../../core/services/section.service';
@@ -66,6 +67,9 @@ export class PainelComponent implements OnInit {
  
   // ───────── valores do formulário de parâmetros (answerId -> resposta) ─────────
   readonly paramValues = signal<Record<string, string>>({});
+ 
+  // valor atual já gravado no banco para cada answerId (a última linha existente)
+  readonly existingResults = signal<Record<string, AnswerResult | null>>({});
  
   // ───────── filtros de busca (por campo das interfaces) ─────────
   readonly filtersOpen = signal(false);
@@ -269,14 +273,58 @@ export class PainelComponent implements OnInit {
         const all = this.unwrap<Answer>(res);
         const params = all.filter((a) => a.formId === formId);
         this.answers.set(params);
-        // inicializa o mapa de respostas vazio
-        const init: Record<string, string> = {};
-        for (const a of params) init[a.id] = '';
-        this.paramValues.set(init);
-        this.loading.set(false);
+ 
+        if (params.length === 0) {
+          this.paramValues.set({});
+          this.existingResults.set({});
+          this.loading.set(false);
+          return;
+        }
+ 
+        // busca o valor já gravado de cada parâmetro
+        this.fetchResults(params).subscribe({
+          next: (results) => {
+            this.applyResults(results);
+            this.loading.set(false);
+          },
+          error: () => this.fail('Não foi possível carregar as respostas atuais.'),
+        });
       },
       error: () => this.fail('Não foi possível carregar os parâmetros.'),
     });
+  }
+ 
+  /** Busca, para cada answer, suas linhas em answer_result. */
+  private fetchResults(
+    params: Answer[]
+  ): Observable<{ id: string; list: AnswerResult[] }[]> {
+    return forkJoin(
+      params.map((a) =>
+        this.answerResultService.getByAnswerId(a.id).pipe(
+          map((list) => ({ id: a.id, list: list ?? [] })),
+          catchError(() => of({ id: a.id, list: [] as AnswerResult[] }))
+        )
+      )
+    );
+  }
+ 
+  /** Aplica o último valor de cada answer ao estado (existingResults + paramValues). */
+  private applyResults(results: { id: string; list: AnswerResult[] }[]): void {
+    const existing: Record<string, AnswerResult | null> = {};
+    const values: Record<string, string> = {};
+    for (const r of results) {
+      const last = this.latestResult(r.list);
+      existing[r.id] = last;
+      values[r.id] = last?.resposta ?? '';
+    }
+    this.existingResults.set(existing);
+    this.paramValues.set(values);
+  }
+ 
+  /** Linha atual do parâmetro. O backend já retorna apenas a mais recente
+   *  (ORDER BY data_criacao DESC LIMIT 1), então basta pegar a primeira. */
+  private latestResult(list: AnswerResult[]): AnswerResult | null {
+    return list?.[0] ?? null;
   }
  
   // ============================================================
@@ -380,36 +428,73 @@ export class PainelComponent implements OnInit {
     }
   }
  
-  readonly filledCount = computed(
-    () => Object.values(this.paramValues()).filter((v) => v.trim() !== '').length
-  );
+  /** Valor atualmente gravado no banco para o parâmetro (ou null). */
+  currentValue(answerId: string): string | null {
+    return this.existingResults()[answerId]?.resposta ?? null;
+  }
+ 
+  /** O valor digitado difere do que está gravado? */
+  isChanged(answerId: string): boolean {
+    const v = (this.paramValues()[answerId] ?? '').trim();
+    const prev = (this.existingResults()[answerId]?.resposta ?? '').trim();
+    return !!v && v !== prev;
+  }
+ 
+  readonly changedCount = computed(() => {
+    const values = this.paramValues();
+    const existing = this.existingResults();
+    return this.answers().reduce((n, a) => {
+      const v = (values[a.id] ?? '').trim();
+      const prev = (existing[a.id]?.resposta ?? '').trim();
+      return v && v !== prev ? n + 1 : n;
+    }, 0);
+  });
  
   save(): void {
     this.clearFeedback();
  
     const values = this.paramValues();
-    const payload: AnswerResultCreate[] = Object.entries(values)
-      .filter(([, resposta]) => resposta.trim() !== '')
-      .map(([answerId, resposta]) => ({ answerId, resposta: resposta.trim() }));
+    const existing = this.existingResults();
+    const ops: Observable<AnswerResult>[] = [];
  
-    if (payload.length === 0) {
-      this.error.set('Preencha ao menos um parâmetro antes de salvar.');
+    for (const a of this.answers()) {
+      const value = (values[a.id] ?? '').trim();
+      if (!value) continue;
+ 
+      const prev = existing[a.id];
+      if (prev && prev.resposta === value) continue; // sem alteração → ignora
+ 
+      // Sem constraint de answerId único: cada alteração gera uma nova linha
+      // (o valor anterior fica preservado como histórico).
+      ops.push(
+        this.answerResultService.create({ AnswerId: a.id, resposta: value })
+      );
+    }
+ 
+    if (ops.length === 0) {
+      this.error.set('Nenhuma alteração para salvar.');
       return;
     }
  
     this.saving.set(true);
-    forkJoin(payload.map((p) => this.answerResultService.create(p))).subscribe({
+    forkJoin(ops).subscribe({
       next: () => {
         this.saving.set(false);
-        this.success.set(
-          `${payload.length} resposta(s) salva(s) com sucesso.`
-        );
+        this.success.set(`${ops.length} resposta(s) salva(s) com sucesso.`);
+        this.refreshResults(); // recarrega os "valores atuais"
       },
       error: () => {
         this.saving.set(false);
         this.error.set('Erro ao salvar as respostas. Tente novamente.');
       },
     });
+  }
+ 
+  /** Recarrega os valores gravados após salvar. */
+  private refreshResults(): void {
+    const params = this.answers();
+    if (!params.length) return;
+    this.fetchResults(params).subscribe((results) => this.applyResults(results));
   }
  
   // ============================================================

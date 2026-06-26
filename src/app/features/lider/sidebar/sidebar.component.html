@@ -81,6 +81,7 @@
           routerLink="/lider"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"
+          title="Home"
           class="sidebar-link"
         >
           <i class="bi bi-house-door"></i>
@@ -94,6 +95,7 @@
           routerLink="/lider/painel"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"
+          title="Painel de Inspeção"
           class="sidebar-link"
         >
           <i class="bi bi-clipboard-check"></i>
@@ -107,6 +109,7 @@
           routerLink="/lider/historico"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"
+          title="Histórico"
           class="sidebar-link"
         >
           <i class="bi bi-clock-history"></i>
@@ -115,19 +118,12 @@
             <span>Histórico</span>
           }
         </a>
-      </nav>
-    </div>
 
-    <div class="sidebar-section">
-      @if (!layout.collapsed()) {
-        <div class="sidebar-section-title">Administração</div>
-      }
-
-      <nav class="sidebar-nav">
         <a
           routerLink="/lider/config"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"
+          title="Configurações"
           class="sidebar-link"
         >
           <i class="bi bi-gear"></i>
@@ -135,7 +131,7 @@
           @if (!layout.collapsed()) {
             <span>Configurações</span>
           }
-        </a>
+        </a>        
       </nav>
     </div>
 
@@ -149,6 +145,7 @@
           routerLink="/"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"
+          title="Voltar"
           class="sidebar-link"
         >
           <i class="bi bi-arrow-left-circle"></i>

@@ -14,7 +14,7 @@ export interface AnswerCreate {
   nome: string;
   descricao?: string | null;
   status?: number;
-  categoryId?: number;
+  categoryId: number;
 }
 
 export interface AnswerUpdate {

@@ -50,30 +50,25 @@
       <code>answers</code>.
     </div>
   } @else {
-    <div class="list-group">
-      @for (answer of answers; track answer.id) {
-        <a
-          class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3"
-          [title]="answer.descricao"
-          [routerLink]="[
-            '/inspetor/local',
-            this.navigationContext.context().locationId,
-            'secao',
-            this.navigationContext.context().sectionId,
-            'formulario',
-            answer.id,
-          ]"
-        >
+    <div class="d-flex flex-column gap-3">
+      @for (grupo of agrupados(); track grupo.categoria?.id) {
+        <!-- Título da categoria -->
+        <h5>{{ grupo.categoria?.nome ?? 'Sem categoria' }}</h5>
+
+        <!-- Inputs dos parâmetros desse grupo -->
+        @for (answer of grupo.answers; track answer.id) {
           <div>
-            <span class="badge bg-success me-2"> #{{ answer.id }} </span>
-
-            <span class="fw-semibold">
-              {{ answer.nome || 'parametro sem nome' }}
-            </span>
+            <label [for]="'input-' + answer.id">{{ answer.nome }}</label>
+            <input
+              [id]="'input-' + answer.id"
+              type="text"
+              class="form-control"
+              placeholder="Digite a resposta..."
+              [value]="respostas()[answer.id] ?? ''"
+              (input)="setResposta(answer.id, $any($event.target).value)"
+            />
           </div>
-
-          <span class="text-success fw-semibold"> Ver painel → </span>
-        </a>
+        }
       }
     </div>
   }

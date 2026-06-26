@@ -9,6 +9,9 @@ import { FormService } from '../../../core/services/form.service';
 import { NavigationContextService } from '../../../core/services/navigation-context.service';
 import { AnswerService } from '../../../core/services/answer.service';
 import { Answer } from '../../../core/models/answer.model';
+import { CategoryService } from '../../../core/services/category-answer.service';
+import { readonly } from '@angular/forms/signals';
+import { Category } from '../../../core/models/category-answer.model';
 
 @Component({
   selector: 'app-formulario',
@@ -23,8 +26,38 @@ export class FormularioComponent {
   protected readonly formService = inject(FormService);
   protected readonly answerService = inject(AnswerService);
   protected readonly navigationContext = inject(NavigationContextService);
+  private readonly categoryService = inject(CategoryService);
+
+  protected readonly categoriesResource = rxResource({
+    stream: () => this.categoryService.getAll(),
+  });
+
+  protected readonly categories = computed(() => this.categoriesResource.value()?.data ?? []);
 
   protected readonly query = signal('');
+
+  // Dicionário de respostas: chave = answerId, valor = texto digitado pelo inspetor
+  // Começa vazio e vai sendo preenchido conforme o usuário digita
+  protected readonly respostas = signal<Record<string, string>>({});
+
+  // Atualiza a resposta de um parâmetro específico sem apagar as outras
+  protected setResposta(answerId: string, valor: string): void {
+    this.respostas.update((atual) => ({ ...atual, [answerId]: valor }));
+  }
+
+  protected readonly agrupados = computed(() => {
+    const answers = this.filtered(); // parâmetros já filtrados
+    const categorias = this.categories(); // todas as categorias carregadas
+
+    // Pega só os IDs únicos de categoria que aparecem nos answers
+    const ids = [...new Set(answers.map((a) => a.categoryId))];
+
+    // Para cada ID, monta o grupo
+    return ids.map((id) => ({
+      categoria: categorias.find((c: Category) => String(c.id) === String(id)) ?? null,
+      answers: answers.filter((a) => a.categoryId === id),
+    }));
+  });
 
   protected readonly page = signal(1);
   protected readonly limit = signal(undefined);
@@ -37,8 +70,8 @@ export class FormularioComponent {
 
   private setContext(): void {
     this.navigationContext.update({
-      locationId: this.route.snapshot.paramMap.get('local_id')!,      
-      sectionId: this.route.snapshot.paramMap.get('secao_id')!,      
+      locationId: this.route.snapshot.paramMap.get('local_id')!,
+      sectionId: this.route.snapshot.paramMap.get('secao_id')!,
       formId: this.route.snapshot.paramMap.get('formulario_id')!,
     });
   }
@@ -126,4 +159,24 @@ export class FormularioComponent {
   protected previousPage(): void {
     this.goToPage(this.pagination().page - 1);
   }
+  private salvarRascunho(): void {
+  const formId = this.navigationContext.context().formId;
+  localStorage.setItem(`formulario_rascunho_${formId}`, JSON.stringify(this.respostas()));
+}
+  private restaurarRascunho(): void {
+  const formId = this.navigationContext.context().formId;
+  const salvo  = localStorage.getItem(`formulario_rascunho_${formId}`);
+  if (salvo) this.respostas.set(JSON.parse(salvo));
+}
+
+// protected setResposta(answerId: string, valor: string): void {
+//   this.respostas.update(atual => ({ ...atual, [answerId]: valor }));
+//   this.salvarRascunho();
+// }
+
+
+
+
+
+
 }

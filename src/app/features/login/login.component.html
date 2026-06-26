@@ -1,7 +1,7 @@
 <div class="login-layout">
   <!-- Painel Institucional -->
 
-  <div class="login-brand-panel d-none d-lg-flex">
+  <div class="login-brand-panel">
     <div class="brand-content">
       <div class="brand-logo">
         <i class="bi bi-shield-check"></i>
@@ -49,119 +49,117 @@
 
   <div class="login-form-panel">
     <div class="login-container">
-      <div class="login-card">
-        <div class="login-header">
-          <a class="btn btn-light border" [routerLink]="['/']">
-            <i class="bi bi-arrow-left"></i>
-          </a>
+      <div class="login-header">
+        <a class="btn btn-light border" [routerLink]="['/']">
+          <i class="bi bi-arrow-left"></i>
+        </a>
 
-          <span class="badge rounded-pill text-bg-primary"> Administração </span>
+        <span class="badge rounded-pill text-bg-primary"> Administração </span>
+      </div>
+
+      <div class="text-center mb-4">
+        <div class="login-avatar">
+          <i class="bi bi-person-lock"></i>
         </div>
 
-        <div class="text-center mb-4">
-          <div class="login-avatar">
-            <i class="bi bi-person-lock"></i>
-          </div>
+        <h2 class="fw-bold mt-4 mb-2">Bem-vindo</h2>
 
-          <h2 class="fw-bold mt-4 mb-2">Bem-vindo</h2>
+        <p class="text-muted mb-0">Entre com suas credenciais</p>
+      </div>
 
-          <p class="text-muted mb-0">Entre com suas credenciais</p>
+      <div class="login-type mb-4">
+        @for (t of types; track t.value) {
+          <button
+            type="button"
+            class="login-type-btn"
+            [class.active]="identifierType() === t.value"
+            (click)="changeType(t.value)"
+          >
+            {{ t.label }}
+          </button>
+        }
+      </div>
+
+      <form (ngSubmit)="submit()">
+        <div class="form-floating mb-3">
+          <input
+            id="identifier"
+            class="form-control"
+            name="identifier"
+            [type]="identifierType() === 'registerNumber' ? 'number' : 'text'"
+            [ngModel]="identifier()"
+            (ngModelChange)="identifier.set($event)"
+            autocomplete="username"
+            placeholder="Identificação"
+          />
+
+          <label for="identifier">
+            {{ identifierLabel() }}
+          </label>
         </div>
 
-        <div class="login-type mb-4">
-          @for (t of types; track t.value) {
-            <button
-              type="button"
-              class="login-type-btn"
-              [class.active]="identifierType() === t.value"
-              (click)="changeType(t.value)"
-            >
-              {{ t.label }}
-            </button>
-          }
-        </div>
-
-        <form (ngSubmit)="submit()">
-          <div class="form-floating mb-3">
+        <div class="input-group mb-3">
+          <div class="form-floating flex-grow-1">
             <input
-              id="identifier"
+              id="password"
               class="form-control"
-              name="identifier"
-              [type]="identifierType() === 'registerNumber' ? 'number' : 'text'"
-              [ngModel]="identifier()"
-              (ngModelChange)="identifier.set($event)"
-              autocomplete="username"
-              placeholder="Identificação"
+              name="password"
+              [type]="showPassword() ? 'text' : 'password'"
+              [ngModel]="password()"
+              (ngModelChange)="password.set($event)"
+              autocomplete="current-password"
+              placeholder="Senha"
             />
 
-            <label for="identifier">
-              {{ identifierLabel() }}
-            </label>
+            <label for="password"> Senha </label>
           </div>
 
-          <div class="input-group mb-3">
-            <div class="form-floating flex-grow-1">
-              <input
-                id="password"
-                class="form-control"
-                name="password"
-                [type]="showPassword() ? 'text' : 'password'"
-                [ngModel]="password()"
-                (ngModelChange)="password.set($event)"
-                autocomplete="current-password"
-                placeholder="Senha"
-              />
-
-              <label for="password"> Senha </label>
-            </div>
-
-            <button
-              type="button"
-              class="btn btn-outline-secondary"
-              (click)="togglePasswordVisibility()"
-            >
-              <i
-                class="bi"
-                [class.bi-eye]="!showPassword()"
-                [class.bi-eye-slash]="showPassword()"
-              ></i>
-            </button>
-          </div>
-
-          <div class="login-options">
-            <div class="form-check form-switch">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                id="remember"
-                name="rememberAccess"
-                [ngModel]="rememberAccess()"
-                (ngModelChange)="rememberAccess.set($event)"
-              />
-
-              <label class="form-check-label" for="remember"> Lembrar acesso </label>
-            </div>
-          </div>
-
-          @if (error(); as errorMessage) {
-            <div class="alert alert-danger">
-              <i class="bi bi-exclamation-circle me-2"></i>
-
-              {{ errorMessage }}
-            </div>
-          }
-
-          <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="loading()">
-            @if (loading()) {
-              <span class="spinner-border spinner-border-sm me-2"></span>
-
-              Entrando...
-            } @else {
-              Entrar no Sistema
-            }
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            (click)="togglePasswordVisibility()"
+          >
+            <i
+              class="bi"
+              [class.bi-eye]="!showPassword()"
+              [class.bi-eye-slash]="showPassword()"
+            ></i>
           </button>
-        </form>
-      </div>
+        </div>
+
+        <div class="login-options">
+          <div class="form-check form-switch">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="remember"
+              name="rememberAccess"
+              [ngModel]="rememberAccess()"
+              (ngModelChange)="rememberAccess.set($event)"
+            />
+
+            <label class="form-check-label" for="remember"> Lembrar acesso </label>
+          </div>
+        </div>
+
+        @if (error(); as errorMessage) {
+          <div class="alert alert-danger">
+            <i class="bi bi-exclamation-circle me-2"></i>
+
+            {{ errorMessage }}
+          </div>
+        }
+
+        <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="loading()">
+          @if (loading()) {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+
+            Entrando...
+          } @else {
+            Entrar no Sistema
+          }
+        </button>
+      </form>
     </div>
   </div>
 </div>

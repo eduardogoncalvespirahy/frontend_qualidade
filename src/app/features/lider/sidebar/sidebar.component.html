@@ -138,6 +138,28 @@
         </a>
       </nav>
     </div>
+
+    <div class="sidebar-section">
+      @if (!layout.collapsed()) {
+        <div class="sidebar-section-title">Pagina Inicial</div>
+      }
+
+      <nav class="sidebar-nav">
+        <a
+          routerLink="/"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
+          <i class="bi bi-arrow-left-circle"></i>
+
+          @if (!layout.collapsed()) {
+            <span>Voltar</span>
+          }
+        </a>
+      </nav>
+    </div>
+
   </div>
 
   <!-- Footer -->

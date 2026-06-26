@@ -105,25 +105,25 @@
       </nav>
     </div>
 
-    <!-- <div class="sidebar-section">
+    <div class="sidebar-section">
       @if (!layout.collapsed()) {
-        <div class="sidebar-section-title">Administração</div>
+        <div class="sidebar-section-title">Pagina Inicial</div>
       }
 
       <nav class="sidebar-nav">
         <a
-          routerLink="/inspetor/config"
+          routerLink="/"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"
           class="sidebar-link"
         >
-          <i class="bi bi-gear"></i>
+          <i class="bi bi-arrow-left-circle"></i>
 
           @if (!layout.collapsed()) {
-            <span>Configurações</span>
+            <span>Voltar</span>
           }
         </a>
       </nav>
-    </div> -->
+    </div>
   </div>
 </aside>

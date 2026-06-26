@@ -1,176 +1,230 @@
-<div class="container-fluid">
-
-    <!-- LOCAIS -->
-
-    <div class="mb-5">
-
-        <h3>Locais</h3>
-
-        <div class="row g-3">
-
-            @for(location of locations(); track location.id){
-
-                <div class="col-md-4">
-
-                    <div
-                        class="card selectable"
-
-                        [class.active]="selectedLocation()?.id===location.id"
-
-                        (click)="selectLocation(location)"
-                    >
-
-                        <div class="card-body">
-
-                            <h5>{{location.nome}}</h5>
-
-                            <small>
-
-                                {{location.descricao}}
-
-                            </small>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            }
-
-        </div>
-
+<section class="painel">
+  <!-- Cabeçalho -->
+  <header class="painel__head">
+    <div>
+      <span class="painel__eyebrow">Inspeção</span>
+      <h1 class="painel__title">{{ pageTitle() }}</h1>
+      <p class="painel__subtitle">{{ pageDescription() }}</p>
     </div>
+  </header>
 
-    @if(selectedLocation()){
-
-        <div class="mb-5">
-
-            <h3>Seções</h3>
-
-            <div class="row g-3">
-
-                @for(section of sections(); track section.id){
-
-                    <div class="col-md-4">
-
-                        <div
-                            class="card selectable"
-
-                            [class.active]="selectedSection()?.id===section.id"
-
-                            (click)="selectSection(section)"
-                        >
-
-                            <div class="card-body">
-
-                                <h5>{{section.nome}}</h5>
-
-                                <small>
-
-                                    {{section.descricao}}
-
-                                </small>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                }
-
-            </div>
-
-        </div>
-
+  <!-- Trilha colapsável (breadcrumb) -->
+  <nav class="trail" aria-label="Navegação da inspeção">
+    @if (step() !== 'location') {
+      <button type="button" class="trail__back" (click)="back()">
+        <i class="bi bi-arrow-left"></i>
+        <span>Voltar</span>
+      </button>
     }
 
-    @if(selectedSection()){
+    <ol class="trail__steps">
+      <!-- Local -->
+      <li class="chip" [class.chip--active]="step() === 'location'">
+        <button
+          type="button"
+          class="chip__btn"
+          [disabled]="!selectedLocation()"
+          (click)="goToLocations()"
+        >
+          <i class="bi bi-geo-alt"></i>
+          <span class="chip__label">{{ selectedLocation()?.nome ?? 'Local' }}</span>
+        </button>
+      </li>
 
-        <div class="mb-5">
+      @if (selectedLocation()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
 
-            <h3>Formulários</h3>
+        <!-- Seção -->
+        <li class="chip" [class.chip--active]="step() === 'section'">
+          <button
+            type="button"
+            class="chip__btn"
+            [disabled]="!selectedSection()"
+            (click)="goToSections()"
+          >
+            <i class="bi bi-sliders"></i>
+            <span class="chip__label">{{ selectedSection()?.nome ?? 'Seção' }}</span>
+          </button>
+        </li>
+      }
 
-            <div class="row g-3">
+      @if (selectedSection()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
 
-                @for(form of forms(); track form.id){
+        <!-- Formulário -->
+        <li class="chip" [class.chip--active]="step() === 'form'">
+          <button
+            type="button"
+            class="chip__btn"
+            [disabled]="!selectedForm()"
+            (click)="goToForms()"
+          >
+            <i class="bi bi-card-checklist"></i>
+            <span class="chip__label">{{ selectedForm()?.nome ?? 'Formulário' }}</span>
+          </button>
+        </li>
+      }
 
-                    <div class="col-md-4">
+      @if (selectedForm()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip chip--active">
+          <span class="chip__btn chip__btn--static">
+            <i class="bi bi-pencil-square"></i>
+            <span class="chip__label">Parâmetros</span>
+          </span>
+        </li>
+      }
+    </ol>
+  </nav>
 
-                        <div
-                            class="card selectable"
+  <!-- Feedback -->
+  @if (error()) {
+    <div class="alert alert--error" role="alert">
+      <i class="bi bi-exclamation-triangle"></i> {{ error() }}
+    </div>
+  }
+  @if (success()) {
+    <div class="alert alert--success" role="status">
+      <i class="bi bi-check-circle"></i> {{ success() }}
+    </div>
+  }
 
-                            [class.active]="selectedForm()?.id===form.id"
+  <!-- Conteúdo -->
+  @if (loading()) {
+    <div class="grid">
+      @for (s of [1, 2, 3, 4, 5, 6]; track s) {
+        <div class="card card--skeleton"></div>
+      }
+    </div>
+  } @else {
+    @switch (step()) {
+      <!-- ───── LOCAIS ───── -->
+      @case ('location') {
+        @if (locations().length) {
+          <div class="grid">
+            @for (loc of locations(); track trackById($index, loc)) {
+              <button type="button" class="card" (click)="selectLocation(loc)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-geo-alt"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(loc.status)">
+                    {{ isAtivo(loc.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </div>
+                <h3 class="card__title">{{ loc.nome }}</h3>
+                <p class="card__desc">{{ loc.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Abrir seções <i class="bi bi-arrow-right"></i></span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>Nenhum local cadastrado.</p>
+          </div>
+        }
+      }
 
-                            (click)="selectForm(form)"
-                        >
+      <!-- ───── SEÇÕES ───── -->
+      @case ('section') {
+        @if (sections().length) {
+          <div class="grid">
+            @for (sec of sections(); track trackById($index, sec)) {
+              <button type="button" class="card" (click)="selectSection(sec)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-sliders"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(sec.status)">
+                    {{ isAtivo(sec.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </div>
+                <h3 class="card__title">{{ sec.nome }}</h3>
+                <p class="card__desc">{{ sec.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Abrir formulários <i class="bi bi-arrow-right"></i></span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>Nenhuma seção encontrada para este local.</p>
+          </div>
+        }
+      }
 
-                            <div class="card-body">
+      <!-- ───── FORMULÁRIOS ───── -->
+      @case ('form') {
+        @if (forms().length) {
+          <div class="grid">
+            @for (form of forms(); track trackById($index, form)) {
+              <button type="button" class="card" (click)="selectForm(form)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(form.status)">
+                    {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </div>
+                <h3 class="card__title">{{ form.nome }}</h3>
+                <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Preencher <i class="bi bi-arrow-right"></i></span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>Nenhum formulário encontrado para esta seção.</p>
+          </div>
+        }
+      }
 
-                                <h5>{{form.nome}}</h5>
+      <!-- ───── PARÂMETROS ───── -->
+      @case ('parameters') {
+        @if (answers().length) {
+          <div class="formpanel">
+            <div class="formpanel__fields">
+              @for (a of answers(); track trackById($index, a)) {
+                <div class="field">
+                  <label class="field__label" [for]="'p-' + a.id">
+                    {{ a.nome }}
+                    @if (!isAtivo(a.status)) {
+                      <span class="badge field__badge">Inativo</span>
+                    }
+                  </label>
+                  @if (a.descricao) {
+                    <span class="field__hint">{{ a.descricao }}</span>
+                  }
+                  <input
+                    class="field__input"
+                    [id]="'p-' + a.id"
+                    [type]="inputType(a.categoryId)"
+                    [ngModel]="paramValues()[a.id] ?? ''"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="updateParam(a.id, $event)"
+                    placeholder="Informe o valor"
+                  />
+                </div>
+              }
+            </div>
 
-                                <small>
-
-                                    {{form.descricao}}
-
-                                </small>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
+            <div class="formpanel__footer">
+              <span class="formpanel__count">
+                {{ filledCount() }} de {{ answers().length }} preenchido(s)
+              </span>
+              <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="save()">
+                @if (saving()) {
+                  <i class="bi bi-arrow-repeat spin"></i> Salvando…
+                } @else {
+                  <i class="bi bi-check-lg"></i> Salvar respostas
                 }
-
+              </button>
             </div>
-
-        </div>
-
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>Este formulário não possui parâmetros.</p>
+          </div>
+        }
+      }
     }
-
-    @if(selectedForm()){
-
-        <div class="card shadow-sm">
-
-            <div class="card-header">
-
-                <h4>Parâmetros</h4>
-
-            </div>
-
-            <div class="card-body">
-
-                @for(answer of answers(); track answer.id){
-
-                    <div class="mb-4">
-
-                        <label class="form-label">
-
-                            {{answer.nome}}
-
-                        </label>
-
-                        <input
-                            type="text"
-                            class="form-control"
-                        >
-
-                    </div>
-
-                }
-
-                <button class="btn btn-primary">
-
-                    Salvar Inspeção
-
-                </button>
-
-            </div>
-
-        </div>
-
-    }
-
-</div>
+  }
+</section>

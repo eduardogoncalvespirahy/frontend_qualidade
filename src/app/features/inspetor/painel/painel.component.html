@@ -89,6 +89,162 @@
     </div>
   }
 
+  <!-- Filtros por campo (não aparece na etapa de parâmetros) -->
+  @if (step() !== 'parameters' && !loading()) {
+    <div class="filters">
+      <div class="filters__bar">
+        <button
+          type="button"
+          class="filters__toggle"
+          [class.is-open]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <i class="bi bi-funnel"></i>
+          <span>Filtros</span>
+          @if (activeFilterCount()) {
+            <span class="filters__count">{{ activeFilterCount() }}</span>
+          }
+          <i
+            class="bi"
+            [class.bi-chevron-down]="!filtersOpen()"
+            [class.bi-chevron-up]="filtersOpen()"
+          ></i>
+        </button>
+
+        @if (hasFilter()) {
+          <button type="button" class="filters__clear" (click)="resetFilters()">
+            <i class="bi bi-x-lg"></i> Limpar
+          </button>
+        }
+      </div>
+
+      @if (filtersOpen()) {
+        <div class="filters__grid">
+          <!-- Nome -->
+          <label class="ff">
+            <span class="ff__label">Nome</span>
+            <input
+              type="text"
+              class="ff__control"
+              [ngModel]="filters().nome"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('nome', $event)"
+              placeholder="Contém…"
+            />
+          </label>
+
+          <!-- Descrição -->
+          <label class="ff">
+            <span class="ff__label">Descrição</span>
+            <input
+              type="text"
+              class="ff__control"
+              [ngModel]="filters().descricao"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('descricao', $event)"
+              placeholder="Contém…"
+            />
+          </label>
+
+          <!-- employerId (Locais e Seções) -->
+          <!-- @if (step() === 'location' || step() === 'section') {
+            <label class="ff">
+              <span class="ff__label">Employer ID</span>
+              <select
+                class="ff__control"
+                [ngModel]="filters().employerId"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('employerId', $event)"
+              >
+                <option value="">Todos</option>
+                @for (id of employerIdOptions(); track id) {
+                  <option [value]="id">{{ id }}</option>
+                }
+              </select>
+            </label>
+          } -->
+
+          <!-- sectionId (Formulários) -->
+          <!-- @if (step() === 'form') {
+            <label class="ff">
+              <span class="ff__label">Seção</span>
+              <select
+                class="ff__control"
+                [ngModel]="filters().sectionId"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('sectionId', $event)"
+              >
+                <option value="">Todas</option>
+                @for (opt of sectionIdOptions(); track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </label>
+          } -->
+
+          <!-- Status -->
+          <label class="ff">
+            <span class="ff__label">Status</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().status"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('status', $event)"
+            >
+              <option value="all">Todos</option>
+              <option value="active">Ativo</option>
+              <option value="inactive">Inativo</option>
+            </select>
+          </label>
+
+          <!-- Datas (Seções e Formulários) -->
+          @if (step() === 'section' || step() === 'form') {
+            <label class="ff">
+              <span class="ff__label">Criado de</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoDe', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Criado até</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoAte', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Alterado de</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoDe', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Alterado até</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoAte', $event)"
+              />
+            </label>
+          }
+        </div>
+      }
+    </div>
+  }
+
   <!-- Conteúdo -->
   @if (loading()) {
     <div class="grid">
@@ -100,9 +256,9 @@
     @switch (step()) {
       <!-- ───── LOCAIS ───── -->
       @case ('location') {
-        @if (locations().length) {
+        @if (filteredLocations().length) {
           <div class="grid">
-            @for (loc of locations(); track trackById($index, loc)) {
+            @for (loc of filteredLocations(); track trackById($index, loc)) {
               <button type="button" class="card" (click)="selectLocation(loc)">
                 <div class="card__top">
                   <span class="card__icon"><i class="bi bi-geo-alt"></i></span>
@@ -119,16 +275,25 @@
         } @else {
           <div class="empty">
             <i class="bi bi-inbox"></i>
-            <p>Nenhum local cadastrado.</p>
+            <p>
+              {{
+                hasFilter() ? 'Nenhum local corresponde aos filtros.' : 'Nenhum local cadastrado.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
           </div>
         }
       }
 
       <!-- ───── SEÇÕES ───── -->
       @case ('section') {
-        @if (sections().length) {
+        @if (filteredSections().length) {
           <div class="grid">
-            @for (sec of sections(); track trackById($index, sec)) {
+            @for (sec of filteredSections(); track trackById($index, sec)) {
               <button type="button" class="card" (click)="selectSection(sec)">
                 <div class="card__top">
                   <span class="card__icon"><i class="bi bi-sliders"></i></span>
@@ -145,16 +310,27 @@
         } @else {
           <div class="empty">
             <i class="bi bi-inbox"></i>
-            <p>Nenhuma seção encontrada para este local.</p>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhuma seção corresponde aos filtros.'
+                  : 'Nenhuma seção encontrada para este local.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
           </div>
         }
       }
 
       <!-- ───── FORMULÁRIOS ───── -->
       @case ('form') {
-        @if (forms().length) {
+        @if (filteredForms().length) {
           <div class="grid">
-            @for (form of forms(); track trackById($index, form)) {
+            @for (form of filteredForms(); track trackById($index, form)) {
               <button type="button" class="card" (click)="selectForm(form)">
                 <div class="card__top">
                   <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
@@ -171,7 +347,18 @@
         } @else {
           <div class="empty">
             <i class="bi bi-inbox"></i>
-            <p>Nenhum formulário encontrado para esta seção.</p>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhum formulário corresponde aos filtros.'
+                  : 'Nenhum formulário encontrado para esta seção.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
           </div>
         }
       }

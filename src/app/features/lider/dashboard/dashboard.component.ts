@@ -2,11 +2,12 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { LayoutService } from '../../../core/services/layout.service';
+import { HomeComponent } from './home/home.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterOutlet, SidebarComponent],
+  imports: [RouterOutlet, SidebarComponent, HomeComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
 })

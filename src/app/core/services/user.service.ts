@@ -24,15 +24,16 @@ export class UserService {
     return this.http.post<User>(this.apiUrl, user);
   }
 
+  getById(id: string): Observable<User> {
+    return this.http.get<User>(`${this.apiUrl}/${id}`);
+  }
+
   getByIdUserProfile(id: string): Observable<UserProfile> {
     return this.http.get<UserProfile>(`${this.apiUrl}/profile/${id}`);
   }
 
-  getById(id: string): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/${id}`);
-  }
   getByRegisterNumber(registerNumber: string): Observable<User> {
-    return this.http.get<User>(`${this.apiUrl}/registernumber/${registerNumber}`);
+    return this.http.get<User>(`${this.apiUrl}/registerNumber/${registerNumber}`);
   }
 
   getAll(limit?: number, page?: number): Observable<PaginatedResult<User>> {
@@ -44,6 +45,17 @@ export class UserService {
       params = params.set('page', page.toString());
     }
     return this.http.get<PaginatedResult<User>>(this.apiUrl, { params });
+  }
+
+  getAllUserProfile(limit?: number, page?: number): Observable<PaginatedResult<UserProfile>> {
+    let params = new HttpParams();
+    if (limit != null) {
+      params = params.set('limit', limit.toString());
+    }
+    if (page != null) {
+      params = params.set('page', page.toString());
+    }
+    return this.http.get<PaginatedResult<UserProfile>>(this.apiUrl + '/profiles', { params });
   }
 
   update(id: string, user: UserUpdate): Observable<User> {

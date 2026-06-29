@@ -7,6 +7,27 @@ export const ConfigRoutes: Routes = [
     loadComponent: () => import('./config.component').then((c) => c.ConfigComponent),
     children: [
         {
+            path:'location',
+            title:'Locais',
+            loadComponent: () =>
+                import('./add-configs/location/location.component')
+                    .then(m => m.LocationComponent), 
+        },
+        {
+            path:'section',
+            title:'Seções',
+            loadComponent: () =>
+                import('./add-configs/section/section.component')
+                    .then(m => m.SectionComponent), 
+        },        
+        {
+            path:'form',
+            title:'Formularios',
+            loadComponent: () =>
+                import('./add-configs/form/form.component')
+                    .then(m => m.FormComponent), 
+        },        
+        {
             path:'machine',
             title:'Maquinas',
             loadComponent: () =>

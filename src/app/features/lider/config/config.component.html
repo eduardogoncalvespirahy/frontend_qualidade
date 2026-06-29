@@ -84,6 +84,18 @@
 
         @switch (activeSection()) {
 
+          @case ('location') {
+            <app-location />
+          }
+          
+          @case ('section') {
+            <app-section />
+          }
+          
+          @case ('form') {
+            <app-form />
+          }
+
           @case ('machine') {
             <app-machine />
           }

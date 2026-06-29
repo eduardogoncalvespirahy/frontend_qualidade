@@ -1,245 +1,371 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  output,
-  signal,
-} from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
-import { Employer } from '../../../../../core/models/employer.model';
 import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
 import { Form } from '../../../../../core/models/form.model';
 import { Machine } from '../../../../../core/models/machine.model';
-import { PaginatedResult } from '../../../../../core/models/paginated.model';
 
-import { EmployerService } from '../../../../../core/services/employer.service';
 import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { FormService } from '../../../../../core/services/form.service';
 import { MachineService } from '../../../../../core/services/machine.service';
 import { ModalService } from '../../../../../core/services/modal.service';
+
 import { FormComponent } from './modals/form/form.component';
 import { DetailComponent } from './modals/detail/detail.component';
-
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
+
+type Step = 'location' | 'section' | 'form' | 'machine';
+
+/** Campos filtráveis derivados das interfaces (sem o id). */
+interface Filters {
+  nome: string;
+  descricao: string;
+  employerId: string; // Location / Section
+  sectionId: string; // Form
+  status: 'all' | 'active' | 'inactive';
+  criadoDe: string; // yyyy-mm-dd
+  criadoAte: string;
+  alteradoDe: string;
+  alteradoAte: string;
+}
 
 @Component({
   selector: 'app-machine',
   standalone: true,
-  imports: [ScrollTopComponent],
+  imports: [CommonModule, FormsModule, ScrollTopComponent],
   templateUrl: './machine.component.html',
   styleUrl: './machine.component.css',
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MachineComponent {
-  private readonly employerService = inject(EmployerService);
+export class MachineComponent implements OnInit {
   private readonly locationService = inject(LocationService);
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
   private readonly machineService = inject(MachineService);
   private readonly modalService = inject(ModalService);
 
-  protected readonly query = signal('');
+  // ───────── navegação ─────────
+  readonly step = signal<Step>('location');
 
-  protected readonly filterMachine = signal('');
-  protected readonly filterLocation = signal('');
-  protected readonly filterSection = signal('');
-  protected readonly filterForm = signal('');
-  protected readonly filterStatus = signal<string>('');
-  protected readonly filterCreatedStart = signal('');
-  protected readonly filterCreatedEnd = signal('');
-  protected readonly filterUpdatedStart = signal('');
-  protected readonly filterUpdatedEnd = signal('');
+  // ───────── coleções ─────────
+  readonly locations = signal<Location[]>([]);
+  readonly sections = signal<Section[]>([]);
+  readonly forms = signal<Form[]>([]);
+  readonly machines = signal<Machine[]>([]); // máquinas do formulário selecionado
 
-  protected readonly employersResource = rxResource<PaginatedResult<Employer>, void>({
-    stream: () => this.employerService.getAll(),
+  // ───────── seleções ─────────
+  readonly selectedLocation = signal<Location | null>(null);
+  readonly selectedSection = signal<Section | null>(null);
+  readonly selectedForm = signal<Form | null>(null);
+
+  // ───────── feedback ─────────
+  readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly success = signal<string | null>(null);
+
+  // ───────── filtros por campo ─────────
+  readonly filtersOpen = signal(false);
+
+  private readonly emptyFilters: Filters = {
+    nome: '',
+    descricao: '',
+    employerId: '',
+    sectionId: '',
+    status: 'all',
+    criadoDe: '',
+    criadoAte: '',
+    alteradoDe: '',
+    alteradoAte: '',
+  };
+
+  readonly filters = signal<Filters>({ ...this.emptyFilters });
+
+  updateFilter<K extends keyof Filters>(key: K, value: Filters[K]): void {
+    this.filters.update((f) => ({ ...f, [key]: value }));
+  }
+
+  readonly activeFilterCount = computed(() => {
+    const f = this.filters();
+    let n = f.status !== 'all' ? 1 : 0;
+    for (const [k, v] of Object.entries(f)) {
+      if (k !== 'status' && v !== '') n++;
+    }
+    return n;
   });
 
-  protected readonly locationsResource = rxResource<PaginatedResult<Location>, void>({
-    stream: () => this.locationService.getAll(),
+  readonly hasFilter = computed(() => this.activeFilterCount() > 0);
+
+  // ── helpers de comparação ──
+  private textMatch(value: string | null | undefined, term: string): boolean {
+    if (!term.trim()) return true;
+    return (value ?? '').toLowerCase().includes(term.trim().toLowerCase());
+  }
+
+  private statusMatch(status: number, f: Filters['status']): boolean {
+    if (f === 'all') return true;
+    return f === 'active' ? status === 1 : status !== 1;
+  }
+
+  private dateInRange(
+    date: Date | string | null | undefined,
+    from: string,
+    to: string,
+  ): boolean {
+    if (!from && !to) return true;
+    if (!date) return false;
+    const d = new Date(date).getTime();
+    if (from && d < new Date(from).getTime()) return false;
+    if (to && d > new Date(`${to}T23:59:59`).getTime()) return false;
+    return true;
+  }
+
+  readonly filteredLocations = computed(() => {
+    const f = this.filters();
+    return this.locations().filter(
+      (l) =>
+        this.textMatch(l.nome, f.nome) &&
+        this.textMatch(l.descricao, f.descricao) &&
+        this.textMatch(l.employerId, f.employerId) &&
+        this.statusMatch(l.status, f.status),
+    );
   });
 
-  protected readonly sectionsResource = rxResource<PaginatedResult<Section>, void>({
-    stream: () => this.sectionService.getAll(),
+  readonly filteredSections = computed(() => {
+    const f = this.filters();
+    return this.sections().filter(
+      (s) =>
+        this.textMatch(s.nome, f.nome) &&
+        this.textMatch(s.descricao, f.descricao) &&
+        this.textMatch(s.employerId, f.employerId) &&
+        this.statusMatch(s.status, f.status) &&
+        this.dateInRange(s.dataCriacao, f.criadoDe, f.criadoAte) &&
+        this.dateInRange(s.dataAlteracao, f.alteradoDe, f.alteradoAte),
+    );
   });
 
-  protected readonly formsResource = rxResource<PaginatedResult<Form>, void>({
-    stream: () => this.formService.getAll(),
+  readonly filteredForms = computed(() => {
+    const f = this.filters();
+    return this.forms().filter(
+      (fm) =>
+        this.textMatch(fm.nome, f.nome) &&
+        this.textMatch(fm.descricao, f.descricao) &&
+        this.textMatch(fm.sectionId, f.sectionId) &&
+        this.statusMatch(fm.status, f.status) &&
+        this.dateInRange(fm.dataCriacao, f.criadoDe, f.criadoAte) &&
+        this.dateInRange(fm.dataAlteracao, f.alteradoDe, f.alteradoAte),
+    );
   });
 
-  protected readonly machinesResource = rxResource<PaginatedResult<Machine>, void>({
-    stream: () => this.machineService.getAll(),
+  readonly filteredMachines = computed(() => {
+    const f = this.filters();
+    return this.machines().filter(
+      (m) =>
+        this.textMatch(m.nome, f.nome) &&
+        this.textMatch(m.descricao, f.descricao) &&
+        this.statusMatch(m.status, f.status) &&
+        this.dateInRange(m.dataCriacao, f.criadoDe, f.criadoAte) &&
+        this.dateInRange(m.dataAlteracao, f.alteradoDe, f.alteradoAte),
+    );
   });
 
-  protected readonly locations = computed(() => this.locationsResource.value()?.data ?? []);
-  protected readonly sections = computed(() => this.sectionsResource.value()?.data ?? []);
-  protected readonly forms = computed(() => this.formsResource.value()?.data ?? []);
-  protected readonly machines = computed(() => this.machinesResource.value()?.data ?? []);
+  // ── opções de IDs (selects de filtro) ──
+  private distinct(values: (string | null | undefined)[]): string[] {
+    return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
+  }
 
-  protected readonly filtered = computed(() => {
-    const machineTerm = this.filterMachine().trim().toLowerCase();
-    const locationId = this.filterLocation();
-    const sectionId = this.filterSection();
-    const formId = this.filterForm();
-    const status = this.filterStatus();
+  readonly employerIdOptions = computed<string[]>(() => {
+    if (this.step() === 'location') {
+      return this.distinct(this.locations().map((l) => l.employerId));
+    }
+    if (this.step() === 'section') {
+      return this.distinct(this.sections().map((s) => s.employerId));
+    }
+    return [];
+  });
 
-    const createdStart = this.filterCreatedStart();
-    const createdEnd = this.filterCreatedEnd();
+  readonly sectionIdOptions = computed<{ value: string; label: string }[]>(() => {
+    const byId = new Map(this.sections().map((s) => [s.id, s.nome]));
+    return this.distinct(this.forms().map((f) => f.sectionId)).map((id) => ({
+      value: id,
+      label: byId.get(id) ?? id,
+    }));
+  });
 
-    const updatedStart = this.filterUpdatedStart();
-    const updatedEnd = this.filterUpdatedEnd();
+  // ───────── títulos dinâmicos ─────────
+  private readonly titles: Record<Step, string> = {
+    location: 'Locais',
+    section: 'Seções',
+    form: 'Formulários',
+    machine: 'Máquinas',
+  };
+  private readonly descriptions: Record<Step, string> = {
+    location: 'Selecione um local para começar.',
+    section: 'Escolha a seção desejada.',
+    form: 'Escolha o formulário das máquinas.',
+    machine: 'Gerencie as máquinas vinculadas ao formulário.',
+  };
 
-    return this.machineView().filter((item) => {
-      const machine = item.machine;
+  readonly pageTitle = computed(() => this.titles[this.step()]);
+  readonly pageDescription = computed(() => this.descriptions[this.step()]);
 
-      if (
-        machineTerm &&
-        !machine.nome.toLowerCase().includes(machineTerm) &&
-        !(machine.descricao ?? '').toLowerCase().includes(machineTerm)
-      ) {
-        return false;
-      }
+  ngOnInit(): void {
+    this.loadLocations();
+  }
 
-      if (locationId && item.location?.id !== locationId) {
-        return false;
-      }
+  // ============================================================
+  //  CARREGAMENTO
+  // ============================================================
 
-      if (sectionId && item.section?.id !== sectionId) {
-        return false;
-      }
+  /** O backend devolve PaginatedResult<T>. Ajuste a propriedade se necessário. */
+  private unwrap<T>(res: unknown): T[] {
+    const r = res as Record<string, unknown>;
+    if (Array.isArray(res)) return res as T[];
+    return (r?.['data'] ?? r?.['items'] ?? r?.['results'] ?? []) as T[];
+  }
 
-      if (formId && item.form?.id !== formId) {
-        return false;
-      }
-
-      if (status !== '') {
-        if (machine.status !== Number(status)) {
-          return false;
-        }
-      }
-
-      const createdDate = new Date(machine.dataCriacao);
-      const updatedDate = new Date(machine.dataAlteracao);
-
-      if (createdStart) {
-        if (createdDate < new Date(createdStart)) {
-          return false;
-        }
-      }
-
-      if (createdEnd) {
-        const end = new Date(createdEnd);
-        end.setHours(23, 59, 59, 999);
-
-        if (createdDate > end) {
-          return false;
-        }
-      }
-
-      if (updatedStart) {
-        if (updatedDate < new Date(updatedStart)) {
-          return false;
-        }
-      }
-
-      if (updatedEnd) {
-        const end = new Date(updatedEnd);
-        end.setHours(23, 59, 59, 999);
-
-        if (updatedDate > end) {
-          return false;
-        }
-      }
-
-      return true;
+  private loadLocations(): void {
+    this.startLoading();
+    this.locationService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        this.locations.set(this.unwrap<Location>(res));
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar os locais.'),
     });
-  });
+  }
 
-  protected readonly grouped = computed(() => {
-    const locations = this.locations();
-    const filtered = this.filtered();
-
-    return locations
-      .map((location) => ({
-        location,
-        machines: filtered.filter((item) => item.location?.id === location.id),
-      }))
-      .filter(
-        (group) =>
-          group.machines.length > 0 ||
-          (!this.filterMachine() &&
-            !this.filterLocation() &&
-            !this.filterSection() &&
-            !this.filterForm() &&
-            !this.filterStatus()),
-      );
-  });
-
-  protected readonly loading = computed(
-    () =>
-      this.locationsResource.isLoading() ||
-      this.sectionsResource.isLoading() ||
-      this.formsResource.isLoading() ||
-      this.machinesResource.isLoading(),
-  );
-
-  protected readonly hasError = computed(
-    () =>
-      !!this.locationsResource.error() ||
-      !!this.sectionsResource.error() ||
-      !!this.formsResource.error() ||
-      !!this.machinesResource.error(),
-  );
-
-  protected readonly machineView = computed(() => {
-    const locations = this.locations();
-    const sections = this.sections();
-    const forms = this.forms();
-    const machines = this.machines();
-
-    return machines.map((machine) => {
-      const form = forms.find((f) => f.id === machine.formId) ?? null;
-
-      const section = form ? (sections.find((s) => s.id === form.sectionId) ?? null) : null;
-
-      const location = section
-        ? (locations.find((l) => l.employerId === section.employerId) ?? null)
-        : null;
-
-      return {
-        machine,
-        form,
-        section,
-        location,
-      };
+  private loadSections(): void {
+    this.startLoading();
+    this.sectionService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const employerId = this.selectedLocation()?.employerId;
+        const all = this.unwrap<Section>(res);
+        this.sections.set(
+          employerId ? all.filter((s) => s.employerId === employerId) : all,
+        );
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar as seções.'),
     });
-  });
-
-  protected onSearch(value: string): void {
-    this.query.set(value);
   }
 
-  protected reload(): void {
-    this.employersResource.reload();
-    this.locationsResource.reload();
-    this.sectionsResource.reload();
-    this.formsResource.reload();
-    this.machinesResource.reload();
+  private loadForms(): void {
+    this.startLoading();
+    const sectionId = this.selectedSection()?.id;
+    this.formService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<Form>(res);
+        this.forms.set(all.filter((f) => f.sectionId === sectionId));
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar os formulários.'),
+    });
   }
 
-  protected statusLabel(status: number): string {
-    return status === 1 ? 'Ativo' : 'Inativo';
+  private loadMachines(): void {
+    this.startLoading();
+    const formId = this.selectedForm()?.id;
+    this.machineService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<Machine>(res);
+        this.machines.set(all.filter((m) => m.formId === formId));
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar as máquinas.'),
+    });
   }
+
+  // ============================================================
+  //  AVANÇAR
+  // ============================================================
+
+  selectLocation(loc: Location): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedLocation.set(loc);
+    this.step.set('section');
+    this.loadSections();
+  }
+
+  selectSection(sec: Section): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedSection.set(sec);
+    this.step.set('form');
+    this.loadForms();
+  }
+
+  selectForm(form: Form): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedForm.set(form);
+    this.step.set('machine');
+    this.loadMachines();
+  }
+
+  // ============================================================
+  //  RETROCEDER / NAVEGAR PELA TRILHA
+  // ============================================================
+
+  back(): void {
+    this.clearFeedback();
+    switch (this.step()) {
+      case 'machine':
+        this.goToForms();
+        break;
+      case 'form':
+        this.goToSections();
+        break;
+      case 'section':
+        this.goToLocations();
+        break;
+    }
+  }
+
+  goToLocations(): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedLocation.set(null);
+    this.selectedSection.set(null);
+    this.selectedForm.set(null);
+    this.sections.set([]);
+    this.forms.set([]);
+    this.machines.set([]);
+    this.step.set('location');
+  }
+
+  goToSections(): void {
+    if (!this.selectedLocation()) return;
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedSection.set(null);
+    this.selectedForm.set(null);
+    this.forms.set([]);
+    this.machines.set([]);
+    this.step.set('section');
+  }
+
+  goToForms(): void {
+    if (!this.selectedSection()) return;
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedForm.set(null);
+    this.machines.set([]);
+    this.step.set('form');
+  }
+
+  // ============================================================
+  //  MODAIS
+  // ============================================================
 
   async novo(): Promise<void> {
     const ref = this.modalService.openComponent(FormComponent, {
-      title: 'Nova maquina',
+      title: 'Nova máquina',
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'new' },
+      inputs: { mode: 'new', parentId: this.selectedForm()?.id ?? '' },
       buttons: [
         { text: 'Cancelar', variant: 'secondary', value: false },
         { text: 'Criar', variant: 'primary', value: true, submit: true },
@@ -247,10 +373,7 @@ export class MachineComponent {
     });
 
     const confirmed = await ref.result;
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     const value = ref.instance.value();
 
@@ -263,14 +386,16 @@ export class MachineComponent {
       })
       .subscribe({
         next: () => {
-          this.handleMachineChange(true);
+          this.success.set('Máquina criada com sucesso.');
+          this.loadMachines();
         },
+        error: () => this.error.set('Erro ao criar a máquina.'),
       });
   }
 
   async detalhar(machine: Machine): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
-      title: `Detalhe`,
+      title: 'Detalhe',
       size: 'lg',
       inputs: { machine },
       outputs: {
@@ -278,22 +403,45 @@ export class MachineComponent {
           if (typeof value === 'boolean') {
             if (value) {
               ref.close();
+              this.loadMachines();
             }
-            this.handleMachineChange(value);
           }
         },
       },
       buttons: [{ text: 'Fechar', variant: 'secondary', value: true }],
     });
 
-    const confirmed = await ref.result.then(() => undefined);
-
-    return confirmed;
+    await ref.result;
   }
 
-  handleMachineChange(result: boolean): void {
-    if (result) {
-      this.reload();
-    }
+  // ============================================================
+  //  HELPERS
+  // ============================================================
+
+  isAtivo(status: number): boolean {
+    return status === 1;
+  }
+
+  trackById(_: number, item: { id: string }): string {
+    return item.id;
+  }
+
+  private startLoading(): void {
+    this.loading.set(true);
+    this.error.set(null);
+  }
+
+  private fail(message: string): void {
+    this.loading.set(false);
+    this.error.set(message);
+  }
+
+  private clearFeedback(): void {
+    this.error.set(null);
+    this.success.set(null);
+  }
+
+  resetFilters(): void {
+    this.filters.set({ ...this.emptyFilters });
   }
 }

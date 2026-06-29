@@ -1,125 +1,505 @@
-<div class="param-page">
-  <!-- HEADER -->
-
-  <section class="page-header">
+<section class="painel">
+  <!-- Cabeçalho -->
+  <header class="painel__head">
     <div>
-      <h2 class="page-title">Parâmetros e Regras</h2>
-      <p class="page-description">
-        Gerencie parâmetros e limites vinculados às máquinas e formulários.
-      </p>
+      <span class="painel__eyebrow">Parâmetros e Regras</span>
+      <h1 class="painel__title">{{ pageTitle() }}</h1>
+      <p class="painel__subtitle">{{ pageDescription() }}</p>
     </div>
-    <div class="page-actions">
-      <div class="search-box">
-        <i class="bi bi-search"></i>
-        <input
-          type="search"
-          class="form-control"
-          placeholder="Pesquisar parâmetro, formulário ou máquina..."
-          [value]="query()"
-          (input)="onSearch($any($event.target).value)"
-        />
+  </header>
+
+  <!-- Trilha colapsável (breadcrumb) -->
+  <nav class="trail" aria-label="Navegação">
+    @if (step() !== 'location') {
+      <button type="button" class="trail__back" (click)="back()">
+        <i class="bi bi-arrow-left"></i>
+        <span>Voltar</span>
+      </button>
+    }
+
+    <ol class="trail__steps">
+      <li class="chip" [class.chip--active]="step() === 'location'">
+        <button
+          type="button"
+          class="chip__btn"
+          [disabled]="!selectedLocation()"
+          (click)="goToLocations()"
+        >
+          <i class="bi bi-geo-alt"></i>
+          <span class="chip__label">{{ selectedLocation()?.nome ?? 'Local' }}</span>
+        </button>
+      </li>
+
+      @if (selectedLocation()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip" [class.chip--active]="step() === 'section'">
+          <button
+            type="button"
+            class="chip__btn"
+            [disabled]="!selectedSection()"
+            (click)="goToSections()"
+          >
+            <i class="bi bi-sliders"></i>
+            <span class="chip__label">{{ selectedSection()?.nome ?? 'Seção' }}</span>
+          </button>
+        </li>
+      }
+
+      @if (selectedSection()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip" [class.chip--active]="step() === 'form'">
+          <button
+            type="button"
+            class="chip__btn"
+            [disabled]="!selectedForm()"
+            (click)="goToForms()"
+          >
+            <i class="bi bi-card-checklist"></i>
+            <span class="chip__label">{{ selectedForm()?.nome ?? 'Formulário' }}</span>
+          </button>
+        </li>
+      }
+
+      @if (selectedForm()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip chip--active">
+          <span class="chip__btn chip__btn--static">
+            <i class="bi bi-list-check"></i>
+            <span class="chip__label">Parâmetros</span>
+          </span>
+        </li>
+      }
+    </ol>
+  </nav>
+
+  <!-- Feedback -->
+  @if (error()) {
+    <div class="alert alert--error" role="alert">
+      <i class="bi bi-exclamation-triangle"></i> {{ error() }}
+    </div>
+  }
+  @if (success()) {
+    <div class="alert alert--success" role="status">
+      <i class="bi bi-check-circle"></i> {{ success() }}
+    </div>
+  }
+
+  <!-- Filtros por campo -->
+  @if (!loading()) {
+    <div class="filters">
+      <div class="filters__bar">
+        <button
+          type="button"
+          class="filters__toggle"
+          [class.is-open]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <i class="bi bi-funnel"></i>
+          <span>Filtros</span>
+          @if (activeFilterCount()) {
+            <span class="filters__count">{{ activeFilterCount() }}</span>
+          }
+          <i
+            class="bi"
+            [class.bi-chevron-down]="!filtersOpen()"
+            [class.bi-chevron-up]="filtersOpen()"
+          ></i>
+        </button>
+
+        @if (hasFilter()) {
+          <button type="button" class="filters__clear" (click)="resetFilters()">
+            <i class="bi bi-x-lg"></i> Limpar
+          </button>
+        }
       </div>
-      <button class="btn btn-outline-secondary" (click)="reload()">
-        <i class="bi bi-arrow-clockwise"></i>
-      </button>
-    </div>
-  </section>
 
-  <!-- LOADING -->
+      @if (filtersOpen()) {
+        <div class="filters__grid">
+          <label class="ff">
+            <span class="ff__label">Nome</span>
+            <input
+              type="text"
+              class="ff__control"
+              placeholder="Contém…"
+              [ngModel]="filters().nome"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('nome', $event)"
+            />
+          </label>
 
-  @if (loading()) {
-    <div class="empty-state">
-      <div class="spinner-border text-primary"></div>
-      <p>Carregando informações...</p>
-    </div>
-  }
+          <label class="ff">
+            <span class="ff__label">Descrição</span>
+            <input
+              type="text"
+              class="ff__control"
+              placeholder="Contém…"
+              [ngModel]="filters().descricao"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('descricao', $event)"
+            />
+          </label>
 
-  <!-- ERRO -->
+          @if (step() === 'location' || step() === 'section') {
+            <label class="ff">
+              <span class="ff__label">Employer ID</span>
+              <select
+                class="ff__control"
+                [ngModel]="filters().employerId"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('employerId', $event)"
+              >
+                <option value="">Todos</option>
+                @for (id of employerIdOptions(); track id) {
+                  <option [value]="id">{{ id }}</option>
+                }
+              </select>
+            </label>
+          }
 
-  @else if (hasError()) {
-    <div class="alert alert-danger">
-      <i class="bi bi-exclamation-triangle-fill me-2"></i>
-      Não foi possível carregar os dados.
-      <button class="btn btn-outline-danger btn-sm ms-3" (click)="reload()">
-        Tentar novamente
-      </button>
-    </div>
-  }
+          @if (step() === 'form') {
+            <label class="ff">
+              <span class="ff__label">Seção</span>
+              <select
+                class="ff__control"
+                [ngModel]="filters().sectionId"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('sectionId', $event)"
+              >
+                <option value="">Todas</option>
+                @for (opt of sectionIdOptions(); track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </label>
+          }
 
-  <!-- DADOS -->
+          <label class="ff">
+            <span class="ff__label">Status</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().status"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('status', $event)"
+            >
+              <option value="all">Todos</option>
+              <option value="active">Ativo</option>
+              <option value="inactive">Inativo</option>
+            </select>
+          </label>
 
-  @else {
-    @for (locGroup of grouped(); track locGroup.location.id) {
-      <section class="location-section">
-        <!-- LOCATION HEADER -->
-        <div class="location-header">
-          <div class="location-info">
-            <div class="location-icon">
-              <i class="bi bi-geo-alt-fill"></i>
-            </div>
-            <div>
-              <h4>{{ locGroup.location.nome }}</h4>
-              <span>{{ locGroup.sections.length }} seções</span>
-            </div>
-          </div>
+          @if (step() !== 'location') {
+            <label class="ff">
+              <span class="ff__label">Criado de</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoDe', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Criado até</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoAte', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Alterado de</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoDe', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Alterado até</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoAte', $event)"
+              />
+            </label>
+          }
         </div>
+      }
+    </div>
+  }
 
-        @for (secGroup of locGroup.sections; track secGroup.section.id) {
-          <!-- SECTION LABEL -->
-          <div class="section-label">
-            <i class="bi bi-diagram-3"></i>
-            <span>{{ secGroup.section.nome }}</span>
+  <!-- Conteúdo -->
+  @if (loading()) {
+    <div class="grid">
+      @for (s of [1, 2, 3, 4, 5, 6]; track s) {
+        <div class="card card--skeleton"></div>
+      }
+    </div>
+  } @else {
+    @switch (step()) {
+      <!-- ───── LOCAIS ───── -->
+      @case ('location') {
+        @if (filteredLocations().length) {
+          <div class="grid">
+            @for (loc of filteredLocations(); track trackById($index, loc)) {
+              <button type="button" class="card" (click)="selectLocation(loc)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-geo-alt"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(loc.status)">
+                    {{ isAtivo(loc.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </div>
+                <h3 class="card__title">{{ loc.nome }}</h3>
+                <p class="card__desc">{{ loc.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Abrir seções <i class="bi bi-arrow-right"></i></span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>
+              {{
+                hasFilter() ? 'Nenhum local corresponde aos filtros.' : 'Nenhum local cadastrado.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
+          </div>
+        }
+      }
+
+      <!-- ───── SEÇÕES ───── -->
+      @case ('section') {
+        @if (filteredSections().length) {
+          <div class="grid">
+            @for (sec of filteredSections(); track trackById($index, sec)) {
+              <button type="button" class="card" (click)="selectSection(sec)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-sliders"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(sec.status)">
+                    {{ isAtivo(sec.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </div>
+                <h3 class="card__title">{{ sec.nome }}</h3>
+                <p class="card__desc">{{ sec.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Abrir formulários <i class="bi bi-arrow-right"></i></span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhuma seção corresponde aos filtros.'
+                  : 'Nenhuma seção encontrada para este local.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
+          </div>
+        }
+      }
+
+      <!-- ───── FORMULÁRIOS ───── -->
+      @case ('form') {
+        @if (filteredForms().length) {
+          <div class="grid">
+            @for (form of filteredForms(); track trackById($index, form)) {
+              <button type="button" class="card" (click)="selectForm(form)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(form.status)">
+                    {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </div>
+                <h3 class="card__title">{{ form.nome }}</h3>
+                <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Abrir parâmetros <i class="bi bi-arrow-right"></i></span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhum formulário corresponde aos filtros.'
+                  : 'Nenhum formulário encontrado para esta seção.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
+          </div>
+        }
+      }
+
+      <!-- ───── PARÂMETROS ───── -->
+      @case ('parameters') {
+        <!-- Grupos -->
+        <div class="groups">
+          <div class="groups__row">
+            <button
+              type="button"
+              class="gchip"
+              [class.is-active]="activeGroup() === ''"
+              (click)="activeGroup.set('')"
+            >
+              <i class="bi bi-grid"></i> Todos
+            </button>
+
+            @for (g of answerGroups(); track g.id) {
+              <span class="gchip-wrap">
+                <button
+                  type="button"
+                  class="gchip"
+                  [class.is-active]="activeGroup() === g.id"
+                  (click)="activeGroup.set(g.id)"
+                >
+                  <i class="bi bi-collection"></i> {{ g.nome }}
+                  <span class="gchip__count">{{ countInGroup(g.id) }}</span>
+                </button>
+                @if (activeGroup() === g.id) {
+                  <button
+                    type="button"
+                    class="gchip__del"
+                    title="Excluir grupo"
+                    (click)="excluirGrupo(g.id)"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                }
+              </span>
+            }
+
+            <button
+              type="button"
+              class="gchip"
+              [class.is-active]="activeGroup() === 'none'"
+              (click)="activeGroup.set('none')"
+            >
+              <i class="bi bi-dash-circle"></i> Sem grupo
+            </button>
+
+            <button type="button" class="gchip gchip--new" (click)="toggleNewGroup()">
+              <i class="bi bi-plus-lg"></i> Novo grupo
+            </button>
           </div>
 
-          @if (secGroup.forms.length === 0) {
-            <div class="empty-card">
-              <i class="bi bi-inboxes"></i>
-              <p>Nenhum formulário encontrado nesta seção.</p>
-            </div>
-          } @else {
-            <!-- FORM CARDS -->
-            <div class="machines-grid">
-              @for (fg of secGroup.forms; track fg.form.id) {
-                <div class="machine-card" (click)="listar(fg)">
-                  <div class="machine-card-header">
-                    <div>
-                      <div class="machine-code">#{{ fg.form.id }}</div>
-                      <h5>{{ fg.form.nome }}</h5>
-                    </div>
-                    <span class="status-badge active"> {{ totalFormParams(fg) }} params </span>
-                    <button
-                      class="btn btn-sm btn-outline-primary"
-                      (click)="$event.stopPropagation(); novo(fg.form.id)"
-                    >
-                      <i class="bi bi-plus"></i>
-                    </button>
-                  </div>
-
-                  <div class="machine-card-body">
-                    <div class="info-row">
-                      <i class="bi bi-list-check"></i>
-                      <span>{{ fg.answers.length }} parâm. de formulário</span>
-                    </div>
-                    @if (fg.machines.length > 0) {
-                      <div class="info-row">
-                        <i class="bi bi-gear"></i>
-                        <span>{{ fg.machines.length }} máquinas</span>
-                      </div>
-                    }
-                  </div>
-
-                  <div class="machine-card-footer">
-                    <span>Ver parâmetros</span>
-                    <i class="bi bi-chevron-right"></i>
-                  </div>
-                </div>
-              }
+          @if (newGroupOpen()) {
+            <div class="groups__new">
+              <input
+                type="text"
+                class="ff__control"
+                placeholder="Nome do grupo"
+                [ngModel]="newGroupNome()"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="newGroupNome.set($event)"
+                (keyup.enter)="criarGrupo()"
+              />
+              <button
+                type="button"
+                class="btn btn--primary"
+                [disabled]="!newGroupNome().trim()"
+                (click)="criarGrupo()"
+              >
+                <i class="bi bi-check-lg"></i> Criar
+              </button>
+              <button type="button" class="btn btn--ghost" (click)="toggleNewGroup()">
+                Cancelar
+              </button>
             </div>
           }
+        </div>
+
+        <!-- Parâmetros -->
+        <div class="grid">
+          <!-- card de criação -->
+          <button type="button" class="card card--add" (click)="novo()">
+            <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
+            <h3 class="card__title">Novo parâmetro</h3>
+            <p class="card__desc">
+              @if (activeGroup() && activeGroup() !== 'none') {
+                Será criado dentro do grupo selecionado.
+              } @else {
+                Adicionar um parâmetro a este formulário.
+              }
+            </p>
+          </button>
+
+          @for (a of displayedAnswers(); track trackById($index, a)) {
+            <div class="card param-card" (click)="detalhar(a)">
+              <div class="card__top">
+                <span class="card__icon"><i class="bi bi-list-check"></i></span>
+                <span class="badge" [class.badge--on]="isAtivo(a.status)">
+                  {{ isAtivo(a.status) ? 'Ativo' : 'Inativo' }}
+                </span>
+              </div>
+              <h3 class="card__title">{{ a.nome }}</h3>
+              <p class="card__desc">{{ a.descricao || 'Sem descrição' }}</p>
+
+              <div class="param-card__group" (click)="$event.stopPropagation()">
+                <label class="param-card__group-label">
+                  <i class="bi bi-collection"></i> Grupo
+                </label>
+                <select
+                  class="ff__control"
+                  [ngModel]="groupIdOf(a.id)"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="setParamGroup(a, $event)"
+                >
+                  <option value="">Sem grupo</option>
+                  @for (g of answerGroups(); track g.id) {
+                    <option [value]="g.id">{{ g.nome }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (displayedAnswers().length === 0) {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>
+              @if (hasFilter()) {
+                Nenhum parâmetro corresponde aos filtros.
+              } @else if (activeGroup() && activeGroup() !== 'none') {
+                Nenhum parâmetro neste grupo ainda.
+              } @else if (activeGroup() === 'none') {
+                Nenhum parâmetro sem grupo.
+              } @else {
+                Nenhum parâmetro cadastrado.
+              }
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
+          </div>
         }
-      </section>
-    } @empty {
-      <p class="text-muted">Nenhum local cadastrado.</p>
+      }
     }
   }
-</div>
+</section>
+
+<app-scroll-top />

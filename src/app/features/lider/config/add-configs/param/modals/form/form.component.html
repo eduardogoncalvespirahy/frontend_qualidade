@@ -1,7 +1,8 @@
 <div class="d-flex flex-column gap-3">
-
   <p class="text-muted mb-0 small">
-    {{ mode() === 'new' ? 'Preencha os dados do novo parâmetro.' : 'Atualize os dados do parâmetro.' }}
+    {{
+      mode() === 'new' ? 'Preencha os dados do novo parâmetro.' : 'Atualize os dados do parâmetro.'
+    }}
   </p>
 
   <!-- Nome -->
@@ -45,6 +46,45 @@
         <option [value]="+cat.id">{{ cat.nome }}</option>
       }
     </select>
+  </div>
+
+  <!-- Grupo -->
+  <div>
+    <label for="groupId" class="form-label">Grupo</label>
+
+    @if (!criandoGrupo()) {
+      <div class="d-flex gap-2">
+        <select
+          id="groupId"
+          name="groupId"
+          class="form-select"
+          [value]="groupId()"
+          (change)="groupId.set($any($event.target).value)"
+        >
+          <option value="">Sem grupo</option>
+          @for (g of groups(); track g.id) {
+            <option [value]="g.id">{{ g.nome }}</option>
+          }
+        </select>
+        <button type="button" class="btn btn-outline-secondary" (click)="abrirNovoGrupo()">
+          <i class="bi bi-plus-lg"></i> Novo
+        </button>
+      </div>
+    } @else {
+      <div class="d-flex gap-2">
+        <input
+          type="text"
+          class="form-control"
+          placeholder="Nome do novo grupo"
+          [value]="novoGrupoNome()"
+          (input)="novoGrupoNome.set($any($event.target).value)"
+        />
+        <button type="button" class="btn btn-outline-secondary" (click)="cancelarNovoGrupo()">
+          Cancelar
+        </button>
+      </div>
+      <div class="form-text">O grupo será criado ao salvar.</div>
+    }
   </div>
 
   <!-- Status -->
@@ -98,5 +138,4 @@
       </div>
     </div>
   </div>
-
 </div>

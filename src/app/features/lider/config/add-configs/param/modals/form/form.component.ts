@@ -1,9 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { rxResource } from '@angular/core/rxjs-interop';
 
 import { Answer } from '../../../../../../../core/models/answer.model';
 import { LimitAnswer } from '../../../../../../../core/models/limit-answer.model';
+import { AnswerGroups } from '../../../../../../../core/models/answer-group.model';
 
 import { CategoryService } from '../../../../../../../core/services/category-answer.service';
 
@@ -28,10 +37,15 @@ export class FormComponent implements OnInit {
   // ID do formulário pai — passado quando mode = 'new'
   readonly parentId = input<string>('');
 
+  // ─── Grupos ───────────────────────────────────────────────────────────────
+  // Lista de grupos disponíveis (do formulário) e o grupo atual do parâmetro.
+  readonly groups = input<AnswerGroups[]>([]);
+  readonly currentGroupId = input<string>('');
+
   // traz categoria
   private readonly categoryService = inject(CategoryService);
 
-  // para fazer as pesquisas 
+  // para fazer as pesquisas
   protected readonly categoriesResource = rxResource({
     stream: () => this.categoryService.getAll(),
   });
@@ -42,13 +56,18 @@ export class FormComponent implements OnInit {
   protected id = '';
   protected nome = '';
   protected descricao = '';
-  
+
   protected limitMin = signal('');
   protected limitMax = signal('');
 
   protected status = true;
   protected dataCriacao: Date = new Date(); // só usada no create
   protected categoryId = signal<number>(0);
+
+  // Grupo selecionado ('' = sem grupo) e criação de grupo novo
+  protected groupId = signal<string>('');
+  protected criandoGrupo = signal(false);
+  protected novoGrupoNome = signal('');
 
   ngOnInit(): void {
     const u = this.item();
@@ -66,17 +85,41 @@ export class FormComponent implements OnInit {
       this.limitMin.set(l.limitMin ?? '');
       this.limitMax.set(l.limitMax ?? '');
     }
+
+    // pré-seleciona o grupo atual (edição) ou o grupo ativo (criação)
+    this.groupId.set(this.currentGroupId());
   }
 
-limitValue() {
-  if (!this.limitMin() && !this.limitMax()) return null;
-  return {
-    limitMin: this.limitMin() || null,
-    limitMax: this.limitMax() || null,
-  };
-}
+  protected abrirNovoGrupo(): void {
+    this.criandoGrupo.set(true);
+    this.groupId.set('');
+  }
 
+  protected cancelarNovoGrupo(): void {
+    this.criandoGrupo.set(false);
+    this.novoGrupoNome.set('');
+  }
 
+  limitValue() {
+    if (!this.limitMin() && !this.limitMax()) return null;
+    return {
+      limitMin: this.limitMin() || null,
+      limitMax: this.limitMax() || null,
+    };
+  }
+
+  /**
+   * Intenção de grupo escolhida no modal:
+   * - { groupId, novoNome: null }  → vincular a um grupo existente (ou nenhum se '')
+   * - { groupId: '', novoNome }    → criar um grupo novo e vincular a ele
+   */
+  groupSelection(): { groupId: string; novoNome: string | null } {
+    const novo = this.novoGrupoNome().trim();
+    if (this.criandoGrupo() && novo) {
+      return { groupId: '', novoNome: novo };
+    }
+    return { groupId: this.groupId(), novoNome: null };
+  }
 
   value(): Answer {
     return {

@@ -1,0 +1,63 @@
+<div class="d-flex flex-column gap-3">
+  <p class="text-muted mb-0 small">
+    {{
+      mode() === 'new'
+        ? 'Preencha os dados do novo formulário.'
+        : 'Atualize os dados do formulário.'
+    }}
+  </p>
+
+  <div>
+    <label for="nome" class="form-label">Nome</label>
+    <input
+      id="nome"
+      name="nome"
+      type="text"
+      class="form-control"
+      [(ngModel)]="nome"
+      placeholder="Informe o nome do formulário"
+    />
+  </div>
+
+  <div>
+    <label for="sectionId" class="form-label">Seção</label>
+    <select
+      id="sectionId"
+      name="sectionId"
+      class="form-select"
+      [value]="sectionId()"
+      (change)="sectionId.set($any($event.target).value)"
+    >
+      <option value="">Selecione uma seção</option>
+      @for (s of sections(); track s.id) {
+        <option [value]="s.id">{{ s.nome }}</option>
+      }
+    </select>
+  </div>
+
+  <div>
+    <label for="descricao" class="form-label">Descrição</label>
+    <textarea
+      id="descricao"
+      name="descricao"
+      class="form-control"
+      rows="2"
+      [(ngModel)]="descricao"
+      placeholder="Descrição do formulário (opcional)"
+    ></textarea>
+  </div>
+
+  <div>
+    <label class="form-label">Status</label>
+    <div class="form-check form-switch">
+      <input
+        id="status"
+        name="status"
+        type="checkbox"
+        class="form-check-input"
+        [(ngModel)]="status"
+      />
+      <label class="form-check-label" for="status">{{ status ? 'Ativo' : 'Inativo' }}</label>
+    </div>
+  </div>
+</div>

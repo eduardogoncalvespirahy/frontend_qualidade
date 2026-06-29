@@ -1,0 +1,55 @@
+<div class="d-flex flex-column gap-3">
+  <p class="text-muted mb-0 small">
+    {{ mode() === 'new' ? 'Preencha os dados do novo local.' : 'Atualize os dados do local.' }}
+  </p>
+
+  <div>
+    <label for="nome" class="form-label">Nome</label>
+    <input
+      id="nome"
+      name="nome"
+      type="text"
+      class="form-control"
+      [(ngModel)]="nome"
+      placeholder="Informe o nome do local"
+    />
+  </div>
+
+  <div>
+    <label for="employerId" class="form-label">Employer ID</label>
+    <input
+      id="employerId"
+      name="employerId"
+      type="text"
+      class="form-control"
+      [(ngModel)]="employerId"
+      placeholder="ID do empregador"
+    />
+  </div>
+
+  <div>
+    <label for="descricao" class="form-label">Descrição</label>
+    <textarea
+      id="descricao"
+      name="descricao"
+      class="form-control"
+      rows="2"
+      [(ngModel)]="descricao"
+      placeholder="Descrição do local (opcional)"
+    ></textarea>
+  </div>
+
+  <div>
+    <label class="form-label">Status</label>
+    <div class="form-check form-switch">
+      <input
+        id="status"
+        name="status"
+        type="checkbox"
+        class="form-check-input"
+        [(ngModel)]="status"
+      />
+      <label class="form-check-label" for="status">{{ status ? 'Ativo' : 'Inativo' }}</label>
+    </div>
+  </div>
+</div>

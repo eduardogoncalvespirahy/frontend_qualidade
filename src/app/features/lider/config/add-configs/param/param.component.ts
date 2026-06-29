@@ -1,280 +1,457 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
-import { catchError, of } from 'rxjs';
-import { FormGroupDirective } from '@angular/forms';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
 import { Form } from '../../../../../core/models/form.model';
-import { Machine } from '../../../../../core/models/machine.model';
 import { Answer } from '../../../../../core/models/answer.model';
-import { AnswerMachine } from '../../../../../core/models/answer-machine.model';
-import { LimitAnswer } from '../../../../../core/models/limit-answer.model';
-import { LimitAnswerMachine } from '../../../../../core/models/limit-answer-machine.model';
-import { PaginatedResult } from '../../../../../core/models/paginated.model';
-import { Category } from '../../../../../core/models/category-answer.model';
+import { AnswerGroups } from '../../../../../core/models/answer-group.model';
+import { AnswerGroupItems } from '../../../../../core/models/answer-group-items.model';
 
 import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { FormService } from '../../../../../core/services/form.service';
-import { MachineService } from '../../../../../core/services/machine.service';
 import { AnswerService } from '../../../../../core/services/answer.service';
-import { AnswerMachineService } from '../../../../../core/services/answer-machine.service';
 import { LimitAnswerService } from '../../../../../core/services/limit-answer.service';
-import { LimitAnswerMachineService } from '../../../../../core/services/limit-answer-machine.service';
+import { AnswerGroupsService } from '../../../../../core/services/answer-group.service';
+import { AnswerGroupItemsService } from '../../../../../core/services/answer-groups-items.service';
 import { ModalService } from '../../../../../core/services/modal.service';
-import { CategoryService } from '../../../../../core/services/category-answer.service';
 
 import { DetailComponent, ParamItem, ParamType } from './modals/detail/detail.component';
-import { ListComponent } from './modals/list/list.component';
 import { FormComponent } from './modals/form/form.component';
+import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 
+type Step = 'location' | 'section' | 'form' | 'parameters';
 
-
-
-
-// Resultado vazio padrão usado quando a API retorna erro (tabela sem dados ainda).
-// Isso impede que um endpoint vazio bloqueie a exibição de toda a tela.
-function emptyPage<T>(): PaginatedResult<T> {
-  return { data: [], total: 0, page: 1, limit: 500, totalPages: 0 };
+/** Campos filtráveis derivados das interfaces (sem o id). */
+interface Filters {
+  nome: string;
+  descricao: string;
+  employerId: string; // Location / Section
+  sectionId: string; // Form
+  status: 'all' | 'active' | 'inactive';
+  criadoDe: string; // yyyy-mm-dd
+  criadoAte: string;
+  alteradoDe: string;
+  alteradoAte: string;
 }
 
 @Component({
   selector: 'app-param',
   standalone: true,
-  imports: [],
+  imports: [CommonModule, FormsModule, ScrollTopComponent],
   templateUrl: './param.component.html',
   styleUrl: './param.component.css',
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ParamComponent {
-
-  // ─── Serviços injetados ───────────────────────────────────────────────────
-  // Cada serviço corresponde a uma tabela no banco. Os serviços ficam em core/
-  // e não devem ser modificados aqui.
+export class ParamComponent implements OnInit {
   private readonly locationService = inject(LocationService);
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
-  private readonly machineService = inject(MachineService);
   private readonly answerService = inject(AnswerService);
-  private readonly answerMachineService = inject(AnswerMachineService);
   private readonly limitAnswerService = inject(LimitAnswerService);
-  private readonly limitAnswerMachineService = inject(LimitAnswerMachineService);
-  private readonly categoryService = inject(CategoryService);
+  private readonly answerGroupsService = inject(AnswerGroupsService);
+  private readonly answerGroupItemsService = inject(AnswerGroupItemsService);
+  private readonly modalService = inject(ModalService);
 
-  private readonly modalService = inject(ModalService)
+  // ───────── navegação ─────────
+  readonly step = signal<Step>('location');
 
-  // ─── Estado local ─────────────────────────────────────────────────────────
-  // signal() cria uma variável reativa: quando muda, o Angular re-renderiza
-  // apenas os trechos do template que a utilizam.
-  protected readonly query = signal('');                      // texto da busca
+  // ───────── coleções ─────────
+  readonly locations = signal<Location[]>([]);
+  readonly sections = signal<Section[]>([]);
+  readonly forms = signal<Form[]>([]);
+  readonly answers = signal<Answer[]>([]); // parâmetros do formulário selecionado
 
-  // ─── Recursos (chamadas HTTP) ─────────────────────────────────────────────
-  // rxResource faz a chamada HTTP e expõe .value(), .isLoading(), .error().
-  // O pipe(catchError(...)) garante que, se a API retornar erro (ex: tabela
-  // ainda sem dados), o recurso resolve como lista vazia em vez de travar.
-  //
-  // RECURSOS CRÍTICOS — se falharem, a hierarquia não monta e mostramos erro:
-  protected readonly locationsResource = rxResource<PaginatedResult<Location>, void>({
-    stream: () => this.locationService.getAll(100),
+  // ───────── grupos de parâmetros ─────────
+  readonly answerGroups = signal<AnswerGroups[]>([]);
+  readonly groupItems = signal<AnswerGroupItems[]>([]); // vínculos param↔grupo do formulário
+  readonly activeGroup = signal<string>(''); // '' = todos | 'none' = sem grupo | id do grupo
+  readonly newGroupOpen = signal(false);
+  readonly newGroupNome = signal('');
+
+  // ───────── seleções ─────────
+  readonly selectedLocation = signal<Location | null>(null);
+  readonly selectedSection = signal<Section | null>(null);
+  readonly selectedForm = signal<Form | null>(null);
+
+  // ───────── feedback ─────────
+  readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly success = signal<string | null>(null);
+
+  // ───────── filtros por campo ─────────
+  readonly filtersOpen = signal(false);
+
+  private readonly emptyFilters: Filters = {
+    nome: '',
+    descricao: '',
+    employerId: '',
+    sectionId: '',
+    status: 'all',
+    criadoDe: '',
+    criadoAte: '',
+    alteradoDe: '',
+    alteradoAte: '',
+  };
+
+  readonly filters = signal<Filters>({ ...this.emptyFilters });
+
+  updateFilter<K extends keyof Filters>(key: K, value: Filters[K]): void {
+    this.filters.update((f) => ({ ...f, [key]: value }));
+  }
+
+  readonly activeFilterCount = computed(() => {
+    const f = this.filters();
+    let n = f.status !== 'all' ? 1 : 0;
+    for (const [k, v] of Object.entries(f)) {
+      if (k !== 'status' && v !== '') n++;
+    }
+    return n;
   });
 
-  protected readonly categoryResource = rxResource<PaginatedResult<Category>, void>({
-    stream: () => this.categoryService.getAll(100),
+  readonly hasFilter = computed(() => this.activeFilterCount() > 0);
+
+  // ── helpers de comparação ──
+  private textMatch(value: string | null | undefined, term: string): boolean {
+    if (!term.trim()) return true;
+    return (value ?? '').toLowerCase().includes(term.trim().toLowerCase());
+  }
+
+  private statusMatch(status: number, f: Filters['status']): boolean {
+    if (f === 'all') return true;
+    return f === 'active' ? status === 1 : status !== 1;
+  }
+
+  private dateInRange(date: Date | string | null | undefined, from: string, to: string): boolean {
+    if (!from && !to) return true;
+    if (!date) return false;
+    const d = new Date(date).getTime();
+    if (from && d < new Date(from).getTime()) return false;
+    if (to && d > new Date(`${to}T23:59:59`).getTime()) return false;
+    return true;
+  }
+
+  readonly filteredLocations = computed(() => {
+    const f = this.filters();
+    return this.locations().filter(
+      (l) =>
+        this.textMatch(l.nome, f.nome) &&
+        this.textMatch(l.descricao, f.descricao) &&
+        this.textMatch(l.employerId, f.employerId) &&
+        this.statusMatch(l.status, f.status),
+    );
   });
 
-  protected readonly sectionsResource = rxResource<PaginatedResult<Section>, void>({
-    stream: () => this.sectionService.getAll(100),
+  readonly filteredSections = computed(() => {
+    const f = this.filters();
+    return this.sections().filter(
+      (s) =>
+        this.textMatch(s.nome, f.nome) &&
+        this.textMatch(s.descricao, f.descricao) &&
+        this.textMatch(s.employerId, f.employerId) &&
+        this.statusMatch(s.status, f.status) &&
+        this.dateInRange(s.dataCriacao, f.criadoDe, f.criadoAte) &&
+        this.dateInRange(s.dataAlteracao, f.alteradoDe, f.alteradoAte),
+    );
   });
 
-  protected readonly formsResource = rxResource<PaginatedResult<Form>, void>({
-    stream: () => this.formService.getAll(100),
+  readonly filteredForms = computed(() => {
+    const f = this.filters();
+    return this.forms().filter(
+      (fm) =>
+        this.textMatch(fm.nome, f.nome) &&
+        this.textMatch(fm.descricao, f.descricao) &&
+        this.textMatch(fm.sectionId, f.sectionId) &&
+        this.statusMatch(fm.status, f.status) &&
+        this.dateInRange(fm.dataCriacao, f.criadoDe, f.criadoAte) &&
+        this.dateInRange(fm.dataAlteracao, f.alteradoDe, f.alteradoAte),
+    );
   });
 
-  protected readonly machinesResource = rxResource<PaginatedResult<Machine>, void>({
-    stream: () => this.machineService.getAll(),
+  readonly filteredAnswers = computed(() => {
+    const f = this.filters();
+    return this.answers().filter(
+      (a) =>
+        this.textMatch(a.nome, f.nome) &&
+        this.textMatch(a.descricao, f.descricao) &&
+        this.statusMatch(a.status, f.status) &&
+        this.dateInRange(a.dataCriacao, f.criadoDe, f.criadoAte) &&
+        this.dateInRange(a.dataAlteracao, f.alteradoDe, f.alteradoAte),
+    );
   });
 
-  // RECURSOS SECUNDÁRIOS — podem estar vazios (tabelas recém-criadas).
-  // catchError devolve lista vazia para não bloquear a página.
-  protected readonly answersResource = rxResource<PaginatedResult<Answer>, void>({
-    stream: () => this.answerService.getAll(500).pipe(
-      catchError(() => of(emptyPage<Answer>())),
-    ),
+  /** answerId -> vínculo de grupo (1 grupo por parâmetro). */
+  readonly groupItemByAnswer = computed(() => {
+    const m = new Map<string, AnswerGroupItems>();
+    for (const it of this.groupItems()) {
+      if (!m.has(it.answerId)) m.set(it.answerId, it);
+    }
+    return m;
   });
 
-  protected readonly answerMachinesResource = rxResource<PaginatedResult<AnswerMachine>, void>({
-    stream: () => this.answerMachineService.getAll(500).pipe(
-      catchError(() => of(emptyPage<AnswerMachine>())),
-    ),
-  });
-
-  protected readonly limitAnswersResource = rxResource<PaginatedResult<LimitAnswer>, void>({
-    stream: () => this.limitAnswerService.getAll(500).pipe(
-      catchError(() => of(emptyPage<LimitAnswer>())),
-    ),
-  });
-
-  protected readonly limitAnswerMachinesResource = rxResource<PaginatedResult<LimitAnswerMachine>, void>({
-    stream: () => this.limitAnswerMachineService.getAll(500).pipe(
-      catchError(() => of(emptyPage<LimitAnswerMachine>())),
-    ),
-  });
-
-  // ─── Arrays extraídos dos recursos ───────────────────────────────────────
-  // computed() recalcula automaticamente sempre que o recurso muda.
-  // O ?? [] garante array vazio enquanto está carregando.
-  protected readonly locations = computed(() => this.locationsResource.value()?.data ?? []);
-  protected readonly sections  = computed(() => this.sectionsResource.value()?.data ?? []);
-  protected readonly forms     = computed(() => this.formsResource.value()?.data ?? []);
-  protected readonly machines  = computed(() => this.machinesResource.value()?.data ?? []);
-  protected readonly answers              = computed(() => this.answersResource.value()?.data ?? []);
-  protected readonly category             = computed(() => this.categoryResource.value()?.data ?? []);
-  protected readonly answerMachines       = computed(() => this.answerMachinesResource.value()?.data ?? []);
-  protected readonly limitAnswers         = computed(() => this.limitAnswersResource.value()?.data ?? []);
-  protected readonly limitAnswerMachines  = computed(() => this.limitAnswerMachinesResource.value()?.data ?? []);
-
-  // ─── Agrupamento hierárquico ──────────────────────────────────────────────
-  // Monta a árvore de dados que o template percorre com @for.
-  // A hierarquia é:
-  //   Location (local da fábrica)
-  //     └── Section (seção/departamento) — vinculada pelo employerId
-  //           └── Form (formulário de inspeção) — vinculado pelo sectionId
-  //                 ├── Answer[] (parâmetros do formulário) — vinculados pelo formId ── LimitAnswer[] (limites do formulário) — pelo formId
-  //                 └── Machine[] (máquinas do formulário) — vinculadas pelo formId
-  //                       ├── AnswerMachine[] (parâmetros da máquina) — pelo machineId ── LimitAnswerMachine[] (limites da máquina) — pelo machineId
-  //                       
-
-  protected readonly grouped = computed((): LocationGroup[] => {
-    const locations        = this.locations();
-    const category         = this.category();
-    const sections         = this.sections();
-    const forms            = this.forms();
-    const machines         = this.machines();
-    const answers          = this.answers();
-    const answerMachines   = this.answerMachines();
-    const limitAnswers     = this.limitAnswers();
-    const limitAnswerMachines = this.limitAnswerMachines();
-    const term = this.query().trim().toLowerCase();
-
-    return locations.map((location) => {
-      // Filtra seções que pertencem a este local (pelo employerId)
-      const locationSections = sections.filter((s) => s.employerId === location.employerId);
-
-      const sectionGroups: SectionGroup[] = locationSections.map((section) => {
-        // Filtra formulários desta seção
-        const sectionForms = forms.filter((f) => f.sectionId === section.id);
-
-        const formGroups: FormGroup[] = sectionForms.map((form) => {
-          // Parâmetros diretos do formulário (sem máquina)
-          const formAnswers = answers.filter((a) => a.formId === form.id);
-
-
-
-          // Máquinas vinculadas a este formulário
-          const formMachines = machines.filter((m) => m.formId === form.id);
-
-          // Para cada máquina, agrega seus parâmetros e limites
-          const machineGroups: MachineGroup[] = formMachines.map((machine) => ({
-            machine,
-            answerMachines:      answerMachines.filter((a) => a.machineId === machine.id),
-            // limitAnswers:        limitAnswers.filter((a) => a.formId === form.id),
-            limitAnswerMachines: limitAnswerMachines.filter((a) => a.machineId === machine.id),
-          }));
-
-          return { form, answers: formAnswers, machines: machineGroups };
-        });
-
-        // Filtra os cards pelo texto da busca (se houver)
-        const filteredForms = !term
-          ? formGroups
-          : formGroups.filter(
-              (fg) =>
-                fg.form.nome.toLowerCase().includes(term) ||
-                fg.answers.some((a) => a.nome.toLowerCase().includes(term)) ||
-                fg.machines.some(
-                  (mg) =>
-                    mg.machine.nome.toLowerCase().includes(term) ||
-                    mg.answerMachines.some((a) => a.nome.toLowerCase().includes(term)) ||
-                    // mg.limitAnswers.some((a) => a.nome.toLowerCase().includes(term)) ||
-                    mg.limitAnswerMachines.some((a) => a.nome.toLowerCase().includes(term)),
-                ),
-            );
-
-        return { section, forms: filteredForms };
-      });
-
-      return { location, sections: sectionGroups };
+  /** Parâmetros visíveis = filtrados + recorte pelo grupo ativo. */
+  readonly displayedAnswers = computed(() => {
+    const ag = this.activeGroup();
+    const map = this.groupItemByAnswer();
+    return this.filteredAnswers().filter((a) => {
+      if (ag === '') return true;
+      const gid = map.get(a.id)?.answerGroupId ?? '';
+      return ag === 'none' ? gid === '' : gid === ag;
     });
   });
 
-  // ─── Estados de loading e erro ────────────────────────────────────────────
-  // loading: verdadeiro enquanto qualquer recurso ainda está buscando dados.
-  // hasError: verdadeiro SOMENTE se os recursos críticos (hierarquia base)
-  //           falharem. Recursos secundários usam catchError e nunca chegam aqui.
-  protected readonly loading = computed(
-    () =>
-      this.locationsResource.isLoading() ||
-      this.sectionsResource.isLoading()  ||
-      this.formsResource.isLoading()     ||
-      this.machinesResource.isLoading()  ||
-      this.answersResource.isLoading()   ||
-      this.answerMachinesResource.isLoading() ||
-      this.limitAnswersResource.isLoading()   ||
-      this.limitAnswerMachinesResource.isLoading(),
-  );
-
-  protected readonly hasError = computed(
-    () =>
-      // Apenas os recursos críticos bloqueiam a tela com mensagem de erro
-      !!this.locationsResource.error() ||
-      !!this.sectionsResource.error()  ||
-      !!this.formsResource.error()     ||
-      !!this.machinesResource.error(),
-  );
-
-  // ─── Ações do template ────────────────────────────────────────────────────
-
-  protected onSearch(value: string): void {
-    this.query.set(value);
+  /** Id do grupo de um parâmetro (ou '' quando sem grupo). */
+  groupIdOf(answerId: string): string {
+    return this.groupItemByAnswer().get(answerId)?.answerGroupId ?? '';
   }
 
-  // Recarrega todos os recursos (botão de refresh no header)
-  protected reload(): void {
-    this.locationsResource.reload();
-    this.sectionsResource.reload();
-    this.formsResource.reload();
-    this.machinesResource.reload();
-    this.answersResource.reload();
-    this.answerMachinesResource.reload();
-    this.limitAnswersResource.reload();
-    this.limitAnswerMachinesResource.reload();
+  /** Quantidade de parâmetros num grupo. */
+  countInGroup(groupId: string): number {
+    return this.groupItems().filter((i) => i.answerGroupId === groupId).length;
   }
 
-  // ============================
-  //    Metodos e etc dos modais
-  // =============================
+  private nextOrdem(groupId: string): number {
+    return this.countInGroup(groupId);
+  }
 
-  protected async detalhar(
-    type: ParamType,
-    item: ParamItem,
-    context?: { formNome: string; sectionNome: string; locationNome: string },
-  ): Promise<void> {
+  // ── opções de IDs (selects de filtro) ──
+  private distinct(values: (string | null | undefined)[]): string[] {
+    return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
+  }
+
+  readonly employerIdOptions = computed<string[]>(() => {
+    if (this.step() === 'location') {
+      return this.distinct(this.locations().map((l) => l.employerId));
+    }
+    if (this.step() === 'section') {
+      return this.distinct(this.sections().map((s) => s.employerId));
+    }
+    return [];
+  });
+
+  readonly sectionIdOptions = computed<{ value: string; label: string }[]>(() => {
+    const byId = new Map(this.sections().map((s) => [s.id, s.nome]));
+    return this.distinct(this.forms().map((f) => f.sectionId)).map((id) => ({
+      value: id,
+      label: byId.get(id) ?? id,
+    }));
+  });
+
+  // ───────── títulos dinâmicos ─────────
+  private readonly titles: Record<Step, string> = {
+    location: 'Locais',
+    section: 'Seções',
+    form: 'Formulários',
+    parameters: 'Parâmetros',
+  };
+  private readonly descriptions: Record<Step, string> = {
+    location: 'Selecione um local para começar.',
+    section: 'Escolha a seção desejada.',
+    form: 'Escolha o formulário a gerenciar.',
+    parameters: 'Gerencie os parâmetros e limites do formulário.',
+  };
+
+  readonly pageTitle = computed(() => this.titles[this.step()]);
+  readonly pageDescription = computed(() => this.descriptions[this.step()]);
+
+  ngOnInit(): void {
+    this.loadLocations();
+  }
+
+  // ============================================================
+  //  CARREGAMENTO
+  // ============================================================
+
+  /** O backend devolve PaginatedResult<T>. Ajuste a propriedade se necessário. */
+  private unwrap<T>(res: unknown): T[] {
+    const r = res as Record<string, unknown>;
+    if (Array.isArray(res)) return res as T[];
+    return (r?.['data'] ?? r?.['items'] ?? r?.['results'] ?? []) as T[];
+  }
+
+  private loadLocations(): void {
+    this.startLoading();
+    this.locationService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        this.locations.set(this.unwrap<Location>(res));
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar os locais.'),
+    });
+  }
+
+  private loadSections(): void {
+    this.startLoading();
+    this.sectionService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const employerId = this.selectedLocation()?.employerId;
+        const all = this.unwrap<Section>(res);
+        this.sections.set(employerId ? all.filter((s) => s.employerId === employerId) : all);
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar as seções.'),
+    });
+  }
+
+  private loadForms(): void {
+    this.startLoading();
+    const sectionId = this.selectedSection()?.id;
+    this.formService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<Form>(res);
+        this.forms.set(all.filter((f) => f.sectionId === sectionId));
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar os formulários.'),
+    });
+  }
+
+  private loadAnswers(): void {
+    this.startLoading();
+    const formId = this.selectedForm()?.id;
+    this.answerService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<Answer>(res);
+        this.answers.set(all.filter((a) => a.formId === formId));
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar os parâmetros.'),
+    });
+  }
+
+  /** Grupos do formulário selecionado. */
+  private loadGroups(): void {
+    const formId = this.selectedForm()?.id;
+    this.answerGroupsService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<AnswerGroups>(res);
+        this.answerGroups.set(all.filter((g) => g.formId === formId));
+        this.loadGroupItems();
+      },
+      error: () => this.error.set('Não foi possível carregar os grupos.'),
+    });
+  }
+
+  /** Vínculos param↔grupo restritos aos grupos deste formulário. */
+  private loadGroupItems(): void {
+    const groupIds = new Set(this.answerGroups().map((g) => g.id));
+    this.answerGroupItemsService.getAll(2000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<AnswerGroupItems>(res);
+        this.groupItems.set(all.filter((it) => groupIds.has(it.answerGroupId)));
+      },
+      error: () => this.groupItems.set([]),
+    });
+  }
+
+  // ============================================================
+  //  AVANÇAR
+  // ============================================================
+
+  selectLocation(loc: Location): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedLocation.set(loc);
+    this.step.set('section');
+    this.loadSections();
+  }
+
+  selectSection(sec: Section): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedSection.set(sec);
+    this.step.set('form');
+    this.loadForms();
+  }
+
+  selectForm(form: Form): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.activeGroup.set('');
+    this.selectedForm.set(form);
+    this.step.set('parameters');
+    this.loadAnswers();
+    this.loadGroups();
+  }
+
+  // ============================================================
+  //  RETROCEDER / NAVEGAR PELA TRILHA
+  // ============================================================
+
+  back(): void {
+    this.clearFeedback();
+    switch (this.step()) {
+      case 'parameters':
+        this.goToForms();
+        break;
+      case 'form':
+        this.goToSections();
+        break;
+      case 'section':
+        this.goToLocations();
+        break;
+    }
+  }
+
+  goToLocations(): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.clearGroups();
+    this.selectedLocation.set(null);
+    this.selectedSection.set(null);
+    this.selectedForm.set(null);
+    this.sections.set([]);
+    this.forms.set([]);
+    this.answers.set([]);
+    this.step.set('location');
+  }
+
+  goToSections(): void {
+    if (!this.selectedLocation()) return;
+    this.clearFeedback();
+    this.resetFilters();
+    this.clearGroups();
+    this.selectedSection.set(null);
+    this.selectedForm.set(null);
+    this.forms.set([]);
+    this.answers.set([]);
+    this.step.set('section');
+  }
+
+  goToForms(): void {
+    if (!this.selectedSection()) return;
+    this.clearFeedback();
+    this.resetFilters();
+    this.clearGroups();
+    this.selectedForm.set(null);
+    this.answers.set([]);
+    this.step.set('form');
+  }
+
+  // ============================================================
+  //  MODAIS
+  // ============================================================
+
+  async detalhar(answer: Answer): Promise<void> {
     const ref = this.modalService.openComponent(DetailComponent, {
-      title: (item as any).nome ?? '',
+      title: answer.nome ?? '',
       size: 'lg',
       inputs: {
-        item,
-        paramType: type,
-        formNome:     context?.formNome     ?? '',
-        sectionNome:  context?.sectionNome  ?? '',
-        locationNome: context?.locationNome ?? '',
+        item: answer as ParamItem,
+        paramType: 'answer' as ParamType,
+        formNome: this.selectedForm()?.nome ?? '',
+        sectionNome: this.selectedSection()?.nome ?? '',
+        locationNome: this.selectedLocation()?.nome ?? '',
+        groups: this.answerGroups(),
+        currentGroupId: this.groupIdOf(answer.id),
       },
       outputs: {
         reload_return: (value: unknown) => {
           if (value) {
             ref.close();
-            this.reload();
+            this.loadAnswers();
+            this.loadGroupItems();
           }
         },
       },
@@ -284,124 +461,219 @@ export class ParamComponent {
     await ref.result;
   }
 
-  protected async listar(fg: FormGroup): Promise<void> {
-    const ref = this.modalService.openComponent(ListComponent, {
-      title: `Parâmetros: ${fg.form.nome}`,
+  async novo(): Promise<void> {
+    const formId = this.selectedForm()?.id;
+    if (!formId) return;
+
+    // pré-seleciona o grupo ativo (se houver) dentro do modal
+    const preGroup = this.activeGroup() && this.activeGroup() !== 'none' ? this.activeGroup() : '';
+
+    const ref = this.modalService.openComponent(FormComponent, {
+      title: 'Novo Parâmetro',
       size: 'lg',
+      backdrop: 'static',
       inputs: {
-        answers: fg.answers,
-        formNome: fg.form.nome,
-        limitAnswers: this.limitAnswers(),
+        mode: 'new',
+        parentId: formId,
+        groups: this.answerGroups(),
+        currentGroupId: preGroup,
       },
-      outputs: {
-        selecionado: (item: unknown) => {
-          ref.close();
-          const answer = item as Answer;
-          const section  = this.sections().find(s => s.id === (fg.form as any).sectionId);
-          const location = this.locations().find(l => l.employerId === section?.employerId);
-          this.detalhar('answer', answer, {
-            formNome:     fg.form.nome,
-            sectionNome:  section?.nome  ?? '',
-            locationNome: location?.nome ?? '',
-          });
-        },
-      },
-      buttons: [{ text: 'Fechar', variant: 'secondary', value: true }],
+      buttons: [
+        { text: 'Cancelar', variant: 'secondary', value: false },
+        { text: 'Criar', variant: 'primary', value: true, submit: true },
+      ],
     });
 
-    await ref.result;
+    const confirmed = await ref.result;
+    if (!confirmed) return;
+
+    const value = ref.instance.value();
+    const grupo = ref.instance.groupSelection();
+
+    this.answerService
+      .create({
+        formId: value.formId,
+        nome: value.nome,
+        descricao: value.descricao,
+        status: value.status,
+        categoryId: value.categoryId,
+      })
+      .subscribe({
+        next: (created) => {
+          const limit = ref.instance.limitValue();
+          const proceed = () => this.linkGroupAfterCreate(created.id, grupo);
+          if (limit) {
+            this.limitAnswerService
+              .create({
+                answerId: created.id,
+                limitMin: limit.limitMin,
+                limitMax: limit.limitMax,
+              })
+              .subscribe({
+                next: proceed,
+                error: () => {
+                  this.error.set('Parâmetro criado, mas falhou ao salvar o limite.');
+                  this.loadAnswers();
+                },
+              });
+          } else {
+            proceed();
+          }
+        },
+        error: () => this.error.set('Erro ao criar o parâmetro.'),
+      });
   }
 
-  protected async novo(formId: string): Promise<void> {
-  const ref = this.modalService.openComponent(FormComponent, {
-    title: 'Novo Parâmetro',
-    size: 'lg',
-    backdrop: 'static',
-    inputs: {
-      mode: 'new',
-      parentId: formId,
-    },
-    buttons: [
-      { text: 'Cancelar', variant: 'secondary', value: false },
-      { text: 'Criar', variant: 'primary', value: true, submit: true },
-    ],
-  });
+  /** Vincula o parâmetro recém-criado ao grupo escolhido no modal,
+   *  criando o grupo antes se o usuário optou por um novo. */
+  private linkGroupAfterCreate(
+    answerId: string,
+    grupo: { groupId: string; novoNome: string | null },
+  ): void {
+    const done = () => {
+      this.success.set('Parâmetro criado com sucesso.');
+      this.loadAnswers();
+      this.loadGroups();
+    };
 
-  const confirmed = await ref.result;
-  if (!confirmed) return;
-
-  const value = ref.instance.value();
-
-  this.answerService.create({
-    formId: value.formId,
-    nome: value.nome,
-    descricao: value.descricao,
-    status: value.status,
-    categoryId: value.categoryId,
-  }).subscribe({
-  next: (created) => {
-    const limit = ref.instance.limitValue();
-    if (limit) {
-      this.limitAnswerService.create({
-        answerId: created.id,
-        limitMin: limit.limitMin,
-        limitMax: limit.limitMax,
-      }).subscribe({
-        next: (limit) => {
-          this.reload();
+    if (grupo.novoNome) {
+      const formId = this.selectedForm()?.id;
+      if (!formId) return done();
+      this.answerGroupsService.create({ formId, nome: grupo.novoNome, status: 1 }).subscribe({
+        next: (g) => this.linkParam(g.id, answerId, done),
+        error: () => {
+          this.error.set('Parâmetro criado, mas falhou ao criar o grupo.');
+          this.loadAnswers();
         },
       });
+    } else if (grupo.groupId) {
+      this.linkParam(grupo.groupId, answerId, done);
     } else {
-      this.reload();
+      done();
     }
-  },
-});
-
-}
-
-
-  protected statusLabel(status: number): string {
-    return status === 1 ? 'Ativo' : 'Inativo';
   }
 
-  // Conta o total de parâmetros de um formulário (para exibir no card)
-  protected totalFormParams(fg: FormGroup): number {
-    return (
-      fg.answers.length +
-      fg.machines.reduce(
-        (acc, mg) =>
-          acc + mg.answerMachines.length + 
-          // mg.limitAnswers.length + 
-          mg.limitAnswerMachines.length,
-        0,
-      )
-    );
+  private linkParam(groupId: string, answerId: string, done: () => void): void {
+    this.answerGroupItemsService
+      .create({ answerGroupId: groupId, answerId, ordem: this.nextOrdem(groupId) })
+      .subscribe({
+        next: done,
+        error: () => {
+          this.error.set('Parâmetro criado, mas falhou ao vincular ao grupo.');
+          this.loadAnswers();
+        },
+      });
   }
-}
 
-// ─── Interfaces de agrupamento (usadas apenas neste componente) ─────────────
-// Não são modelos de API — são estruturas internas que o computed() monta
-// para facilitar a renderização hierárquica no template.
+  // ============================================================
+  //  GRUPOS DE PARÂMETROS
+  // ============================================================
 
-interface MachineGroup {
-  machine: Machine;
-  answerMachines: AnswerMachine[];       // parâmetros específicos desta máquina
-  // limitAnswers: LimitAnswer[];           // limites vinculados a esta máquina
-  limitAnswerMachines: LimitAnswerMachine[]; // limites de máquina
-}
+  toggleNewGroup(): void {
+    this.newGroupOpen.update((v) => !v);
+    this.newGroupNome.set('');
+  }
 
-interface FormGroup {
-  form: Form;
-  answers: Answer[];       // parâmetros gerais do formulário (sem máquina)
-  machines: MachineGroup[];
-}
+  /** Cria um grupo vinculado ao formulário atual. */
+  criarGrupo(): void {
+    const nome = this.newGroupNome().trim();
+    const formId = this.selectedForm()?.id;
+    if (!nome || !formId) return;
 
-interface SectionGroup {
-  section: Section;
-  forms: FormGroup[];
-}
+    this.answerGroupsService.create({ formId, nome, status: 1 }).subscribe({
+      next: () => {
+        this.success.set('Grupo criado com sucesso.');
+        this.newGroupOpen.set(false);
+        this.newGroupNome.set('');
+        this.loadGroups();
+      },
+      error: () => this.error.set('Erro ao criar o grupo.'),
+    });
+  }
 
-interface LocationGroup {
-  location: Location;
-  sections: SectionGroup[];
+  excluirGrupo(groupId: string): void {
+    this.answerGroupsService.delete(groupId).subscribe({
+      next: () => {
+        if (this.activeGroup() === groupId) this.activeGroup.set('');
+        this.success.set('Grupo removido.');
+        this.loadGroups();
+      },
+      error: () => this.error.set('Erro ao remover o grupo.'),
+    });
+  }
+
+  /**
+   * Relaciona/realoca um parâmetro a um grupo (ou remove o vínculo).
+   * Como a chave do vínculo é (answerGroupId, answerId), trocar de grupo
+   * significa apagar o vínculo antigo e criar um novo.
+   */
+  setParamGroup(answer: Answer, groupId: string): void {
+    const current = this.groupItemByAnswer().get(answer.id) ?? null;
+    const target = groupId || '';
+    const curGroup = current?.answerGroupId ?? '';
+    if (curGroup === target) return;
+
+    const reload = () => this.loadGroupItems();
+    const createLink = () =>
+      this.answerGroupItemsService
+        .create({ answerGroupId: target, answerId: answer.id, ordem: this.nextOrdem(target) })
+        .subscribe({ next: reload, error: () => this.error.set('Erro ao relacionar ao grupo.') });
+
+    if (!target) {
+      // "Sem grupo" → remove o vínculo existente
+      if (current) {
+        this.answerGroupItemsService
+          .delete(current.answerGroupId, answer.id)
+          .subscribe({ next: reload, error: () => this.error.set('Erro ao remover do grupo.') });
+      }
+      return;
+    }
+
+    if (current) {
+      this.answerGroupItemsService
+        .delete(current.answerGroupId, answer.id)
+        .subscribe({ next: createLink, error: createLink });
+    } else {
+      createLink();
+    }
+  }
+
+  private clearGroups(): void {
+    this.answerGroups.set([]);
+    this.groupItems.set([]);
+    this.activeGroup.set('');
+    this.newGroupOpen.set(false);
+    this.newGroupNome.set('');
+  }
+
+  // ============================================================
+  //  HELPERS
+  // ============================================================
+
+  isAtivo(status: number): boolean {
+    return status === 1;
+  }
+
+  trackById(_: number, item: { id: string }): string {
+    return item.id;
+  }
+
+  private startLoading(): void {
+    this.loading.set(true);
+    this.error.set(null);
+  }
+
+  private fail(message: string): void {
+    this.loading.set(false);
+    this.error.set(message);
+  }
+
+  private clearFeedback(): void {
+    this.error.set(null);
+    this.success.set(null);
+  }
+
+  resetFilters(): void {
+    this.filters.set({ ...this.emptyFilters });
+  }
 }

@@ -1,6 +1,5 @@
 @if (item(); as item) {
   <div class="d-flex flex-column gap-3">
-
     <!-- Badges de tipo e status lado a lado -->
     <div class="d-flex align-items-center gap-2 flex-wrap">
       <span class="badge text-bg-secondary">{{ typeLabel() }}</span>
@@ -26,6 +25,17 @@
       </nav>
     }
 
+    <!-- Grupo -->
+    <div class="d-flex align-items-center gap-2 small">
+      <i class="bi bi-collection text-muted"></i>
+      <span class="text-muted">Grupo:</span>
+      @if (currentGroupNome()) {
+        <span class="badge text-bg-primary">{{ currentGroupNome() }}</span>
+      } @else {
+        <span class="text-muted">Sem grupo</span>
+      }
+    </div>
+
     <!-- Datas -->
     <div class="card border-0 bg-light">
       <div class="card-body py-2 px-3">
@@ -44,9 +54,7 @@
 
     <!-- Limites de inspeção -->
     <div>
-      <div class="small text-muted mb-2">
-        <i class="bi bi-sliders me-1"></i>Limites de inspeção
-      </div>
+      <div class="small text-muted mb-2"><i class="bi bi-sliders me-1"></i>Limites de inspeção</div>
       @if (limits().length === 0) {
         <p class="text-muted small mb-0">Nenhum limite cadastrado para este parâmetro.</p>
       } @else {
@@ -74,6 +82,5 @@
         <i class="bi bi-trash me-1"></i>Deletar
       </button>
     </div>
-
   </div>
 }

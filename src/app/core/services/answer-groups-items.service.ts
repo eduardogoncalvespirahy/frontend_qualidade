@@ -12,10 +12,10 @@ import {
 @Injectable({
   providedIn: 'root',
 })
-export class AnswerGroupsService {
+export class AnswerGroupItemsService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl = `${environment.apiUrl}/answer-groups-items`;
+  private readonly apiUrl = `${environment.apiUrl}/answer-group-items`;
 
   private readonly httpOptions = {
     headers: new HttpHeaders({

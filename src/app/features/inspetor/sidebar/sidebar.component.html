@@ -98,6 +98,19 @@
             <span>Painel da Industria</span>
           }
         </a>
+
+        <a
+          routerLink="/inspetor/relatorio"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
+          <i class="bi bi-graph-up"></i>
+
+          @if (!layout.collapsed()) {
+            <span>Relatório</span>
+          }
+        </a>        
       </nav>
     </div>
     <hr class="border opacity-75" />

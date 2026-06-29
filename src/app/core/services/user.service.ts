@@ -31,6 +31,9 @@ export class UserService {
   getById(id: string): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/${id}`);
   }
+  getByRegisterNumber(registerNumber: string): Observable<User> {
+    return this.http.get<User>(`${this.apiUrl}/registernumber/${registerNumber}`);
+  }
 
   getAll(limit?: number, page?: number): Observable<PaginatedResult<User>> {
     let params = new HttpParams();

@@ -108,7 +108,7 @@ private iniciarBuscaReativa(): void {
 
     // Busca dentro da lista o profile cuja matrícula bate com o que foi digitado.
     // employeeMatricula é o campo de matrícula dentro do UserProfile.
-    const found = profiles.find(
+    const found = profiles.data.find(
       (p) => p.employeeMatricula === this.matricula()
     );
 

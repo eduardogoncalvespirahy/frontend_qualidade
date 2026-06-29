@@ -1,10 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Answer, AnswerCreate, AnswerUpdate } from '../models/answer.model';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { PaginatedResult } from '../models/paginated.model';
-import { AnswerGroups, AnswerGroupsCreate , AnswerGroupsUpdate } from '../models/answer-group.model';
+import { AnswerGroups, AnswerGroupsCreate, AnswerGroupsUpdate } from '../models/answer-group.model';
 
 @Injectable({
   providedIn: 'root',
@@ -16,12 +15,12 @@ export class AnswerGroupsService {
 
   private readonly httpOptions = {
     headers: new HttpHeaders({
-      'Content-Type': 'application/json'
-    })
+      'Content-Type': 'application/json',
+    }),
   };
 
-  create(answer: AnswerGroupsCreate): Observable<AnswerGroups> {
-    return this.http.post<AnswerGroups>(this.apiUrl, answer);
+  create(answerGroup: AnswerGroupsCreate): Observable<AnswerGroups> {
+    return this.http.post<AnswerGroups>(this.apiUrl, answerGroup);
   }
 
   getById(id: string): Observable<AnswerGroups> {
@@ -39,12 +38,8 @@ export class AnswerGroupsService {
     return this.http.get<PaginatedResult<AnswerGroups>>(this.apiUrl, { params });
   }
 
-  update(id: string, answer: AnswerGroupsUpdate): Observable<AnswerGroups> {
-    return this.http.put<AnswerGroups>(
-      `${this.apiUrl}/${id}`,
-      answer,
-      this.httpOptions
-    );
+  update(id: string, answerGroup: AnswerGroupsUpdate): Observable<AnswerGroups> {
+    return this.http.put<AnswerGroups>(`${this.apiUrl}/${id}`, answerGroup, this.httpOptions);
   }
 
   delete(id: string): Observable<AnswerGroups> {

@@ -1,10 +1,13 @@
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Answer, AnswerCreate, AnswerUpdate } from '../models/answer.model';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { PaginatedResult } from '../models/paginated.model';
-import { AnswerGroupItems, AnswerGroupItemsCreate , AnswerGroupItemsUpdate } from '../models/answer-group-items.model';
+import {
+  AnswerGroupItems,
+  AnswerGroupItemsCreate,
+  AnswerGroupItemsUpdate,
+} from '../models/answer-group-items.model';
 
 @Injectable({
   providedIn: 'root',
@@ -16,16 +19,26 @@ export class AnswerGroupsService {
 
   private readonly httpOptions = {
     headers: new HttpHeaders({
-      'Content-Type': 'application/json'
-    })
+      'Content-Type': 'application/json',
+    }),
   };
 
-  create(answer: AnswerGroupItemsCreate): Observable<AnswerGroupItems> {
-    return this.http.post<AnswerGroupItems>(this.apiUrl, answer);
+  create(answerGroupItem: AnswerGroupItemsCreate): Observable<AnswerGroupItems> {
+    return this.http.post<AnswerGroupItems>(this.apiUrl, answerGroupItem);
   }
 
-  getById(id: string): Observable<AnswerGroupItems> {
-    return this.http.get<AnswerGroupItems>(`${this.apiUrl}/${id}`);
+  getById(answerGroupId: string, answerId: string): Observable<AnswerGroupItems> {
+    return this.http.get<AnswerGroupItems>(
+      `${this.apiUrl}/answerGroup/${answerGroupId}/answer/${answerId}`,
+    );
+  }
+
+  getByAnswerGroupId(answerGroupId: string): Observable<AnswerGroupItems> {
+    return this.http.get<AnswerGroupItems>(`${this.apiUrl}/answerGroup/${answerGroupId}`);
+  }
+
+  getByIdAnswerId(answerId: string): Observable<AnswerGroupItems> {
+    return this.http.get<AnswerGroupItems>(`${this.apiUrl}/answer/${answerId}`);
   }
 
   getAll(limit?: number, page?: number): Observable<PaginatedResult<AnswerGroupItems>> {
@@ -39,15 +52,21 @@ export class AnswerGroupsService {
     return this.http.get<PaginatedResult<AnswerGroupItems>>(this.apiUrl, { params });
   }
 
-  update(id: string, answer: AnswerGroupItemsUpdate): Observable<AnswerGroupItems> {
+  update(
+    answerGroupId: string,
+    answerId: string,
+    answerGroupItem: AnswerGroupItemsUpdate,
+  ): Observable<AnswerGroupItems> {
     return this.http.put<AnswerGroupItems>(
-      `${this.apiUrl}/${id}`,
-      answer,
-      this.httpOptions
+      `${this.apiUrl}/answerGroup/${answerGroupId}/answer/${answerId}`,
+      answerGroupItem,
+      this.httpOptions,
     );
   }
 
-  delete(id: string): Observable<AnswerGroupItems> {
-    return this.http.delete<AnswerGroupItems>(`${this.apiUrl}/${id}`);
+  delete(answerGroupId: string, answerId: string): Observable<AnswerGroupItems> {
+    return this.http.delete<AnswerGroupItems>(
+      `${this.apiUrl}/answerGroup/${answerGroupId}/answer/${answerId}`,
+    );
   }
 }

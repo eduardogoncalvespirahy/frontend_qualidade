@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  inject,
   input,
   signal,
   ViewChild,
@@ -11,6 +12,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { Answer } from '../../../../core/models/answer.model';
+import { catchError, debounceTime, distinctUntilChanged, of, Subject, switchMap } from 'rxjs';
+import { UserService } from '../../../../core/services/user.service';
 
 @Component({
   selector: 'app-painel-modal-envio',
@@ -22,6 +25,7 @@ import { Answer } from '../../../../core/models/answer.model';
 })
 export class ModalEnvioComponent implements AfterViewInit {
 
+  private readonly userService = inject(UserService);
   // Hierarquia do formulário — exibida no resumo antes de enviar
   readonly locationNome = input('');
   readonly sectionNome  = input('');
@@ -42,12 +46,85 @@ export class ModalEnvioComponent implements AfterViewInit {
   protected hasSignature = false;
 
   ngAfterViewInit(): void {
-    const canvas = this.canvasRef.nativeElement;
-    this.ctx = canvas.getContext('2d')!;
-    this.ctx.strokeStyle = '#000';
-    this.ctx.lineWidth = 2;
-    this.ctx.lineCap = 'round';
-  }
+  const canvas = this.canvasRef.nativeElement;
+  this.ctx = canvas.getContext('2d')!;
+  this.ctx.strokeStyle = '#000';
+  this.ctx.lineWidth = 2;
+  this.ctx.lineCap = 'round';
+
+  this.iniciarBuscaReativa(); // ← adiciona aqui
+}
+
+
+  // Subject é como um "canal de eventos" — cada vez que o usuário digita,
+// jogamos o valor novo aqui dentro com .next()
+private readonly matriculaInput$ = new Subject<string>();
+
+// Signal que guarda o nome encontrado (null = ainda não buscou)
+protected readonly nomeInspetor = signal<string | null>(null);
+
+// Signal que controla o spinner de carregamento no HTML
+protected readonly buscandoInspetor = signal(false);
+
+private iniciarBuscaReativa(): void {
+  this.matriculaInput$.pipe(
+
+    // Espera 400ms depois que o usuário PAROU de digitar para disparar a busca.
+    // Sem isso, chamaria a API a cada tecla pressionada.
+    debounceTime(400),
+
+    // Se o valor não mudou (ex: usuário apagou e redigitou o mesmo), ignora.
+    distinctUntilChanged(),
+
+    // switchMap cancela a chamada anterior se uma nova chegar antes de terminar.
+    // Ex: digitou "12", chamou a API → digitou "123" antes de receber resposta
+    // → cancela a busca por "12" e começa por "123".
+    switchMap((matricula) => {
+
+      // Se o campo está vazio, limpa o nome e não chama a API.
+      if (!matricula) {
+        this.nomeInspetor.set(null);
+        return of(null); // of(null) = observable que emite null e termina
+      }
+
+      // Ativa o loading e dispara a busca de todos os profiles.
+      this.buscandoInspetor.set(true);
+      return this.userService.getAllUserProfile().pipe(
+
+        // Se der erro na chamada (ex: rede caiu), retorna null
+        // em vez de quebrar o observable inteiro.
+        catchError(() => of(null))
+      );
+    })
+
+  ).subscribe((profiles) => {
+    // Aqui chegam os dados (ou null em caso de erro/vazio)
+
+    if (!profiles) {
+      this.nomeInspetor.set(null);
+      this.buscandoInspetor.set(false);
+      return;
+    }
+
+    // Busca dentro da lista o profile cuja matrícula bate com o que foi digitado.
+    // employeeMatricula é o campo de matrícula dentro do UserProfile.
+    const found = profiles.find(
+      (p) => p.employeeMatricula === this.matricula()
+    );
+
+    // Se achou, pega o nome. Se não achou, mostra '—'.
+    this.nomeInspetor.set(found?.employeeNome ?? '—');
+    this.buscandoInspetor.set(false);
+  });
+}
+
+// Chamado pelo (input) do campo de matrícula no HTML.
+// Atualiza o signal E empurra o valor novo no Subject para disparar a busca.
+protected onMatriculaChange(valor: string): void {
+  this.matricula.set(valor);
+  this.matriculaInput$.next(valor); // <-- isso acorda o pipe lá em cima
+}
+
 
   private getPos(event: MouseEvent | TouchEvent): { x: number; y: number } {
     const canvas = this.canvasRef.nativeElement;

@@ -1,0 +1,100 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  input,
+  signal,
+  ViewChild,
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+import { Answer } from '../../../../core/models/answer.model';
+
+@Component({
+  selector: 'app-modal-envio',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './modal-envio.component.html',
+  styleUrl: './modal-envio.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class ModalEnvioComponent {
+  // Hierarquia do formulário — exibida no resumo antes de enviar
+  readonly locationNome = input('');
+  readonly sectionNome = input('');
+  readonly formNome = input('');
+
+  // Parâmetros agrupados por categoria e respostas preenchidas pelo inspetor
+  readonly agrupados = input<{ categoria: any; answers: Answer[] }[]>([]);
+  readonly respostas = input<Record<string, string>>({});
+
+  // Campos preenchidos dentro do modal
+  protected readonly observacao = signal('');
+  protected readonly matricula = signal('');
+
+  // Canvas de assinatura
+  @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
+  private ctx!: CanvasRenderingContext2D;
+  private isDrawing = false;
+  protected hasSignature = false;
+
+  ngAfterViewInit(): void {
+    const canvas = this.canvasRef.nativeElement;
+    this.ctx = canvas.getContext('2d')!;
+    this.ctx.strokeStyle = '#000';
+    this.ctx.lineWidth = 2;
+    this.ctx.lineCap = 'round';
+  }
+
+  private getPos(event: MouseEvent | TouchEvent): { x: number; y: number } {
+  const canvas = this.canvasRef.nativeElement;
+  const rect   = canvas.getBoundingClientRect();
+  const source = event instanceof MouseEvent ? event : event.touches[0];
+
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  return {
+    x: (source.clientX - rect.left) * scaleX,
+    y: (source.clientY - rect.top)  * scaleY,
+  };
+}
+
+
+  protected iniciarDesenho(event: MouseEvent | TouchEvent): void {
+    this.isDrawing = true;
+    const pos = this.getPos(event);
+    this.ctx.beginPath();
+    this.ctx.moveTo(pos.x, pos.y);
+  }
+
+  protected desenhar(event: MouseEvent | TouchEvent): void {
+    if (!this.isDrawing) return;
+    event.preventDefault(); // evita scroll no mobile ao desenhar
+    const pos = this.getPos(event);
+    this.ctx.lineTo(pos.x, pos.y);
+    this.ctx.stroke();
+    this.hasSignature = true;
+  }
+
+  protected pararDesenho(): void {
+    this.isDrawing = false;
+  }
+
+  protected limpar(): void {
+    const canvas = this.canvasRef.nativeElement;
+    this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+    this.hasSignature = false;
+  }
+
+  // Retorna todos os dados prontos para o pai enviar ao backend
+  value() {
+    return {
+      observacao: this.observacao(),
+      matricula: this.matricula(),
+      assinatura: this.canvasRef.nativeElement.toDataURL(),
+      respostas: this.respostas(),
+    };
+  }
+}

@@ -15,6 +15,8 @@ import { SectionService } from '../../../core/services/section.service';
 import { FormService } from '../../../core/services/form.service';
 import { AnswerService } from '../../../core/services/answer.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
+import { ModalService } from '../../../core/services/modal.service';
+import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -526,5 +528,34 @@ export class PainelComponent implements OnInit {
  
   resetFilters(): void {
     this.filters.set({ ...this.emptyFilters });
+  }
+
+
+  // ============================================================
+  //  MODAL DE ENVIO — exclusivo do painel
+  // ============================================================
+
+  private readonly modalService = inject(ModalService);
+
+  // Agrupa todos os parâmetros em um único bloco para exibição no modal de envio.
+  protected readonly agrupados = computed(() => ([
+    { categoria: null as any, answers: this.answers() },
+  ]));
+
+  // Abre o modal de confirmação com os dados já preenchidos pelo inspetor.
+  // Usa os signals do próprio painel: selectedLocation/Section/Form e paramValues.
+  protected enviar(): void {
+    this.modalService.openComponent(ModalEnvioComponent, {
+      title: 'Confirmar Envio',
+      size: 'lg',
+      inputs: {
+        locationNome: this.selectedLocation()?.nome ?? '',
+        sectionNome:  this.selectedSection()?.nome  ?? '',
+        formNome:     this.selectedForm()?.nome      ?? '',
+        agrupados:    this.agrupados(),
+        respostas:    this.paramValues(),
+      },
+      buttons: [{ text: 'Fechar', variant: 'secondary', value: false }],
+    });
   }
 }

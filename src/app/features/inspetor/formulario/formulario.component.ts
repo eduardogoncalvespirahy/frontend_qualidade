@@ -4,14 +4,16 @@ import { ActivatedRoute, RouterLink, RouterModule } from '@angular/router';
 
 import { Form } from '../../../core/models/form.model';
 import { PaginatedResult } from '../../../core/models/paginated.model';
+import { Answer } from '../../../core/models/answer.model';
+import { Category } from '../../../core/models/category-answer.model';
 
 import { FormService } from '../../../core/services/form.service';
 import { NavigationContextService } from '../../../core/services/navigation-context.service';
 import { AnswerService } from '../../../core/services/answer.service';
-import { Answer } from '../../../core/models/answer.model';
 import { CategoryService } from '../../../core/services/category-answer.service';
-import { readonly } from '@angular/forms/signals';
-import { Category } from '../../../core/models/category-answer.model';
+import { ModalService } from '../../../core/services/modal.service';
+import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
+
 
 @Component({
   selector: 'app-formulario',
@@ -26,6 +28,7 @@ export class FormularioComponent {
   protected readonly formService = inject(FormService);
   protected readonly answerService = inject(AnswerService);
   protected readonly navigationContext = inject(NavigationContextService);
+  private readonly modalService = inject(ModalService);
   private readonly categoryService = inject(CategoryService);
 
   protected readonly categoriesResource = rxResource({
@@ -173,6 +176,25 @@ export class FormularioComponent {
 //   this.respostas.update(atual => ({ ...atual, [answerId]: valor }));
 //   this.salvarRascunho();
 // }
+
+protected enviar(): void {
+  this.modalService.openComponent(ModalEnvioComponent, {
+    title: 'Confirmar Envio',
+    size: 'lg',
+    inputs: {
+      formNome:     this.form()?.nome ?? '',
+      locationNome: this.navigationContext.context().locationId,
+      sectionNome:  this.navigationContext.context().sectionId,
+      agrupados:    this.agrupados(),
+      respostas:    this.respostas(),
+    },
+    buttons: [
+      { text: 'Fechar', variant: 'secondary', value: false },
+    ],
+  });
+}
+
+
 
 
 

@@ -15,21 +15,22 @@ import { Answer } from '../../../../core/models/answer.model';
 import { catchError, debounceTime, distinctUntilChanged, of, Subject, switchMap } from 'rxjs';
 import { UserService } from '../../../../core/services/user.service';
 
+import { SignatureComponent } from '../../../../core/modals/signature/signature.component';
+
 @Component({
   selector: 'app-painel-modal-envio',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SignatureComponent],
   templateUrl: './modal-envio.component.html',
   styleUrl: './modal-envio.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ModalEnvioComponent implements AfterViewInit {
-
   private readonly userService = inject(UserService);
   // Hierarquia do formulário — exibida no resumo antes de enviar
   readonly locationNome = input('');
-  readonly sectionNome  = input('');
-  readonly formNome     = input('');
+  readonly sectionNome = input('');
+  readonly formNome = input('');
 
   // Parâmetros agrupados por categoria e respostas preenchidas pelo inspetor
   readonly agrupados = input<{ categoria: any; answers: Answer[] }[]>([]);
@@ -37,7 +38,7 @@ export class ModalEnvioComponent implements AfterViewInit {
 
   // Campos preenchidos dentro do modal
   protected readonly observacao = signal('');
-  protected readonly matricula  = signal('');
+  protected readonly matricula = signal('');
 
   // Canvas de assinatura
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -45,97 +46,99 @@ export class ModalEnvioComponent implements AfterViewInit {
   private isDrawing = false;
   protected hasSignature = false;
 
+  //assinatura modal
+  protected readonly assinatura = signal('');
+
+  @ViewChild('signature')
+  private signature!: SignatureComponent;
+  //assinatura modal
+
   ngAfterViewInit(): void {
-  const canvas = this.canvasRef.nativeElement;
-  this.ctx = canvas.getContext('2d')!;
-  this.ctx.strokeStyle = '#000';
-  this.ctx.lineWidth = 2;
-  this.ctx.lineCap = 'round';
+    const canvas = this.canvasRef.nativeElement;
+    this.ctx = canvas.getContext('2d')!;
+    this.ctx.strokeStyle = '#000';
+    this.ctx.lineWidth = 2;
+    this.ctx.lineCap = 'round';
 
-  this.iniciarBuscaReativa(); // ← adiciona aqui
-}
-
+    this.iniciarBuscaReativa(); // ← adiciona aqui
+  }
 
   // Subject é como um "canal de eventos" — cada vez que o usuário digita,
-// jogamos o valor novo aqui dentro com .next()
-private readonly matriculaInput$ = new Subject<string>();
+  // jogamos o valor novo aqui dentro com .next()
+  private readonly matriculaInput$ = new Subject<string>();
 
-// Signal que guarda o nome encontrado (null = ainda não buscou)
-protected readonly nomeInspetor = signal<string | null>(null);
+  // Signal que guarda o nome encontrado (null = ainda não buscou)
+  protected readonly nomeInspetor = signal<string | null>(null);
 
-// Signal que controla o spinner de carregamento no HTML
-protected readonly buscandoInspetor = signal(false);
+  // Signal que controla o spinner de carregamento no HTML
+  protected readonly buscandoInspetor = signal(false);
 
-private iniciarBuscaReativa(): void {
-  this.matriculaInput$.pipe(
+  private iniciarBuscaReativa(): void {
+    this.matriculaInput$
+      .pipe(
+        // Espera 400ms depois que o usuário PAROU de digitar para disparar a busca.
+        // Sem isso, chamaria a API a cada tecla pressionada.
+        debounceTime(400),
 
-    // Espera 400ms depois que o usuário PAROU de digitar para disparar a busca.
-    // Sem isso, chamaria a API a cada tecla pressionada.
-    debounceTime(400),
+        // Se o valor não mudou (ex: usuário apagou e redigitou o mesmo), ignora.
+        distinctUntilChanged(),
 
-    // Se o valor não mudou (ex: usuário apagou e redigitou o mesmo), ignora.
-    distinctUntilChanged(),
+        // switchMap cancela a chamada anterior se uma nova chegar antes de terminar.
+        // Ex: digitou "12", chamou a API → digitou "123" antes de receber resposta
+        // → cancela a busca por "12" e começa por "123".
+        switchMap((matricula) => {
+          // Se o campo está vazio, limpa o nome e não chama a API.
+          if (!matricula) {
+            this.nomeInspetor.set(null);
+            return of(null); // of(null) = observable que emite null e termina
+          }
 
-    // switchMap cancela a chamada anterior se uma nova chegar antes de terminar.
-    // Ex: digitou "12", chamou a API → digitou "123" antes de receber resposta
-    // → cancela a busca por "12" e começa por "123".
-    switchMap((matricula) => {
+          // Ativa o loading e dispara a busca de todos os profiles.
+          this.buscandoInspetor.set(true);
+          return this.userService.getAllUserProfile(1000, 1).pipe(
+            // Se der erro na chamada (ex: rede caiu), retorna null
+            // em vez de quebrar o observable inteiro.
+            catchError(() => of(null)),
+          );
+        }),
+      )
+      .subscribe((profiles) => {
+        // Aqui chegam os dados (ou null em caso de erro/vazio)
 
-      // Se o campo está vazio, limpa o nome e não chama a API.
-      if (!matricula) {
-        this.nomeInspetor.set(null);
-        return of(null); // of(null) = observable que emite null e termina
-      }
+        if (!profiles) {
+          this.nomeInspetor.set(null);
+          this.buscandoInspetor.set(false);
+          return;
+        }
 
-      // Ativa o loading e dispara a busca de todos os profiles.
-      this.buscandoInspetor.set(true);
-      return this.userService.getAllUserProfile(1000, 1).pipe(
+        // Busca dentro da lista o profile cuja matrícula bate com o que foi digitado.
+        // employeeMatricula é o campo de matrícula dentro do UserProfile.
+        const found = profiles.data.find(
+          (p) => String(p.employeeMatricula) === String(this.matricula()),
+        );
 
-        // Se der erro na chamada (ex: rede caiu), retorna null
-        // em vez de quebrar o observable inteiro.
-        catchError(() => of(null))
-      );
-    })
+        // Se achou, pega o nome. Se não achou, mostra '—'.
+        this.nomeInspetor.set(found?.employeeNome ?? '—');
+        this.buscandoInspetor.set(false);
+      });
+  }
 
-  ).subscribe((profiles) => {
-    // Aqui chegam os dados (ou null em caso de erro/vazio)
-
-    if (!profiles) {
-      this.nomeInspetor.set(null);
-      this.buscandoInspetor.set(false);
-      return;
-    }
-
-    // Busca dentro da lista o profile cuja matrícula bate com o que foi digitado.
-    // employeeMatricula é o campo de matrícula dentro do UserProfile.
-    const found = profiles.data.find(
-      (p) => String(p.employeeMatricula) === String(this.matricula())
-
-    );
-
-    // Se achou, pega o nome. Se não achou, mostra '—'.
-    this.nomeInspetor.set(found?.employeeNome ?? '—');
-    this.buscandoInspetor.set(false);
-  });
-}
-
-// Chamado pelo (input) do campo de matrícula no HTML.
-// Atualiza o signal E empurra o valor novo no Subject para disparar a busca.
-protected onMatriculaChange(valor: string): void {
-  this.matricula.set(valor);
-  this.matriculaInput$.next(valor); // <-- isso acorda o pipe lá em cima
-}
-
+  // Chamado pelo (input) do campo de matrícula no HTML.
+  // Atualiza o signal E empurra o valor novo no Subject para disparar a busca.
+  protected onMatriculaChange(valor: string): void {
+    this.matricula.set(valor);
+    this.matriculaInput$.next(valor); // <-- isso acorda o pipe lá em cima
+  }
 
   private getPos(event: MouseEvent | TouchEvent): { x: number; y: number } {
     const canvas = this.canvasRef.nativeElement;
-    const rect   = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const source = event instanceof MouseEvent ? event : event.touches[0];
-    const scaleX = canvas.width  / rect.width;
+    const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     return {
       x: (source.clientX - rect.left) * scaleX,
-      y: (source.clientY - rect.top)  * scaleY,
+      y: (source.clientY - rect.top) * scaleY,
     };
   }
 
@@ -169,9 +172,10 @@ protected onMatriculaChange(valor: string): void {
   value() {
     return {
       observacao: this.observacao(),
-      matricula:  this.matricula(),
+      matricula: this.matricula(),
       assinatura: this.canvasRef.nativeElement.toDataURL(),
-      respostas:  this.respostas(),
+      // assinatura: this.signature.getSignature(), // assinatura modal
+      respostas: this.respostas(),
     };
   }
 }

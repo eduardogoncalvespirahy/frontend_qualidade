@@ -169,13 +169,13 @@ export class ModalEnvioComponent implements AfterViewInit {
   }
 
   // Retorna todos os dados prontos para o pai enviar ao backend
-  value() {
+    value() {
     return {
       observacao: this.observacao(),
-      matricula: this.matricula(),
+      userId:     this.matricula(),
       assinatura: this.canvasRef.nativeElement.toDataURL(),
-      // assinatura: this.signature.getSignature(), // assinatura modal
-      respostas: this.respostas(),
+      respostas:  this.respostas(),
     };
   }
+
 }

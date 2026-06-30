@@ -3,7 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
+import { readonly } from '@angular/forms/signals';
 
+import { SignatureFile } from '../../../core/models/signature-file.model';
 import { Machine } from '../../../core/models/machine.model';
 import { Location } from '../../../core/models/location.model';
 import { Section } from '../../../core/models/section.model';
@@ -18,8 +20,11 @@ import { FormService } from '../../../core/services/form.service';
 import { AnswerService } from '../../../core/services/answer.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
 import { ModalService } from '../../../core/services/modal.service';
+import { SignatureFileService } from '../../../core/services/signature-file.service';
+import { ControlService }       from '../../../core/services/control.service';
+
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
-import { readonly } from '@angular/forms/signals';
+
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -546,22 +551,101 @@ export class PainelComponent implements OnInit {
     { categoria: null as any, answers: this.answers() },
   ]));
 
-  // Abre o modal de confirmação com os dados já preenchidos pelo inspetor.
-  // Usa os signals do próprio painel: selectedLocation/Section/Form e paramValues.
-  protected enviar(): void {
-    this.modalService.openComponent(ModalEnvioComponent, {
-      title: 'Confirmar Envio',
-      size: 'lg',
-      inputs: {
-        locationNome: this.selectedLocation()?.nome ?? '',
-        sectionNome:  this.selectedSection()?.nome  ?? '',
-        formNome:     this.selectedForm()?.nome      ?? '',
-        agrupados:    this.agrupados(),
-        respostas:    this.paramValues(),
-      },
-      buttons: [{ text: 'Fechar', variant: 'secondary', value: false }],
-    });
-  }
+protected async enviar(): Promise<void> {
+  const ref = this.modalService.openComponent(ModalEnvioComponent, {
+    title: 'Confirmar Envio',
+    size: 'xl',
+    inputs: {
+      locationNome: this.selectedLocation()?.nome ?? '',
+      sectionNome:  this.selectedSection()?.nome  ?? '',
+      formNome:     this.selectedForm()?.nome      ?? '',
+      agrupados:    this.agrupados(),
+      respostas:    this.paramValues(),
+    },
+    buttons: [
+      { text: 'Cancelar',        variant: 'secondary', value: false },
+      { text: 'Confirmar Envio', variant: 'primary',   value: true  },
+    ],
+  });
+
+  const confirmed = await ref.result;
+  if (!confirmed) return;
+
+  const dados = ref.instance.value();
+
+  this.salvarEnvio(dados);
+}
+
+private readonly signatureFileService = inject(SignatureFileService);
+private readonly controlService       = inject(ControlService);
+
+
+private salvarEnvio(dados: {
+  userId:     string;
+  observacao: string;
+  assinatura: string; // base64 do canvas
+  respostas:  Record<string, string>;
+}): void {
+  this.saving.set(true);
+
+  // 1. Salva a assinatura
+  this.signatureFileService.create({
+    nome:      `assinatura_${dados.userId}_${Date.now()}`,
+    conteudo:  dados.assinatura,
+    mimeType:  'image/png',
+    extensao:  'png',
+  }).subscribe({
+    next: (file) => {
+
+      // 2. Cria o Control (registro da inspeção)
+      this.controlService.create({
+        formId:     this.selectedForm()!.id,
+        userId:     dados.userId,
+        fileId:     file.id,
+        observacao: dados.observacao || null,
+        dataEmissao: new Date(),
+      }).subscribe({
+        next: () => {
+
+          // 3. Salva as respostas de cada parâmetro
+          const ops = this.answers()
+            .filter((a) => dados.respostas[a.id]?.trim())
+            .map((a) => this.answerResultService.create({
+              AnswerId: a.id,
+              resposta: dados.respostas[a.id],
+            }));
+
+          if (!ops.length) {
+            this.saving.set(false);
+            this.success.set('Inspeção enviada com sucesso!');
+            return;
+          }
+
+          forkJoin(ops).subscribe({
+            next: () => {
+              this.saving.set(false);
+              this.success.set('Inspeção enviada com sucesso!');
+            },
+            error: () => {
+              this.saving.set(false);
+              this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
+            },
+          });
+        },
+        error: () => {
+          this.saving.set(false);
+          this.error.set('Falhou ao registrar a inspeção.');
+        },
+      });
+    },
+    error: () => {
+      this.saving.set(false);
+      this.error.set('Falhou ao salvar a assinatura.');
+    },
+  });
+}
+
+
 
   // ============================================================
   //  Trazendo Machines

@@ -360,84 +360,122 @@
               </button>
             }
           </div>
-              
         }
-        
       }
 
       <!-- ───── PARÂMETROS ───── -->
       @case ('parameters') {
-        @if (answers().length) {
-          <div class="formpanel">
-            <div class="formpanel__fields">
-              @for (a of answers(); track trackById($index, a)) {
-                <div class="field">
-                  <label class="field__label" [for]="'p-' + a.id">
-                    {{ a.nome }}
-                    @if (!isAtivo(a.status)) {
-                      <span class="badge field__badge">Inativo</span>
-                    }
-                    @if (isChanged(a.id)) {
-                      <span class="badge badge--change">alterado</span>
-                    }
-                  </label>
-                  @if (a.descricao) {
-                    <span class="field__hint">{{ a.descricao }}</span>
+        <!-- MODO TABELA: formulário com máquinas -->
+        @if (machines().length) {
+          <div class="table-responsive rounded-3 border">
+            <table class="table table-bordered table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="text-muted fw-semibold" style="min-width: 140px">
+                    {{ selectedForm()?.nome }}
+                  </th>
+                  @for (a of answers(); track a.id) {
+                    <th class="text-center small" style="min-width: 110px">{{ a.nome }}</th>
                   }
-
-                  @if (currentValue(a.id) !== null) {
-                    <span class="field__current">
-                      <i class="bi bi-clock-history"></i>
-                      Valor atual: <strong>{{ currentValue(a.id) }}</strong>
-                    </span>
-                  } @else {
-                    <span class="field__current field__current--empty">
-                      <i class="bi bi-dash-circle"></i> Sem valor registrado
-                    </span>
-                  }
-
-                  <input
-                    class="field__input"
-                    [id]="'p-' + a.id"
-                    [type]="inputType(a.categoryId)"
-                    [ngModel]="paramValues()[a.id] ?? ''"
-                    [ngModelOptions]="{ standalone: true }"
-                    (ngModelChange)="updateParam(a.id, $event)"
-                    placeholder="Informe o valor"
-                  />
-                </div>
-              }
-            </div>
-
-            <div class="formpanel__footer">
-              <span class="formpanel__count">
-                {{ changedCount() }} alteração(ões) pendente(s)
-              </span>
-              <button
-                type="button"
-                class="btn btn--primary"
-                [disabled]="saving() || changedCount() === 0"
-                (click)="save()"
-              >
-                @if (saving()) {
-                  <i class="bi bi-arrow-repeat spin"></i> Salvando…
-                } @else {
-                  <i class="bi bi-check-lg"></i> Salvar alterações
+                </tr>
+              </thead>
+              <tbody>
+                @for (m of machines(); track m.id) {
+                  <tr>
+                    <td class="fw-semibold text-dark">{{ m.nome }}</td>
+                    @for (a of answers(); track a.id) {
+                      <td class="p-1">
+                        <input
+                          class="form-control form-control-sm text-center"
+                          [type]="inputType(a.categoryId)"
+                          [ngModel]="machineParamValues()[m.id + '_' + a.id] ?? ''"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="updateMachineParam(m.id, a.id, $event)"
+                          placeholder="—"
+                        />
+                      </td>
+                    }
+                  </tr>
                 }
-              </button>
-            </div>
+              </tbody>
+            </table>
           </div>
+
+          <!-- MODO LISTA: formulário sem máquinas (bloco atual) -->
         } @else {
-          <div class="empty">
-            <i class="bi bi-inbox"></i>
-            <p>Este formulário não possui parâmetros.</p>
-          </div>
-        }
-        <div class="mt-4">
-              <button class="btn btn-primary w-100" (click)="enviar()">
-                <i class="bi bi-send me-2"></i>Enviar Inspeção
-              </button>
+          @if (answers().length) {
+            <div class="formpanel">
+              <div class="formpanel__fields">
+                @for (a of answers(); track trackById($index, a)) {
+                  <div class="field">
+                    <label class="field__label" [for]="'p-' + a.id">
+                      {{ a.nome }}
+                      @if (!isAtivo(a.status)) {
+                        <span class="badge field__badge">Inativo</span>
+                      }
+                      @if (isChanged(a.id)) {
+                        <span class="badge badge--change">alterado</span>
+                      }
+                    </label>
+                    @if (a.descricao) {
+                      <span class="field__hint">{{ a.descricao }}</span>
+                    }
+
+                    @if (currentValue(a.id) !== null) {
+                      <span class="field__current">
+                        <i class="bi bi-clock-history"></i>
+                        Valor atual: <strong>{{ currentValue(a.id) }}</strong>
+                      </span>
+                    } @else {
+                      <span class="field__current field__current--empty">
+                        <i class="bi bi-dash-circle"></i> Sem valor registrado
+                      </span>
+                    }
+
+                    <input
+                      class="field__input"
+                      [id]="'p-' + a.id"
+                      [type]="inputType(a.categoryId)"
+                      [ngModel]="paramValues()[a.id] ?? ''"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="updateParam(a.id, $event)"
+                      placeholder="Informe o valor"
+                    />
+                  </div>
+                }
+              </div>
+
+              <div class="formpanel__footer">
+                <span class="formpanel__count">
+                  {{ changedCount() }} alteração(ões) pendente(s)
+                </span>
+                <button
+                  type="button"
+                  class="btn btn--primary"
+                  [disabled]="saving() || changedCount() === 0"
+                  (click)="save()"
+                >
+                  @if (saving()) {
+                    <i class="bi bi-arrow-repeat spin"></i> Salvando…
+                  } @else {
+                    <i class="bi bi-check-lg"></i> Salvar alterações
+                  }
+                </button>
+              </div>
             </div>
+          } @else {
+            <div class="empty">
+              <i class="bi bi-inbox"></i>
+              <p>Este formulário não possui parâmetros.</p>
+            </div>
+          }
+        }
+
+        <div class="mt-4">
+          <button class="btn btn-primary w-100" (click)="enviar()">
+            <i class="bi bi-send me-2"></i>Enviar Inspeção
+          </button>
+        </div>
       }
     }
   }

@@ -1,141 +1,155 @@
 <div class="d-flex flex-column gap-3">
-  <p class="text-muted mb-0 small">
-    {{
-      mode() === 'new' ? 'Preencha os dados do novo parâmetro.' : 'Atualize os dados do parâmetro.'
-    }}
+
+  <p class="text-muted small mb-0">
+    <i class="bi bi-info-circle me-1"></i>
+    {{ mode() === 'new' ? 'Preencha os dados do novo parâmetro.' : 'Atualize os dados do parâmetro.' }}
   </p>
 
-  <!-- Nome -->
-  <div>
-    <label for="nome" class="form-label">Nome</label>
-    <input
-      id="nome"
-      name="nome"
-      type="text"
-      class="form-control"
-      [(ngModel)]="nome"
-      placeholder="Informe o nome do parâmetro"
-    />
-  </div>
+  <!-- Nome + Descrição -->
+  <div class="border rounded-3 p-3 d-flex flex-column gap-3">
+    <div class="small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.06em">
+      <i class="bi bi-tag me-1"></i>Identificação
+    </div>
 
-  <!-- Descrição -->
-  <div>
-    <label for="descricao" class="form-label">Descrição</label>
-    <textarea
-      id="descricao"
-      name="descricao"
-      class="form-control"
-      rows="2"
-      [(ngModel)]="descricao"
-      placeholder="Descrição do parâmetro (opcional)"
-    ></textarea>
-  </div>
-
-  <!-- Categoria -->
-  <div>
-    <label for="categoryId" class="form-label">Categoria</label>
-    <select
-      id="categoryId"
-      name="categoryId"
-      class="form-select"
-      [value]="categoryId()"
-      (change)="categoryId.set(+$any($event.target).value)"
-    >
-      <option [value]="0">Selecione uma categoria</option>
-      @for (cat of categories(); track cat.id) {
-        <option [value]="+cat.id">{{ cat.nome }}</option>
-      }
-    </select>
-  </div>
-
-  <!-- Grupo -->
-  <div>
-    <label for="groupId" class="form-label">Grupo</label>
-
-    @if (!criandoGrupo()) {
-      <div class="d-flex gap-2">
-        <select
-          id="groupId"
-          name="groupId"
-          class="form-select"
-          [value]="groupId()"
-          (change)="groupId.set($any($event.target).value)"
-        >
-          <option value="">Sem grupo</option>
-          @for (g of groups(); track g.id) {
-            <option [value]="g.id">{{ g.nome }}</option>
-          }
-        </select>
-        <button type="button" class="btn btn-outline-secondary" (click)="abrirNovoGrupo()">
-          <i class="bi bi-plus-lg"></i> Novo
-        </button>
-      </div>
-    } @else {
-      <div class="d-flex gap-2">
-        <input
-          type="text"
-          class="form-control"
-          placeholder="Nome do novo grupo"
-          [value]="novoGrupoNome()"
-          (input)="novoGrupoNome.set($any($event.target).value)"
-        />
-        <button type="button" class="btn btn-outline-secondary" (click)="cancelarNovoGrupo()">
-          Cancelar
-        </button>
-      </div>
-      <div class="form-text">O grupo será criado ao salvar.</div>
-    }
-  </div>
-
-  <!-- Status -->
-  <div>
-    <label class="form-label">Status</label>
-    <div class="form-check form-switch">
+    <div>
+      <label for="nome" class="form-label small fw-semibold">Nome</label>
       <input
-        id="status"
-        name="status"
-        type="checkbox"
-        class="form-check-input"
-        [(ngModel)]="status"
+        id="nome"
+        name="nome"
+        type="text"
+        class="form-control"
+        [(ngModel)]="nome"
+        placeholder="Informe o nome do parâmetro"
       />
-      <label class="form-check-label" for="status">
-        {{ status ? 'Ativo' : 'Inativo' }}
-      </label>
+    </div>
+
+    <div>
+      <label for="descricao" class="form-label small fw-semibold">Descrição <span class="fw-normal text-muted">(opcional)</span></label>
+      <textarea
+        id="descricao"
+        name="descricao"
+        class="form-control"
+        rows="2"
+        [(ngModel)]="descricao"
+        placeholder="Descrição do parâmetro"
+      ></textarea>
+    </div>
+  </div>
+
+  <!-- Categoria + Grupo + Status -->
+  <div class="border rounded-3 p-3 d-flex flex-column gap-3">
+    <div class="small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.06em">
+      <i class="bi bi-grid me-1"></i>Classificação
+    </div>
+
+    <div>
+      <label for="categoryId" class="form-label small fw-semibold">Categoria</label>
+      <select
+        id="categoryId"
+        name="categoryId"
+        class="form-select"
+        [value]="categoryId()"
+        (change)="categoryId.set(+$any($event.target).value)"
+      >
+        <option [value]="0">Selecione uma categoria</option>
+        @for (cat of categories(); track cat.id) {
+          <option [value]="+cat.id">{{ cat.nome }}</option>
+        }
+      </select>
+    </div>
+
+    <div>
+      <label for="groupId" class="form-label small fw-semibold">Grupo</label>
+      @if (!criandoGrupo()) {
+        <div class="d-flex gap-2">
+          <select
+            id="groupId"
+            name="groupId"
+            class="form-select"
+            [value]="groupId()"
+            (change)="groupId.set($any($event.target).value)"
+          >
+            <option value="">Sem grupo</option>
+            @for (g of groups(); track g.id) {
+              <option [value]="g.id">{{ g.nome }}</option>
+            }
+          </select>
+          <button type="button" class="btn btn-outline-secondary text-nowrap" (click)="abrirNovoGrupo()">
+            <i class="bi bi-plus-lg me-1"></i>Novo
+          </button>
+        </div>
+      } @else {
+        <div class="d-flex gap-2">
+          <input
+            type="text"
+            class="form-control"
+            placeholder="Nome do novo grupo"
+            [value]="novoGrupoNome()"
+            (input)="novoGrupoNome.set($any($event.target).value)"
+          />
+          <button type="button" class="btn btn-outline-secondary text-nowrap" (click)="cancelarNovoGrupo()">
+            Cancelar
+          </button>
+        </div>
+        <div class="form-text"><i class="bi bi-info-circle me-1"></i>O grupo será criado ao salvar.</div>
+      }
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between border rounded-3 px-3 py-2">
+      <div>
+        <div class="small fw-semibold">Status</div>
+        <div class="small text-muted">{{ status ? 'Parâmetro ativo e visível nas inspeções' : 'Parâmetro inativo' }}</div>
+      </div>
+      <div class="form-check form-switch mb-0">
+        <input
+          id="status"
+          name="status"
+          type="checkbox"
+          class="form-check-input"
+          style="width:2.5rem;height:1.25rem"
+          [(ngModel)]="status"
+        />
+      </div>
     </div>
   </div>
 
   <!-- Limites -->
-  <div class="card border-0 bg-light">
-    <div class="card-body py-2 px-3">
-      <div class="small text-muted mb-2">
-        <i class="bi bi-sliders me-1"></i>Limite de inspeção (opcional)
+  <div class="border rounded-3 p-3 d-flex flex-column gap-2">
+    <div class="small fw-semibold text-muted text-uppercase" style="font-size:.7rem;letter-spacing:.06em">
+      <i class="bi bi-sliders me-1"></i>Limite de inspeção <span class="fw-normal normal-case text-muted">(opcional)</span>
+    </div>
+    <div class="row g-2">
+      <div class="col-6">
+        <label for="limitMin" class="form-label small fw-semibold" style="color:#16a34a">
+          <i class="bi bi-arrow-down-circle me-1"></i>Mínimo
+        </label>
+        <input
+          id="limitMin"
+          name="limitMin"
+          type="number"
+          class="form-control"
+          style="border-color:#bbf7d0"
+          [value]="limitMin()"
+          (input)="limitMin.set($any($event.target).value)"
+          placeholder="Ex: 0"
+        />
       </div>
-      <div class="row g-2">
-        <div class="col-6">
-          <label for="limitMin" class="form-label small">Mínimo</label>
-          <input
-            id="limitMin"
-            name="limitMin"
-            type="number"
-            class="form-control form-control-sm"
-            [value]="limitMin()"
-            (input)="limitMin.set($any($event.target).value)"
-            placeholder="Ex: 0"
-          />
-        </div>
-        <div class="col-6">
-          <label for="limitMax" class="form-label small">Máximo</label>
-          <input
-            id="limitMax"
-            name="limitMax"
-            type="number"
-            class="form-control form-control-sm"
-            [value]="limitMax()"
-            (input)="limitMax.set($any($event.target).value)"
-            placeholder="Ex: 100"
-          />
-        </div>
+      <div class="col-6">
+        <label for="limitMax" class="form-label small fw-semibold" style="color:#c2410c">
+          <i class="bi bi-arrow-up-circle me-1"></i>Máximo
+        </label>
+        <input
+          id="limitMax"
+          name="limitMax"
+          type="number"
+          class="form-control"
+          style="border-color:#fed7aa"
+          [value]="limitMax()"
+          (input)="limitMax.set($any($event.target).value)"
+          placeholder="Ex: 100"
+        />
       </div>
     </div>
   </div>
+
 </div>

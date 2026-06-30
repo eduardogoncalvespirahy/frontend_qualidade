@@ -1,72 +1,77 @@
 @if (item(); as item) {
   <div class="d-flex flex-column gap-3">
-    <!-- Badges de tipo e status lado a lado -->
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <span class="badge text-bg-secondary">{{ typeLabel() }}</span>
-      <span class="badge" [class]="statusClass()">{{ statusLabel() }}</span>
-    </div>
 
-    <!-- Breadcrumb: Local → Seção → Formulário -->
-    @if (locationNome() || sectionNome() || formNome()) {
-      <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0 small">
+    <!-- Topo: tipo + status + breadcrumb -->
+    <div class="p-3 rounded-3 bg-light border">
+      <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+        <span class="badge text-bg-secondary"><strong>{{ typeLabel() }}</strong></span>
+        <span class="badge" [class]="statusClass()"><strong>{{ statusLabel() }}</strong></span>
+      </div>
+      
+      @if (locationNome() || sectionNome() || formNome()) {
+        <div class="d-flex align-items-center gap-1 flex-wrap small text-muted">
           @if (locationNome()) {
-            <li class="breadcrumb-item text-muted">
-              <i class="bi bi-geo-alt me-1"></i>{{ locationNome() }}
-            </li>
+            <span><i class="bi bi-geo-alt me-1"></i><strong>{{ locationNome() }}</strong></span>
+            <i class="bi bi-chevron-right" style="font-size:.65rem"></i>
           }
           @if (sectionNome()) {
-            <li class="breadcrumb-item text-muted">{{ sectionNome() }}</li>
+            <span><strong>{{ sectionNome() }}</strong></span>
+            <i class="bi bi-chevron-right" style="font-size:.65rem"></i>
           }
           @if (formNome()) {
-            <li class="breadcrumb-item active fw-semibold">{{ formNome() }}</li>
+            <span class="fw-semibold text-dark"><strong> {{ formNome() }}</strong></span>
           }
-        </ol>
-      </nav>
-    }
-
-    <!-- Grupo -->
-    <div class="d-flex align-items-center gap-2 small">
-      <i class="bi bi-collection text-muted"></i>
-      <span class="text-muted">Grupo:</span>
-      @if (currentGroupNome()) {
-        <span class="badge text-bg-primary">{{ currentGroupNome() }}</span>
-      } @else {
-        <span class="text-muted">Sem grupo</span>
+        </div>
       }
     </div>
 
-    <!-- Datas -->
-    <div class="card border-0 bg-light">
-      <div class="card-body py-2 px-3">
-        <div class="row g-2">
-          <div class="col-6">
-            <div class="small text-muted">Criado em</div>
-            <div class="small">{{ item.dataCriacao | date: 'dd/MM/yyyy HH:mm' }}</div>
+    <!-- Grupo + Datas -->
+    <div class="row g-2">
+      <div class="col-12 col-sm-6">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-muted mb-1"><i class="bi bi-collection me-1"></i>Grupo</div>
+          @if (currentGroupNome()) {
+            <span class="badge text-bg-primary fw-normal" style="font-size:.85rem">{{ currentGroupNome() }}</span>
+          } @else {
+            <span class="text-muted small">Sem grupo</span>
+          }
+        </div>
+      </div>
+      <div class="col-12 col-sm-6">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="small text-muted mb-1"><i class="bi bi-clock me-1"></i>Datas</div>
+          <div class="small">
+            <span class="text-muted">Criado:</span>
+            <strong class="ms-1">{{ item.dataCriacao | date: 'dd/MM/yy HH:mm' }}</strong>
           </div>
-          <div class="col-6">
-            <div class="small text-muted">Alterado em</div>
-            <div class="small">{{ item.dataAlteracao | date: 'dd/MM/yyyy HH:mm' }}</div>
+          <div class="small mt-1">
+            <span class="text-muted">Alterado:</span>
+            <strong class="ms-1">{{ item.dataAlteracao | date: 'dd/MM/yy HH:mm' }}</strong>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Limites de inspeção -->
-    <div>
-      <div class="small text-muted mb-2"><i class="bi bi-sliders me-1"></i>Limites de inspeção</div>
+    <!-- Limites -->
+    <div class="border rounded-3 p-3">
+      <div class="small fw-semibold text-muted text-uppercase mb-2" style="font-size:.7rem;letter-spacing:.06em">
+        <i class="bi bi-sliders me-1"></i>Limites de inspeção
+      </div>
       @if (limits().length === 0) {
-        <p class="text-muted small mb-0">Nenhum limite cadastrado para este parâmetro.</p>
+        <div class="text-center py-2 text-muted small">
+          <i class="bi bi-dash-circle d-block mb-1 fs-5"></i>
+          Nenhum limite cadastrado para este parâmetro.
+        </div>
       } @else {
         @for (l of limits(); track l.id) {
-          <div class="d-flex gap-2">
-            <div class="flex-fill text-center border rounded p-2">
-              <div class="small text-muted">Mínimo</div>
-              <div class="fw-bold fs-5">{{ l.limitMin ?? '—' }}</div>
+          <div class="d-flex gap-3">
+            <div class="flex-fill text-center rounded-3 p-3" style="background:#f0fdf4;border:1px solid #bbf7d0">
+              <div class="small mb-1" style="color:#16a34a">Mínimo</div>
+              <div class="fw-bold fs-4" style="color:#16a34a">{{ l.limitMin ?? '—' }}</div>
             </div>
-            <div class="flex-fill text-center border rounded p-2">
-              <div class="small text-muted">Máximo</div>
-              <div class="fw-bold fs-5">{{ l.limitMax ?? '—' }}</div>
+            <div class="flex-fill text-center rounded-3 p-3" style="background:#fff7ed;border:1px solid #fed7aa">
+              <div class="small mb-1" style="color:#c2410c">Máximo</div>
+              <div class="fw-bold fs-4" style="color:#c2410c">{{ l.limitMax ?? '—' }}</div>
             </div>
           </div>
         }
@@ -74,13 +79,14 @@
     </div>
 
     <!-- Ações -->
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-primary btn-sm" (click)="editar(item)">
-        <i class="bi bi-pencil me-1"></i>Editar
+    <div class="d-flex gap-2 pt-1">
+      <button class="btn btn-primary btn-sm flex-fill" (click)="editar(item)">
+        <i class="bi bi-pencil me-1"></i>Editar parâmetro
       </button>
-      <button class="btn btn-outline-danger btn-sm" (click)="deletar(item)">
-        <i class="bi bi-trash me-1"></i>Deletar
+      <button class="btn btn-outline-danger btn-sm px-3" (click)="deletar(item)">
+        <i class="bi bi-trash"></i>
       </button>
     </div>
+
   </div>
 }

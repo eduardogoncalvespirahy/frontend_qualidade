@@ -79,8 +79,11 @@ export class DetailComponent {
   });
 
   protected readonly limits = computed(() =>
-    (this.limitsResource.value()?.data ?? []).filter((l: any) => l.answerId === this.item().id),
-  );
+  (this.limitsResource.value()?.data ?? []).filter(
+    (l: any) => l.answerId === this.item().id && l.status === 1
+  )
+);
+
 
   // Avisa o pai (param.component.ts) que algo mudou e precisa recarregar
   readonly reload_return = output<boolean>();
@@ -189,24 +192,30 @@ export class DetailComponent {
       })
       .subscribe({
         next: () => {
-          if (existingLimit && limitValue) {
-            // Limite já existe → atualiza
-            this.LimitAnswerService.update(existingLimit.id, {
-              answerId: value.id,
-              limitMin: limitValue.limitMin,
-              limitMax: limitValue.limitMax,
-            }).subscribe({ next: afterLimit });
-          } else if (!existingLimit && limitValue) {
-            // Não havia limite → cria
+          if (limitValue) {
+            // Sempre cria um novo limite com os valores informados
             this.LimitAnswerService.create({
               answerId: value.id,
               limitMin: limitValue.limitMin,
               limitMax: limitValue.limitMax,
-            }).subscribe({ next: afterLimit });
+            }).subscribe({
+              next: () => {
+                // Se havia um limite anterior, desativa ele
+                if (existingLimit) {
+                  this.LimitAnswerService.update(existingLimit.id, {
+                    answerId: existingLimit.answerId,
+                    status: 0,
+                  }).subscribe({ next: afterLimit });
+                } else {
+                  afterLimit();
+                }
+              },
+            });
           } else {
             afterLimit();
           }
         },
+
       });
   }
 

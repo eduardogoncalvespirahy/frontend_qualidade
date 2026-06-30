@@ -570,7 +570,7 @@ export class PainelComponent implements OnInit {
   private readonly machineService = inject(MachineService);
 
   readonly machines = signal<Machine[]>([]);
-  readonly machinesParamValues = signal<Record<string, string>>({});
+  readonly machineParamValues = signal<Record<string, string>>({});
 
   private loadMachines(): void {
     const formId = this.selectedForm()?.id;
@@ -584,7 +584,7 @@ export class PainelComponent implements OnInit {
   }
 
 updateMachineParam(machineId: string, answerId: string, value: string): void {
-  this.machinesParamValues.update((m) => ({ ...m, [`${machineId}_${answerId}`]: value }));
+  this.machineParamValues.update((m) => ({ ...m, [`${machineId}_${answerId}`]: value }));
 }
 
 

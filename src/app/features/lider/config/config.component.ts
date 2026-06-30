@@ -36,19 +36,19 @@ export class ConfigComponent {
     {
       key: 'location' as const,
       label: 'Locais',
-      icon: 'bi-cpu',
+      icon: 'bi-geo-alt',
       description: 'Gerenciamento dos Locais',
     },
     {
       key: 'section' as const,
       label: 'Seções',
-      icon: 'bi-cpu',
+      icon: 'bi-building',
       description: 'Gerenciamento das Seções',
     },
     {
       key: 'form' as const,
       label: 'Formularios',
-      icon: 'bi-cpu',
+      icon: 'bi-file-bar-graph',
       description: 'Gerenciamento dos Formularios',
     },        
     {

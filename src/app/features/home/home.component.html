@@ -1,131 +1,47 @@
-<div class="home-page">
-  <!-- HERO -->
+<div class="home">
+  <section class="hero">
+    <div class="hero-left">
+      <h1>
+        Controle de qualidade
+        <span>simples, moderno e confiável.</span>
+      </h1>
 
-  <section class="hero-section">
-    <div class="hero-card">
-      <div class="hero-top">
-        <div class="hero-content">
-          <div class="hero-logo">
-            <i class="bi bi-shield-check"></i>
-          </div>
+      <p>
+        Plataforma para inspeções, rastreabilidade, monitoramento operacional e gestão de processos
+        de qualidade.
+      </p>
 
-          <div class="hero-text">
-            <h1 class="hero-title">PIRAHY</h1>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" [routerLink]="['/login']">
+          <i class="bi bi-building-lock"></i>
 
-            <p class="hero-subtitle">Sistema de Controle de Qualidade</p>
+          Área Administrativa
+        </a>
 
-            <p class="hero-description">
-              Plataforma para inspeções, rastreabilidade, monitoramento operacional e gestão da
-              qualidade.
-            </p>
-          </div>
-        </div>
+        <a class="btn btn-outline-primary btn-lg" [routerLink]="['/inspetor']">
+          <i class="bi bi-person-badge"></i>
 
-        <div class="admin-access">
-          <a class="btn btn-primary btn-lg" [routerLink]="['/login']">
-            <i class="bi bi-shield-lock me-2"></i>
-            Área Administrativa
-          </a>
-        </div>
-
-        <div class="admin-access">
-          <a class="btn btn-primary btn-lg" [routerLink]="['/inspetor']">
-            <i class="bi bi-shield-lock me-2"></i>
-            Área Inspetor
-          </a>
-        </div>
-
-      </div>
-
-      <div class="hero-metrics">
-        <div class="metric-card">
-          <div class="metric-value">
-            {{ locations().length }}
-          </div>
-
-          <div class="metric-label">Unidades Disponíveis</div>
-        </div>
+          Área Inspetor
+        </a>
       </div>
     </div>
-  </section>
 
-  <!-- CONTEÚDO -->
-
-  <section class="content-section">
-    <div class="content-card">
-      <div class="content-header">
-        <div>
-          <h4 class="mb-1 fw-bold">Unidades</h4>
-
-          <p class="text-muted mb-0">Selecione uma unidade para acessar o painel.</p>
+    <div class="hero-right">
+      <div class="glass-card">
+        <div class="logo">
+          <i class="bi bi-shield-check"></i>
         </div>
 
-        <div class="search-box">
-          <i class="bi bi-search"></i>
+        <h2>PIRAHY</h2>
 
-          <input
-            type="search"
-            class="form-control"
-            placeholder="Pesquisar unidade..."
-            [value]="query()"
-            (input)="onSearch($any($event.target).value)"
-          />
+        <p>Sistema de Controle de Qualidade</p>
+
+        <div class="status">
+          <span></span>
+
+          Online
         </div>
       </div>
-
-      @if (locationsResource.isLoading()) {
-        <div class="loading-state">
-          <div class="spinner-border text-primary" role="status"></div>
-
-          <p class="mt-3 text-muted">Carregando unidades...</p>
-        </div>
-      } @else if (locationsResource.error()) {
-        <div class="error-state">
-          <i class="bi bi-exclamation-triangle"></i>
-
-          <h5>Erro ao carregar dados</h5>
-
-          <button class="btn btn-outline-danger" (click)="reload()">Tentar novamente</button>
-        </div>
-      } @else {
-        @let locations = filtered();
-
-        @if (locations.length === 0) {
-          <div class="empty-state">
-            <i class="bi bi-inboxes"></i>
-
-            <h5>Nenhuma unidade encontrada</h5>
-
-            <p>Ajuste os filtros utilizados.</p>
-          </div>
-        } @else {
-          <div class="row g-4">
-            @for (location of locations; track location.id) {
-              <div class="col-12 col-md-6 col-xl-4">
-                <a class="location-card" [routerLink]="['/inspetor/local', location.id]">
-                  <div class="location-icon">
-                    <i class="bi bi-geo-alt-fill"></i>
-                  </div>
-
-                  <div class="location-content">
-                    <span class="location-code"> #{{ location.id }} </span>
-
-                    <h6 class="location-title">
-                      {{ location.nome || 'Unidade sem nome' }}
-                    </h6>
-
-                    <p class="location-description">
-                      {{ location.descricao || 'Sem descrição cadastrada.' }}
-                    </p>
-                  </div>
-
-                  <i class="bi bi-arrow-right-short location-arrow"></i>
-                </a>
-              </div>
-            }
-          </div>
-        }
-      }
     </div>
   </section>
 </div>

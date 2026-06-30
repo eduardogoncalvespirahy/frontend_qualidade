@@ -1,1 +1,103 @@
-<p>form works!</p>
+<div class="d-flex flex-column gap-3">
+  <p class="text-muted mb-0 small">
+    {{ mode() === 'new' ? 'Preencha os dados do novo usuário.' : 'Atualize os dados do usuário.' }}
+  </p>
+
+  <div>
+    <label for="username" class="form-label">Usuário</label>
+    <input
+      id="username"
+      name="username"
+      type="text"
+      class="form-control"
+      [(ngModel)]="username"
+      placeholder="Nome de usuário"
+    />
+  </div>
+
+  <div>
+    <label for="email" class="form-label">E-mail</label>
+    <input
+      id="email"
+      name="email"
+      type="email"
+      class="form-control"
+      [(ngModel)]="email"
+      placeholder="email@exemplo.com"
+    />
+  </div>
+
+  <!-- Combobox com busca de funcionário -->
+  <div>
+    <label for="employeeQuery" class="form-label">Funcionário</label>
+    <div class="position-relative">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input
+          id="employeeQuery"
+          name="employeeQuery"
+          type="text"
+          class="form-control"
+          autocomplete="off"
+          placeholder="Digite para buscar pelo nome…"
+          [ngModel]="query()"
+          (ngModelChange)="onQuery($event)"
+          (focus)="open.set(true)"
+          (blur)="onBlur()"
+        />
+        @if (query()) {
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            (click)="clearEmployee()"
+            title="Limpar"
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
+        }
+      </div>
+
+      @if (open()) {
+        <div
+          class="list-group position-absolute w-100 shadow-sm"
+          style="z-index: 1060; max-height: 240px; overflow: auto"
+        >
+          @for (e of filteredEmployees(); track e.id) {
+            <button
+              type="button"
+              class="list-group-item list-group-item-action"
+              [class.active]="e.id === employeeId"
+              (click)="selectEmployee(e)"
+            >
+              {{ e.personName || e.id }}
+            </button>
+          } @empty {
+            <span class="list-group-item text-muted">Nenhum funcionário encontrado.</span>
+          }
+        </div>
+      }
+    </div>
+
+    @if (employeeId) {
+      <div class="form-text text-success">
+        <i class="bi bi-check-circle"></i> Funcionário selecionado.
+      </div>
+    } @else {
+      <div class="form-text">Selecione um funcionário da lista.</div>
+    }
+  </div>
+
+  <div>
+    <label class="form-label">Status</label>
+    <div class="form-check form-switch">
+      <input
+        id="status"
+        name="status"
+        type="checkbox"
+        class="form-check-input"
+        [(ngModel)]="status"
+      />
+      <label class="form-check-label" for="status">{{ status ? 'Ativo' : 'Inativo' }}</label>
+    </div>
+  </div>
+</div>

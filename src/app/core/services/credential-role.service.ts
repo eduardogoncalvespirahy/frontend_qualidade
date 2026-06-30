@@ -10,7 +10,7 @@ import { environment } from '../../../environments/environment';
 export class CredentialRoleService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl = `${environment.apiUrl}/credential-roles`;
+  private readonly apiUrl = `${environment.apiUrl}/credentials-roles`;
 
   private readonly httpOptions = {
     headers: new HttpHeaders({
@@ -26,7 +26,7 @@ export class CredentialRoleService {
     return this.http.get<CredentialRole>(`${this.apiUrl}/${credentialId}`);
   }
 
-  delete(credentialId: string): Observable<CredentialRole> {
-    return this.http.delete<CredentialRole>(`${this.apiUrl}/${credentialId}`);
+  delete(credentialId: string, roleId: string): Observable<CredentialRole> {
+    return this.http.delete<CredentialRole>(`${this.apiUrl}/${credentialId}/${roleId}`);
   }
 }

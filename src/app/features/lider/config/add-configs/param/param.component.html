@@ -139,18 +139,18 @@
             />
           </label>
 
-          @if (step() === 'location' || step() === 'section') {
+          @if (step() === 'location') {
             <label class="ff">
-              <span class="ff__label">Employer ID</span>
+              <span class="ff__label">Local</span>
               <select
                 class="ff__control"
-                [ngModel]="filters().employerId"
+                [ngModel]="filters().locationId"
                 [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="updateFilter('employerId', $event)"
+                (ngModelChange)="updateFilter('locationId', $event)"
               >
                 <option value="">Todos</option>
-                @for (id of employerIdOptions(); track id) {
-                  <option [value]="id">{{ id }}</option>
+                @for (opt of locationOptions(); track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
                 }
               </select>
             </label>

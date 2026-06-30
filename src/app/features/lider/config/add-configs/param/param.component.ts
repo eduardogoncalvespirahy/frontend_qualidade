@@ -28,7 +28,7 @@ type Step = 'location' | 'section' | 'form' | 'parameters';
 interface Filters {
   nome: string;
   descricao: string;
-  employerId: string; // Location / Section
+  locationId: string; // filtro de Local (nível de locais)
   sectionId: string; // Form
   status: 'all' | 'active' | 'inactive';
   criadoDe: string; // yyyy-mm-dd
@@ -86,7 +86,7 @@ export class ParamComponent implements OnInit {
   private readonly emptyFilters: Filters = {
     nome: '',
     descricao: '',
-    employerId: '',
+    locationId: '',
     sectionId: '',
     status: 'all',
     criadoDe: '',
@@ -138,7 +138,7 @@ export class ParamComponent implements OnInit {
       (l) =>
         this.textMatch(l.nome, f.nome) &&
         this.textMatch(l.descricao, f.descricao) &&
-        this.textMatch(l.employerId, f.employerId) &&
+        (!f.locationId || l.id === f.locationId) &&
         this.statusMatch(l.status, f.status),
     );
   });
@@ -149,7 +149,6 @@ export class ParamComponent implements OnInit {
       (s) =>
         this.textMatch(s.nome, f.nome) &&
         this.textMatch(s.descricao, f.descricao) &&
-        this.textMatch(s.employerId, f.employerId) &&
         this.statusMatch(s.status, f.status) &&
         this.dateInRange(s.dataCriacao, f.criadoDe, f.criadoAte) &&
         this.dateInRange(s.dataAlteracao, f.alteradoDe, f.alteradoAte),
@@ -220,15 +219,11 @@ export class ParamComponent implements OnInit {
     return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
   }
 
-  readonly employerIdOptions = computed<string[]>(() => {
-    if (this.step() === 'location') {
-      return this.distinct(this.locations().map((l) => l.employerId));
-    }
-    if (this.step() === 'section') {
-      return this.distinct(this.sections().map((s) => s.employerId));
-    }
-    return [];
-  });
+  readonly locationOptions = computed(() =>
+    [...this.locations()]
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map((l) => ({ value: l.id, label: l.nome })),
+  );
 
   readonly sectionIdOptions = computed<{ value: string; label: string }[]>(() => {
     const byId = new Map(this.sections().map((s) => [s.id, s.nome]));

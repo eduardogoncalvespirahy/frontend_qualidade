@@ -7,18 +7,19 @@ import { Location } from '../../../../../core/models/location.model';
 import { LocationService } from '../../../../../core/services/location.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { FormComponent } from './modals/form/form.component';
+import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 
 interface Filters {
   nome: string;
   descricao: string;
-  employerId: string;
+  locationId: string;
   status: 'all' | 'active' | 'inactive';
 }
 
 @Component({
   selector: 'app-location',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ScrollTopComponent],
   templateUrl: './location.component.html',
   styleUrl: './location.component.css',
 })
@@ -33,7 +34,12 @@ export class LocationComponent implements OnInit {
 
   // filtros
   readonly filtersOpen = signal(false);
-  private readonly emptyFilters: Filters = { nome: '', descricao: '', employerId: '', status: 'all' };
+  private readonly emptyFilters: Filters = {
+    nome: '',
+    descricao: '',
+    locationId: '',
+    status: 'all',
+  };
   readonly filters = signal<Filters>({ ...this.emptyFilters });
 
   updateFilter<K extends keyof Filters>(key: K, value: Filters[K]): void {
@@ -63,13 +69,15 @@ export class LocationComponent implements OnInit {
       (l) =>
         this.textMatch(l.nome, f.nome) &&
         this.textMatch(l.descricao, f.descricao) &&
-        this.textMatch(l.employerId, f.employerId) &&
+        (!f.locationId || l.id === f.locationId) &&
         this.statusMatch(l.status, f.status),
     );
   });
 
-  readonly employerIdOptions = computed(() =>
-    Array.from(new Set(this.items().map((l) => l.employerId).filter(Boolean))).sort(),
+  readonly locationOptions = computed(() =>
+    [...this.items()]
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map((l) => ({ value: l.id, label: l.nome })),
   );
 
   ngOnInit(): void {

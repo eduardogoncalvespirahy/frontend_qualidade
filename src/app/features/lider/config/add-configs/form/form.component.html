@@ -2,10 +2,54 @@
   <header class="painel__head">
     <div>
       <span class="painel__eyebrow">Cadastro</span>
-      <h1 class="painel__title">Formulários</h1>
-      <p class="painel__subtitle">Gerencie os formulários vinculados às seções.</p>
+      <h1 class="painel__title">{{ pageTitle() }}</h1>
+      <p class="painel__subtitle">{{ pageDescription() }}</p>
     </div>
   </header>
+
+  <!-- Trilha -->
+  <nav class="trail" aria-label="Navegação">
+    @if (step() !== 'location') {
+      <button type="button" class="trail__back" (click)="back()">
+        <i class="bi bi-arrow-left"></i> <span>Voltar</span>
+      </button>
+    }
+    <ol class="trail__steps">
+      <li class="chip" [class.chip--active]="step() === 'location'">
+        <button
+          type="button"
+          class="chip__btn"
+          [disabled]="!selectedLocation()"
+          (click)="goToLocations()"
+        >
+          <i class="bi bi-geo-alt"></i>
+          <span class="chip__label">{{ selectedLocation()?.nome ?? 'Locais' }}</span>
+        </button>
+      </li>
+      @if (selectedLocation()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip" [class.chip--active]="step() === 'section'">
+          <button
+            type="button"
+            class="chip__btn"
+            [disabled]="!selectedSection()"
+            (click)="goToSections()"
+          >
+            <i class="bi bi-diagram-3"></i>
+            <span class="chip__label">{{ selectedSection()?.nome ?? 'Seções' }}</span>
+          </button>
+        </li>
+      }
+      @if (selectedSection()) {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip chip--active">
+          <span class="chip__btn chip__btn--static">
+            <i class="bi bi-card-checklist"></i> <span class="chip__label">Formulários</span>
+          </span>
+        </li>
+      }
+    </ol>
+  </nav>
 
   @if (error()) {
     <div class="alert alert--error" role="alert">
@@ -18,6 +62,7 @@
     </div>
   }
 
+  <!-- Filtros -->
   @if (!loading()) {
     <div class="filters">
       <div class="filters__bar">
@@ -68,20 +113,24 @@
               (ngModelChange)="updateFilter('descricao', $event)"
             />
           </label>
-          <label class="ff">
-            <span class="ff__label">Seção</span>
-            <select
-              class="ff__control"
-              [ngModel]="filters().sectionId"
-              [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('sectionId', $event)"
-            >
-              <option value="">Todas</option>
-              @for (opt of sectionIdOptions(); track opt.value) {
-                <option [value]="opt.value">{{ opt.label }}</option>
-              }
-            </select>
-          </label>
+
+          @if (step() === 'location') {
+            <label class="ff">
+              <span class="ff__label">Local</span>
+              <select
+                class="ff__control"
+                [ngModel]="filters().locationId"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('locationId', $event)"
+              >
+                <option value="">Todos</option>
+                @for (opt of locationOptions(); track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </label>
+          }
+
           <label class="ff">
             <span class="ff__label">Status</span>
             <select
@@ -95,51 +144,55 @@
               <option value="inactive">Inativo</option>
             </select>
           </label>
-          <label class="ff">
-            <span class="ff__label">Criado de</span>
-            <input
-              type="date"
-              class="ff__control"
-              [ngModel]="filters().criadoDe"
-              [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('criadoDe', $event)"
-            />
-          </label>
-          <label class="ff">
-            <span class="ff__label">Criado até</span>
-            <input
-              type="date"
-              class="ff__control"
-              [ngModel]="filters().criadoAte"
-              [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('criadoAte', $event)"
-            />
-          </label>
-          <label class="ff">
-            <span class="ff__label">Alterado de</span>
-            <input
-              type="date"
-              class="ff__control"
-              [ngModel]="filters().alteradoDe"
-              [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('alteradoDe', $event)"
-            />
-          </label>
-          <label class="ff">
-            <span class="ff__label">Alterado até</span>
-            <input
-              type="date"
-              class="ff__control"
-              [ngModel]="filters().alteradoAte"
-              [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('alteradoAte', $event)"
-            />
-          </label>
+
+          @if (step() !== 'location') {
+            <label class="ff">
+              <span class="ff__label">Criado de</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoDe', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Criado até</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoAte', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Alterado de</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoDe', $event)"
+              />
+            </label>
+            <label class="ff">
+              <span class="ff__label">Alterado até</span>
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoAte', $event)"
+              />
+            </label>
+          }
         </div>
       }
     </div>
   }
 
+  <!-- Conteúdo -->
   @if (loading()) {
     <div class="grid">
       @for (s of [1, 2, 3, 4, 5, 6]; track s) {
@@ -147,56 +200,133 @@
       }
     </div>
   } @else {
-    <div class="grid">
-      <button type="button" class="card card--add" (click)="novo()">
-        <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
-        <h3 class="card__title">Novo formulário</h3>
-        <p class="card__desc">Cadastrar um novo formulário.</p>
-      </button>
-
-      @for (fm of filtered(); track trackById($index, fm)) {
-        <div class="card" (click)="editar(fm)">
-          <div class="card__top">
-            <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
-            <div class="card__top-right">
-              <span class="badge" [class.badge--on]="isAtivo(fm.status)">
-                {{ isAtivo(fm.status) ? 'Ativo' : 'Inativo' }}
-              </span>
-              <button
-                type="button"
-                class="card__del"
-                title="Excluir"
-                (click)="$event.stopPropagation(); excluir(fm)"
-              >
-                <i class="bi bi-trash"></i>
+    @switch (step()) {
+      <!-- LOCAIS (navegação) -->
+      @case ('location') {
+        @if (filteredLocations().length) {
+          <div class="grid">
+            @for (loc of filteredLocations(); track trackById($index, loc)) {
+              <button type="button" class="card" (click)="selectLocation(loc)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-geo-alt"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(loc.status)">{{
+                    isAtivo(loc.status) ? 'Ativo' : 'Inativo'
+                  }}</span>
+                </div>
+                <h3 class="card__title">{{ loc.nome }}</h3>
+                <p class="card__desc">{{ loc.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Abrir seções <i class="bi bi-arrow-right"></i></span>
               </button>
-            </div>
+            }
           </div>
-          <h3 class="card__title">{{ fm.nome }}</h3>
-          <p class="card__desc">{{ fm.descricao || 'Sem descrição' }}</p>
-          <span class="card__meta"
-            ><i class="bi bi-diagram-3"></i> {{ sectionNome(fm.sectionId) }}</span
-          >
-        </div>
-      }
-    </div>
-
-    @if (filtered().length === 0) {
-      <div class="empty">
-        <i class="bi bi-inbox"></i>
-        <p>
-          {{
-            hasFilter()
-              ? 'Nenhum formulário corresponde aos filtros.'
-              : 'Nenhum formulário cadastrado.'
-          }}
-        </p>
-        @if (hasFilter()) {
-          <button type="button" class="btn btn--ghost" (click)="resetFilters()">
-            Limpar filtros
-          </button>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>
+              {{
+                hasFilter() ? 'Nenhum local corresponde aos filtros.' : 'Nenhum local cadastrado.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
+          </div>
         }
-      </div>
+      }
+
+      <!-- SEÇÕES (navegação) -->
+      @case ('section') {
+        @if (filteredSections().length) {
+          <div class="grid">
+            @for (sec of filteredSections(); track trackById($index, sec)) {
+              <button type="button" class="card" (click)="selectSection(sec)">
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-diagram-3"></i></span>
+                  <span class="badge" [class.badge--on]="isAtivo(sec.status)">{{
+                    isAtivo(sec.status) ? 'Ativo' : 'Inativo'
+                  }}</span>
+                </div>
+                <h3 class="card__title">{{ sec.nome }}</h3>
+                <p class="card__desc">{{ sec.descricao || 'Sem descrição' }}</p>
+                <span class="card__go">Abrir formulários <i class="bi bi-arrow-right"></i></span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhuma seção corresponde aos filtros.'
+                  : 'Nenhuma seção neste local.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
+          </div>
+        }
+      }
+
+      <!-- FORMULÁRIOS (CRUD) -->
+      @case ('form') {
+        <div class="grid">
+          <button type="button" class="card card--add" (click)="novoForm()">
+            <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
+            <h3 class="card__title">Novo formulário</h3>
+            <p class="card__desc">Cadastrar um formulário nesta seção.</p>
+          </button>
+
+          @for (fm of filteredForms(); track trackById($index, fm)) {
+            <div class="card" (click)="editarForm(fm)">
+              <div class="card__top">
+                <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
+                <div class="card__top-right">
+                  <span class="badge" [class.badge--on]="isAtivo(fm.status)">{{
+                    isAtivo(fm.status) ? 'Ativo' : 'Inativo'
+                  }}</span>
+                  <button
+                    type="button"
+                    class="card__del"
+                    title="Excluir"
+                    (click)="$event.stopPropagation(); excluirForm(fm)"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <h3 class="card__title">{{ fm.nome }}</h3>
+              <p class="card__desc">{{ fm.descricao || 'Sem descrição' }}</p>
+              <span class="card__go">Editar <i class="bi bi-pencil"></i></span>
+            </div>
+          }
+        </div>
+
+        @if (filteredForms().length === 0) {
+          <div class="empty">
+            <i class="bi bi-inbox"></i>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhum formulário corresponde aos filtros.'
+                  : 'Nenhum formulário nesta seção.'
+              }}
+            </p>
+            @if (hasFilter()) {
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
+            }
+          </div>
+        }
+      }
     }
   }
 </section>
+
+<app-scroll-top />

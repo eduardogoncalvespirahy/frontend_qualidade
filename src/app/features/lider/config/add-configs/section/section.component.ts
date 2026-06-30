@@ -2,15 +2,20 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
+import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
+import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { FormComponent } from './modals/form/form.component';
+import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
+
+type Step = 'location' | 'section';
 
 interface Filters {
   nome: string;
   descricao: string;
-  employerId: string;
+  locationId: string;
   status: 'all' | 'active' | 'inactive';
   criadoDe: string;
   criadoAte: string;
@@ -21,23 +26,39 @@ interface Filters {
 @Component({
   selector: 'app-section',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ScrollTopComponent],
   templateUrl: './section.component.html',
   styleUrl: './section.component.css',
 })
 export class SectionComponent implements OnInit {
+  private readonly locationService = inject(LocationService);
   private readonly sectionService = inject(SectionService);
   private readonly modalService = inject(ModalService);
 
-  readonly items = signal<Section[]>([]);
+  // ───────── navegação ─────────
+  readonly step = signal<Step>('location');
+
+  // ───────── coleções / seleção ─────────
+  readonly locations = signal<Location[]>([]);
+  readonly sections = signal<Section[]>([]);
+  readonly selectedLocation = signal<Location | null>(null);
+
+  // ───────── feedback ─────────
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly success = signal<string | null>(null);
 
+  // ───────── filtros ─────────
   readonly filtersOpen = signal(false);
   private readonly emptyFilters: Filters = {
-    nome: '', descricao: '', employerId: '', status: 'all',
-    criadoDe: '', criadoAte: '', alteradoDe: '', alteradoAte: '',
+    nome: '',
+    descricao: '',
+    locationId: '',
+    status: 'all',
+    criadoDe: '',
+    criadoAte: '',
+    alteradoDe: '',
+    alteradoAte: '',
   };
   readonly filters = signal<Filters>({ ...this.emptyFilters });
 
@@ -70,26 +91,51 @@ export class SectionComponent implements OnInit {
     return true;
   }
 
-  readonly filtered = computed(() => {
+  readonly filteredLocations = computed(() => {
     const f = this.filters();
-    return this.items().filter(
+    return this.locations().filter(
+      (l) =>
+        this.textMatch(l.nome, f.nome) &&
+        this.textMatch(l.descricao, f.descricao) &&
+        (!f.locationId || l.id === f.locationId) &&
+        this.statusMatch(l.status, f.status),
+    );
+  });
+
+  readonly filteredSections = computed(() => {
+    const f = this.filters();
+    return this.sections().filter(
       (s) =>
         this.textMatch(s.nome, f.nome) &&
         this.textMatch(s.descricao, f.descricao) &&
-        this.textMatch(s.employerId, f.employerId) &&
         this.statusMatch(s.status, f.status) &&
         this.dateInRange(s.dataCriacao, f.criadoDe, f.criadoAte) &&
         this.dateInRange(s.dataAlteracao, f.alteradoDe, f.alteradoAte),
     );
   });
 
-  readonly employerIdOptions = computed(() =>
-    Array.from(new Set(this.items().map((s) => s.employerId).filter(Boolean))).sort(),
+  readonly locationOptions = computed(() =>
+    [...this.locations()]
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map((l) => ({ value: l.id, label: l.nome })),
   );
 
+  // ───────── títulos ─────────
+  private readonly titles: Record<Step, string> = { location: 'Locais', section: 'Seções' };
+  private readonly descriptions: Record<Step, string> = {
+    location: 'Selecione um local para gerenciar suas seções.',
+    section: 'Gerencie as seções deste local.',
+  };
+  readonly pageTitle = computed(() => this.titles[this.step()]);
+  readonly pageDescription = computed(() => this.descriptions[this.step()]);
+
   ngOnInit(): void {
-    this.load();
+    this.loadLocations();
   }
+
+  // ============================================================
+  //  CARREGAMENTO
+  // ============================================================
 
   private unwrap<T>(res: unknown): T[] {
     const r = res as Record<string, unknown>;
@@ -97,83 +143,122 @@ export class SectionComponent implements OnInit {
     return (r?.['data'] ?? r?.['items'] ?? r?.['results'] ?? []) as T[];
   }
 
-  load(): void {
-    this.loading.set(true);
-    this.error.set(null);
-    this.sectionService.getAll(1000, 1).subscribe({
+  private loadLocations(): void {
+    this.startLoading();
+    this.locationService.getAll(1000, 1).subscribe({
       next: (res) => {
-        this.items.set(this.unwrap<Section>(res));
+        this.locations.set(this.unwrap<Location>(res));
         this.loading.set(false);
       },
-      error: () => {
-        this.loading.set(false);
-        this.error.set('Não foi possível carregar as seções.');
-      },
+      error: () => this.fail('Não foi possível carregar os locais.'),
     });
   }
 
-  async novo(): Promise<void> {
+  private loadSections(): void {
+    this.startLoading();
+    const employerId = this.selectedLocation()?.employerId;
+    this.sectionService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<Section>(res);
+        this.sections.set(employerId ? all.filter((s) => s.employerId === employerId) : all);
+        this.loading.set(false);
+      },
+      error: () => this.fail('Não foi possível carregar as seções.'),
+    });
+  }
+
+  // ============================================================
+  //  NAVEGAÇÃO
+  // ============================================================
+
+  selectLocation(loc: Location): void {
     this.clearFeedback();
+    this.resetFilters();
+    this.selectedLocation.set(loc);
+    this.step.set('section');
+    this.loadSections();
+  }
+
+  back(): void {
+    this.goToLocations();
+  }
+
+  goToLocations(): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedLocation.set(null);
+    this.sections.set([]);
+    this.step.set('location');
+  }
+
+  // ============================================================
+  //  CRUD — SEÇÕES (employerId travado pelo local)
+  // ============================================================
+
+  async novaSecao(): Promise<void> {
+    this.clearFeedback();
+    const employerId = this.selectedLocation()?.employerId ?? '';
     const ref = this.modalService.openComponent(FormComponent, {
       title: 'Nova Seção',
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'new' },
-      buttons: [
-        { text: 'Cancelar', variant: 'secondary', value: false },
-        { text: 'Criar', variant: 'primary', value: true, submit: true },
-      ],
+      inputs: { mode: 'new', lockedEmployerId: employerId },
+      buttons: this.crudButtons('Criar'),
     });
     if (!(await ref.result)) return;
-
     const v = ref.instance.value();
     this.sectionService
-      .create({ employerId: v.employerId, nome: v.nome, descricao: v.descricao, status: v.status })
+      .create({ employerId, nome: v.nome, descricao: v.descricao, status: v.status })
       .subscribe({
-        next: () => {
-          this.success.set('Seção criada com sucesso.');
-          this.load();
-        },
+        next: () => this.done('Seção criada.', () => this.loadSections()),
         error: () => this.error.set('Erro ao criar a seção.'),
       });
   }
 
-  async editar(item: Section): Promise<void> {
+  async editarSecao(item: Section): Promise<void> {
     this.clearFeedback();
+    const employerId = this.selectedLocation()?.employerId ?? item.employerId;
     const ref = this.modalService.openComponent(FormComponent, {
       title: `Editar: ${item.nome}`,
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'edit', item },
-      buttons: [
-        { text: 'Cancelar', variant: 'secondary', value: false },
-        { text: 'Salvar', variant: 'primary', value: true, submit: true },
-      ],
+      inputs: { mode: 'edit', item, lockedEmployerId: employerId },
+      buttons: this.crudButtons('Salvar'),
     });
     if (!(await ref.result)) return;
-
     const v = ref.instance.value();
     this.sectionService
-      .update(item.id, {
-        employerId: v.employerId,
-        nome: v.nome,
-        descricao: v.descricao,
-        status: v.status,
-      })
+      .update(item.id, { employerId, nome: v.nome, descricao: v.descricao, status: v.status })
       .subscribe({
-        next: () => {
-          this.success.set('Seção atualizada com sucesso.');
-          this.load();
-        },
+        next: () => this.done('Seção atualizada.', () => this.loadSections()),
         error: () => this.error.set('Erro ao atualizar a seção.'),
       });
   }
 
-  async excluir(item: Section): Promise<void> {
+  async excluirSecao(item: Section): Promise<void> {
+    if (!(await this.confirmDelete(item.nome))) return;
+    this.sectionService.delete(item.id).subscribe({
+      next: () => this.done('Seção excluída.', () => this.loadSections()),
+      error: () => this.error.set('Erro ao excluir a seção.'),
+    });
+  }
+
+  // ============================================================
+  //  HELPERS
+  // ============================================================
+
+  private crudButtons(confirmText: string) {
+    return [
+      { text: 'Cancelar', variant: 'secondary', value: false },
+      { text: confirmText, variant: 'primary', value: true, submit: true },
+    ];
+  }
+
+  private async confirmDelete(nome: string): Promise<boolean> {
     this.clearFeedback();
     const ref = this.modalService.open<boolean>({
-      title: 'Excluir Seção',
-      body: `Deseja realmente excluir "${item.nome}"?`,
+      title: 'Confirmar exclusão',
+      body: `Deseja realmente excluir "${nome}"?`,
       centered: true,
       backdrop: 'static',
       buttons: [
@@ -181,15 +266,12 @@ export class SectionComponent implements OnInit {
         { text: 'Excluir', variant: 'danger', value: true },
       ],
     });
-    if (!(await ref.result)) return;
+    return !!(await ref.result);
+  }
 
-    this.sectionService.delete(item.id).subscribe({
-      next: () => {
-        this.success.set('Seção excluída.');
-        this.load();
-      },
-      error: () => this.error.set('Erro ao excluir a seção.'),
-    });
+  private done(msg: string, reload: () => void): void {
+    this.success.set(msg);
+    reload();
   }
 
   isAtivo(status: number): boolean {
@@ -200,6 +282,14 @@ export class SectionComponent implements OnInit {
   }
   resetFilters(): void {
     this.filters.set({ ...this.emptyFilters });
+  }
+  private startLoading(): void {
+    this.loading.set(true);
+    this.error.set(null);
+  }
+  private fail(message: string): void {
+    this.loading.set(false);
+    this.error.set(message);
   }
   private clearFeedback(): void {
     this.error.set(null);

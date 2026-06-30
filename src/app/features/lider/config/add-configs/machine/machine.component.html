@@ -99,7 +99,11 @@
           @if (activeFilterCount()) {
             <span class="filters__count">{{ activeFilterCount() }}</span>
           }
-          <i class="bi" [class.bi-chevron-down]="!filtersOpen()" [class.bi-chevron-up]="filtersOpen()"></i>
+          <i
+            class="bi"
+            [class.bi-chevron-down]="!filtersOpen()"
+            [class.bi-chevron-up]="filtersOpen()"
+          ></i>
         </button>
 
         @if (hasFilter()) {
@@ -113,27 +117,40 @@
         <div class="filters__grid">
           <label class="ff">
             <span class="ff__label">Nome</span>
-            <input type="text" class="ff__control" placeholder="Contém…"
-              [ngModel]="filters().nome" [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('nome', $event)" />
+            <input
+              type="text"
+              class="ff__control"
+              placeholder="Contém…"
+              [ngModel]="filters().nome"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('nome', $event)"
+            />
           </label>
 
           <label class="ff">
             <span class="ff__label">Descrição</span>
-            <input type="text" class="ff__control" placeholder="Contém…"
-              [ngModel]="filters().descricao" [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('descricao', $event)" />
+            <input
+              type="text"
+              class="ff__control"
+              placeholder="Contém…"
+              [ngModel]="filters().descricao"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('descricao', $event)"
+            />
           </label>
 
-          @if (step() === 'location' || step() === 'section') {
+          @if (step() === 'location') {
             <label class="ff">
-              <span class="ff__label">Employer ID</span>
-              <select class="ff__control"
-                [ngModel]="filters().employerId" [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="updateFilter('employerId', $event)">
+              <span class="ff__label">Local</span>
+              <select
+                class="ff__control"
+                [ngModel]="filters().locationId"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('locationId', $event)"
+              >
                 <option value="">Todos</option>
-                @for (id of employerIdOptions(); track id) {
-                  <option [value]="id">{{ id }}</option>
+                @for (opt of locationOptions(); track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
                 }
               </select>
             </label>
@@ -142,9 +159,12 @@
           @if (step() === 'form') {
             <label class="ff">
               <span class="ff__label">Seção</span>
-              <select class="ff__control"
-                [ngModel]="filters().sectionId" [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="updateFilter('sectionId', $event)">
+              <select
+                class="ff__control"
+                [ngModel]="filters().sectionId"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('sectionId', $event)"
+              >
                 <option value="">Todas</option>
                 @for (opt of sectionIdOptions(); track opt.value) {
                   <option [value]="opt.value">{{ opt.label }}</option>
@@ -155,9 +175,12 @@
 
           <label class="ff">
             <span class="ff__label">Status</span>
-            <select class="ff__control"
-              [ngModel]="filters().status" [ngModelOptions]="{ standalone: true }"
-              (ngModelChange)="updateFilter('status', $event)">
+            <select
+              class="ff__control"
+              [ngModel]="filters().status"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('status', $event)"
+            >
               <option value="all">Todos</option>
               <option value="active">Ativo</option>
               <option value="inactive">Inativo</option>
@@ -167,27 +190,43 @@
           @if (step() !== 'location') {
             <label class="ff">
               <span class="ff__label">Criado de</span>
-              <input type="date" class="ff__control"
-                [ngModel]="filters().criadoDe" [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="updateFilter('criadoDe', $event)" />
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoDe', $event)"
+              />
             </label>
             <label class="ff">
               <span class="ff__label">Criado até</span>
-              <input type="date" class="ff__control"
-                [ngModel]="filters().criadoAte" [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="updateFilter('criadoAte', $event)" />
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().criadoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('criadoAte', $event)"
+              />
             </label>
             <label class="ff">
               <span class="ff__label">Alterado de</span>
-              <input type="date" class="ff__control"
-                [ngModel]="filters().alteradoDe" [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="updateFilter('alteradoDe', $event)" />
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoDe"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoDe', $event)"
+              />
             </label>
             <label class="ff">
               <span class="ff__label">Alterado até</span>
-              <input type="date" class="ff__control"
-                [ngModel]="filters().alteradoAte" [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="updateFilter('alteradoAte', $event)" />
+              <input
+                type="date"
+                class="ff__control"
+                [ngModel]="filters().alteradoAte"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="updateFilter('alteradoAte', $event)"
+              />
             </label>
           }
         </div>
@@ -225,9 +264,15 @@
         } @else {
           <div class="empty">
             <i class="bi bi-inbox"></i>
-            <p>{{ hasFilter() ? 'Nenhum local corresponde aos filtros.' : 'Nenhum local cadastrado.' }}</p>
+            <p>
+              {{
+                hasFilter() ? 'Nenhum local corresponde aos filtros.' : 'Nenhum local cadastrado.'
+              }}
+            </p>
             @if (hasFilter()) {
-              <button type="button" class="btn btn--ghost" (click)="resetFilters()">Limpar filtros</button>
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
             }
           </div>
         }
@@ -254,9 +299,17 @@
         } @else {
           <div class="empty">
             <i class="bi bi-inbox"></i>
-            <p>{{ hasFilter() ? 'Nenhuma seção corresponde aos filtros.' : 'Nenhuma seção encontrada para este local.' }}</p>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhuma seção corresponde aos filtros.'
+                  : 'Nenhuma seção encontrada para este local.'
+              }}
+            </p>
             @if (hasFilter()) {
-              <button type="button" class="btn btn--ghost" (click)="resetFilters()">Limpar filtros</button>
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
             }
           </div>
         }
@@ -283,9 +336,17 @@
         } @else {
           <div class="empty">
             <i class="bi bi-inbox"></i>
-            <p>{{ hasFilter() ? 'Nenhum formulário corresponde aos filtros.' : 'Nenhum formulário encontrado para esta seção.' }}</p>
+            <p>
+              {{
+                hasFilter()
+                  ? 'Nenhum formulário corresponde aos filtros.'
+                  : 'Nenhum formulário encontrado para esta seção.'
+              }}
+            </p>
             @if (hasFilter()) {
-              <button type="button" class="btn btn--ghost" (click)="resetFilters()">Limpar filtros</button>
+              <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+                Limpar filtros
+              </button>
             }
           </div>
         }
@@ -320,7 +381,9 @@
           <div class="empty">
             <i class="bi bi-inbox"></i>
             <p>Nenhuma máquina corresponde aos filtros.</p>
-            <button type="button" class="btn btn--ghost" (click)="resetFilters()">Limpar filtros</button>
+            <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+              Limpar filtros
+            </button>
           </div>
         }
       }

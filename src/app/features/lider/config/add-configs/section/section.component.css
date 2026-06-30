@@ -40,7 +40,7 @@
   gap: 24px;
 }
 
-/* Cabeçalho */
+/* ───────── Cabeçalho ───────── */
 .painel__eyebrow {
   display: inline-block;
   font-size: 12px;
@@ -62,7 +62,93 @@
   font-size: 15px;
 }
 
-/* Alertas */
+/* ───────── Trilha colapsável ───────── */
+.trail {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.trail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+.trail__back:hover {
+  transform: translateX(-2px);
+}
+.trail__back:active {
+  opacity: 0.85;
+}
+
+.trail__steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.trail__sep {
+  color: var(--line);
+  display: inline-flex;
+  font-size: 12px;
+}
+
+.chip__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.chip__btn:not(:disabled):hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.chip__btn:disabled {
+  cursor: default;
+}
+.chip__btn--static {
+  cursor: default;
+}
+.chip--active .chip__btn {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+.chip__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ───────── Alertas ───────── */
 .alert {
   display: flex;
   align-items: center;
@@ -81,7 +167,7 @@
   color: var(--on);
 }
 
-/* Filtros */
+/* ───────── Filtros por campo ───────── */
 .filters {
   background: var(--card);
   border: 1px solid var(--line);
@@ -148,6 +234,7 @@
 .filters__clear:hover {
   color: var(--danger);
 }
+
 .filters__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -188,7 +275,7 @@
   background: #fff;
 }
 
-/* Botões */
+/* ───────── Botões ───────── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -203,13 +290,6 @@
     transform 0.15s ease,
     opacity 0.15s ease;
 }
-.btn--primary {
-  background: var(--accent);
-  color: #fff;
-}
-.btn--primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
 .btn--ghost {
   background: transparent;
   border: 1px solid var(--line);
@@ -219,17 +299,14 @@
 .btn--ghost:hover:not(:disabled) {
   border-color: var(--accent);
 }
-.btn:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
 
-/* Grade + cards */
+/* ───────── Grade de cards ───────── */
 .grid {
   display: grid;
-  gap: 18px;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
 }
+
 .card {
   display: flex;
   flex-direction: column;
@@ -259,12 +336,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-}
-.card__top-right {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 .card__icon {
   display: inline-grid;
@@ -275,10 +346,6 @@
   background: var(--accent-soft);
   color: var(--accent-ink);
   font-size: 20px;
-}
-.card__icon--add {
-  background: var(--accent);
-  color: #fff;
 }
 .card__title {
   margin: 0;
@@ -297,35 +364,23 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.card__meta {
+.card__go {
+  margin-top: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: auto;
-}
-.card__meta i {
   font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-ink);
 }
-.card__del {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  transition: all 0.15s ease;
+.card:hover .card__go i {
+  transform: translateX(3px);
 }
-.card__del:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-  background: var(--danger-soft);
+.card__go i {
+  transition: transform 0.18s ease;
 }
 
+/* card de criação */
 .card--add {
   align-items: flex-start;
   justify-content: center;
@@ -337,8 +392,12 @@
   border-color: var(--accent);
   background: #fff;
 }
+.card__icon--add {
+  background: var(--accent);
+  color: #fff;
+}
 
-/* badge */
+/* badge de status */
 .badge {
   font-size: 11px;
   font-weight: 700;
@@ -356,13 +415,13 @@
 
 /* skeleton */
 .card--skeleton {
-  height: 150px;
+  height: 168px;
   cursor: default;
-  border-color: transparent;
-  box-shadow: none;
   background: linear-gradient(100deg, #f1f5f9 30%, #e9eef5 50%, #f1f5f9 70%);
   background-size: 200% 100%;
   animation: shimmer 1.3s infinite;
+  border-color: transparent;
+  box-shadow: none;
 }
 @keyframes shimmer {
   from {
@@ -373,7 +432,7 @@
   }
 }
 
-/* vazio */
+/* ───────── Estado vazio ───────── */
 .empty {
   display: flex;
   flex-direction: column;
@@ -394,7 +453,7 @@
   font-size: 15px;
 }
 
-/* responsivo */
+/* ───────── Responsivo ───────── */
 @media (max-width: 768px) {
   .painel {
     gap: 18px;
@@ -407,7 +466,20 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
 @media (max-width: 560px) {
+  .trail {
+    border-radius: 16px;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .trail__steps {
+    gap: 4px;
+  }
+  .chip__btn {
+    max-width: 130px;
+    padding: 6px 11px;
+  }
   .card {
     padding: 16px;
   }
@@ -424,12 +496,23 @@
     padding: 40px 16px;
   }
 }
+
 @media (max-width: 380px) {
   .painel {
     padding: 14px;
     gap: 16px;
   }
+  .trail__back span {
+    display: none;
+  }
+  .chip__btn {
+    max-width: 104px;
+  }
+  .filters__bar {
+    flex-wrap: wrap;
+  }
 }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -437,4 +520,40 @@
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* ───────── Ações no card (editar/excluir) e meta ───────── */
+.card__top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.card__del {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.card__del:hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.card__del[title='Excluir']:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+.card__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
 }

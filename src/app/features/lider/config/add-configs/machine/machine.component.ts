@@ -192,10 +192,10 @@ export class MachineComponent implements OnInit {
     machine: 'Máquinas',
   };
   private readonly descriptions: Record<Step, string> = {
-    location: 'Selecione um local para começar.',
-    section: 'Escolha a seção desejada.',
-    form: 'Escolha o formulário das máquinas.',
-    machine: 'Gerencie as máquinas vinculadas ao formulário.',
+    location: 'Selecione um local para gerenciar suas maquinas.',
+    section: 'Selecione uma seção para gerenciar suas maquinas.',
+    form: 'Selecione um formulário para gerenciar suas maquinas.',
+    machine: 'Gerencie as máquinas vinculadas deste formulário.',
   };
 
   readonly pageTitle = computed(() => this.titles[this.step()]);

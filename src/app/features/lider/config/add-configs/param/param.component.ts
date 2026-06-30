@@ -241,10 +241,10 @@ export class ParamComponent implements OnInit {
     parameters: 'Parâmetros',
   };
   private readonly descriptions: Record<Step, string> = {
-    location: 'Selecione um local para começar.',
-    section: 'Escolha a seção desejada.',
-    form: 'Escolha o formulário a gerenciar.',
-    parameters: 'Gerencie os parâmetros e limites do formulário.',
+    location: 'Selecione um local para gerenciar seus parâmetros e limites.',
+    section: 'Selecione uma seção para gerenciar seus parâmetros e limites.',
+    form: 'Selecione um formulário para gerenciar seus parâmetros e limites.',
+    parameters: 'Gerencie os parâmetros e limites deste formulário.',
   };
 
   readonly pageTitle = computed(() => this.titles[this.step()]);

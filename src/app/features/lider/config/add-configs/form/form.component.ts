@@ -136,8 +136,8 @@ export class FormComponent implements OnInit {
     location: 'Locais', section: 'Seções', form: 'Formulários',
   };
   private readonly descriptions: Record<Step, string> = {
-    location: 'Selecione um local.',
-    section: 'Selecione a seção dos formulários.',
+    location: 'Selecione um local para gerenciar seus formularios.',
+    section: 'Selecione uma seção para gerenciar seus formularios.',
     form: 'Gerencie os formulários desta seção.',
   };
   readonly pageTitle = computed(() => this.titles[this.step()]);

@@ -89,7 +89,7 @@ private iniciarBuscaReativa(): void {
 
       // Ativa o loading e dispara a busca de todos os profiles.
       this.buscandoInspetor.set(true);
-      return this.userService.getAllUserProfile().pipe(
+      return this.userService.getAllUserProfile(1000, 1).pipe(
 
         // Se der erro na chamada (ex: rede caiu), retorna null
         // em vez de quebrar o observable inteiro.
@@ -109,7 +109,8 @@ private iniciarBuscaReativa(): void {
     // Busca dentro da lista o profile cuja matrícula bate com o que foi digitado.
     // employeeMatricula é o campo de matrícula dentro do UserProfile.
     const found = profiles.data.find(
-      (p) => p.employeeMatricula === this.matricula()
+      (p) => String(p.employeeMatricula) === String(this.matricula())
+
     );
 
     // Se achou, pega o nome. Se não achou, mostra '—'.

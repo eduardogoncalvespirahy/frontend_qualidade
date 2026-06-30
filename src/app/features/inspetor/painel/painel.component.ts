@@ -4,12 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 
+import { Machine } from '../../../core/models/machine.model';
 import { Location } from '../../../core/models/location.model';
 import { Section } from '../../../core/models/section.model';
 import { Form } from '../../../core/models/form.model';
 import { Answer } from '../../../core/models/answer.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 
+import { MachineService } from '../../../core/services/machine.service';
 import { LocationService } from '../../../core/services/location.service';
 import { SectionService } from '../../../core/services/section.service';
 import { FormService } from '../../../core/services/form.service';
@@ -17,6 +19,7 @@ import { AnswerService } from '../../../core/services/answer.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
 import { ModalService } from '../../../core/services/modal.service';
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
+import { readonly } from '@angular/forms/signals';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -350,11 +353,12 @@ export class PainelComponent implements OnInit {
   }
  
   selectForm(form: Form): void {
-    this.clearFeedback();
-    this.selectedForm.set(form);
-    this.step.set('parameters');
-    this.loadAnswers();
-  }
+  this.clearFeedback();
+  this.selectedForm.set(form);
+  this.step.set('parameters');
+  this.loadAnswers();
+  this.loadMachines(); // ← adiciona aqui
+} 
  
   // ============================================================
   //  RETROCEDER / NAVEGAR PELA TRILHA
@@ -558,4 +562,31 @@ export class PainelComponent implements OnInit {
       buttons: [{ text: 'Fechar', variant: 'secondary', value: false }],
     });
   }
+
+  // ============================================================
+  //  Trazendo Machines
+  // ============================================================
+  
+  private readonly machineService = inject(MachineService);
+
+  readonly machines = signal<Machine[]>([]);
+  readonly machinesParamValues = signal<Record<string, string>>({});
+
+  private loadMachines(): void {
+    const formId = this.selectedForm()?.id;
+    this.machineService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<Machine>(res);
+        this.machines.set(all.filter((m) => m.formId === formId));
+      },
+      error: () => {},
+    });
+  }
+
+updateMachineParam(machineId: string, answerId: string, value: string): void {
+  this.machinesParamValues.update((m) => ({ ...m, [`${machineId}_${answerId}`]: value }));
+}
+
+
+
 }

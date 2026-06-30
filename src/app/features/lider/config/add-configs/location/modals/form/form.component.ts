@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, input, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { Location } from '../../../../../../../core/models/location.model';
+import { Employer } from '../../../../../../../core/models/employer.model';
 
 @Component({
   selector: 'app-form',
@@ -14,12 +15,31 @@ import { Location } from '../../../../../../../core/models/location.model';
 export class FormComponent implements OnInit {
   readonly mode = input<'new' | 'edit'>('new');
   readonly item = input<Location | null>(null);
+  // Catálogo de empresas para buscar pelo nome fantasia (tradingName → id).
+  readonly employers = input<Employer[]>([]);
 
   protected id = '';
-  protected employerId = '';
+  protected employerId = ''; // id resolvido a partir da seleção
   protected nome = '';
   protected descricao = '';
   protected status = true;
+
+  // ── combobox de empresa ──
+  protected readonly query = signal('');
+  protected readonly open = signal(false);
+  private blurTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private label(e: Employer): string {
+    return e.tradingName || e.id;
+  }
+
+  /** Empresas que combinam com o texto digitado (limitado p/ performance). */
+  readonly filteredEmployers = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = [...this.employers()].sort((a, b) => this.label(a).localeCompare(this.label(b)));
+    const base = q ? list.filter((e) => this.label(e).toLowerCase().includes(q)) : list;
+    return base.slice(0, 50);
+  });
 
   ngOnInit(): void {
     const u = this.item();
@@ -29,7 +49,32 @@ export class FormComponent implements OnInit {
       this.nome = u.nome;
       this.descricao = u.descricao || '';
       this.status = u.status === 1;
+      const sel = this.employers().find((e) => e.id === u.employerId);
+      this.query.set(sel ? this.label(sel) : u.employerId || '');
     }
+  }
+
+  onQuery(text: string): void {
+    this.query.set(text);
+    this.open.set(true);
+    this.employerId = ''; // digitar exige nova seleção
+  }
+
+  selectEmployer(e: Employer): void {
+    if (this.blurTimer) clearTimeout(this.blurTimer);
+    this.employerId = e.id;
+    this.query.set(this.label(e));
+    this.open.set(false);
+  }
+
+  onBlur(): void {
+    this.blurTimer = setTimeout(() => this.open.set(false), 150);
+  }
+
+  clearEmployer(): void {
+    this.employerId = '';
+    this.query.set('');
+    this.open.set(true);
   }
 
   value() {

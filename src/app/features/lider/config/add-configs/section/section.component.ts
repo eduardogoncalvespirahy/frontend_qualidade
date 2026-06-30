@@ -4,8 +4,10 @@ import { FormsModule } from '@angular/forms';
 
 import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
+import { Employer } from '../../../../../core/models/employer.model';
 import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
+import { EmployerService } from '../../../../../core/services/employer.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { FormComponent } from './modals/form/form.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
@@ -33,6 +35,7 @@ interface Filters {
 export class SectionComponent implements OnInit {
   private readonly locationService = inject(LocationService);
   private readonly sectionService = inject(SectionService);
+  private readonly employerService = inject(EmployerService);
   private readonly modalService = inject(ModalService);
 
   // ───────── navegação ─────────
@@ -41,6 +44,7 @@ export class SectionComponent implements OnInit {
   // ───────── coleções / seleção ─────────
   readonly locations = signal<Location[]>([]);
   readonly sections = signal<Section[]>([]);
+  readonly employers = signal<Employer[]>([]); // catálogo de empresas
   readonly selectedLocation = signal<Location | null>(null);
 
   // ───────── feedback ─────────
@@ -131,6 +135,7 @@ export class SectionComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadLocations();
+    this.loadEmployers();
   }
 
   // ============================================================
@@ -151,6 +156,13 @@ export class SectionComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => this.fail('Não foi possível carregar os locais.'),
+    });
+  }
+
+  private loadEmployers(): void {
+    this.employerService.getAll(1000, 1).subscribe({
+      next: (res) => this.employers.set(this.unwrap<Employer>(res)),
+      error: () => this.employers.set([]),
     });
   }
 
@@ -202,7 +214,7 @@ export class SectionComponent implements OnInit {
       title: 'Nova Seção',
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'new', lockedEmployerId: employerId },
+      inputs: { mode: 'new', lockedEmployerId: employerId, employers: this.employers() },
       buttons: this.crudButtons('Criar'),
     });
     if (!(await ref.result)) return;
@@ -222,7 +234,7 @@ export class SectionComponent implements OnInit {
       title: `Editar: ${item.nome}`,
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'edit', item, lockedEmployerId: employerId },
+      inputs: { mode: 'edit', item, lockedEmployerId: employerId, employers: this.employers() },
       buttons: this.crudButtons('Salvar'),
     });
     if (!(await ref.result)) return;

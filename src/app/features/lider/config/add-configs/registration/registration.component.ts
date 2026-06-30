@@ -1,23 +1,27 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
+
+import { RoleService } from '../../../../../core/services/role.service';
 import { UserService } from '../../../../../core/services/user.service';
 import { ModalService } from '../../../../../core/services/modal.service';
-import { User } from '../../../../../core/models/user.model';
-import { FormComponent } from './modals/form/form.component';
+import { SystemService } from '../../../../../core/services/system.service';
+import { EmployeeService } from '../../../../../core/services/employee.service';
 import { CredentialService } from '../../../../../core/services/credential.service';
 import { CredentialRoleService } from '../../../../../core/services/credential-role.service';
-import { CredentialRole } from '../../../../../core/models/credential-role.model';
-import { Credential } from '../../../../../core/models/credential.model';
-import { CredentialFormComponent } from './modals/credential-form/credential-form.component';
-import { CredentialRoleFormComponent } from './modals/credential-role-form/credential-role-form.component';
-import { RoleService } from '../../../../../core/services/role.service';
+
+import { User } from '../../../../../core/models/user.model';
 import { Role } from '../../../../../core/models/role.model';
 import { System } from '../../../../../core/models/system.model';
-import { SystemService } from '../../../../../core/services/system.service';
-import { forkJoin } from 'rxjs';
 import { Employee } from '../../../../../core/models/employee.model';
-import { EmployeeService } from '../../../../../core/services/employee.service';
+import { Credential } from '../../../../../core/models/credential.model';
+import { CredentialRole } from '../../../../../core/models/credential-role.model';
+
+import { FormComponent } from './modals/form/form.component';
+import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
+import { CredentialFormComponent } from './modals/credential-form/credential-form.component';
+import { CredentialRoleFormComponent } from './modals/credential-role-form/credential-role-form.component';
 
 type Step = 'user' | 'credential' | 'role';
 
@@ -39,7 +43,7 @@ interface Filters {
 @Component({
   selector: 'app-registration',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ScrollTopComponent],
   templateUrl: './registration.component.html',
   styleUrl: './registration.component.css',
 })

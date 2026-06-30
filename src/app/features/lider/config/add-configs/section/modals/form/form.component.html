@@ -15,16 +15,70 @@
     />
   </div>
 
+  <!-- Empresa (employer) — travada pelo local no drill-down; busca quando livre -->
   <div>
-    <label for="employerId" class="form-label">Employer ID</label>
-    <input
-      id="employerId"
-      name="employerId"
-      type="text"
-      class="form-control"
-      [(ngModel)]="employerId"
-      placeholder="ID do empregador"
-    />
+    <label for="employerQuery" class="form-label">Empresa</label>
+
+    @if (locked()) {
+      <input id="employerQuery" type="text" class="form-control" [value]="query()" readonly />
+      <div class="form-text">Definida pelo local selecionado.</div>
+    } @else {
+      <div class="position-relative">
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input
+            id="employerQuery"
+            name="employerQuery"
+            type="text"
+            class="form-control"
+            autocomplete="off"
+            placeholder="Digite para buscar pelo nome…"
+            [ngModel]="query()"
+            (ngModelChange)="onQuery($event)"
+            (focus)="open.set(true)"
+            (blur)="onBlur()"
+          />
+          @if (query()) {
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              (click)="clearEmployer()"
+              title="Limpar"
+            >
+              <i class="bi bi-x-lg"></i>
+            </button>
+          }
+        </div>
+
+        @if (open()) {
+          <div
+            class="list-group position-absolute w-100 shadow-sm"
+            style="z-index: 1060; max-height: 240px; overflow: auto"
+          >
+            @for (e of filteredEmployers(); track e.id) {
+              <button
+                type="button"
+                class="list-group-item list-group-item-action"
+                [class.active]="e.id === employerId"
+                (click)="selectEmployer(e)"
+              >
+                {{ e.tradingName || e.id }}
+              </button>
+            } @empty {
+              <span class="list-group-item text-muted">Nenhuma empresa encontrada.</span>
+            }
+          </div>
+        }
+      </div>
+
+      @if (employerId) {
+        <div class="form-text text-success">
+          <i class="bi bi-check-circle"></i> Empresa selecionada.
+        </div>
+      } @else {
+        <div class="form-text">Selecione uma empresa da lista.</div>
+      }
+    }
   </div>
 
   <div>

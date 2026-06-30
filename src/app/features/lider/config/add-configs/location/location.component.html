@@ -136,7 +136,9 @@
           </div>
           <h3 class="card__title">{{ l.nome }}</h3>
           <p class="card__desc">{{ l.descricao || 'Sem descrição' }}</p>
-          <span class="card__meta"><i class="bi bi-building"></i> {{ l.employerId }}</span>
+          <span class="card__meta"
+            ><i class="bi bi-building"></i> {{ employerNome(l.employerId) }}</span
+          >
         </div>
       }
     </div>

@@ -4,7 +4,9 @@ import { FormsModule } from '@angular/forms';
 
 // ⚠️ Ajuste os caminhos conforme a localização real deste componente no projeto.
 import { Location } from '../../../../../core/models/location.model';
+import { Employer } from '../../../../../core/models/employer.model';
 import { LocationService } from '../../../../../core/services/location.service';
+import { EmployerService } from '../../../../../core/services/employer.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { FormComponent } from './modals/form/form.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
@@ -25,9 +27,11 @@ interface Filters {
 })
 export class LocationComponent implements OnInit {
   private readonly locationService = inject(LocationService);
+  private readonly employerService = inject(EmployerService);
   private readonly modalService = inject(ModalService);
 
   readonly items = signal<Location[]>([]);
+  readonly employers = signal<Employer[]>([]); // catálogo de empresas
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly success = signal<string | null>(null);
@@ -80,8 +84,15 @@ export class LocationComponent implements OnInit {
       .map((l) => ({ value: l.id, label: l.nome })),
   );
 
+  /** Nome fantasia (tradingName) de uma empresa a partir do seu id. */
+  employerNome(employerId: string | null | undefined): string {
+    if (!employerId) return '';
+    return this.employers().find((e) => e.id === employerId)?.tradingName ?? employerId;
+  }
+
   ngOnInit(): void {
     this.load();
+    this.loadEmployers();
   }
 
   private unwrap<T>(res: unknown): T[] {
@@ -105,13 +116,20 @@ export class LocationComponent implements OnInit {
     });
   }
 
+  private loadEmployers(): void {
+    this.employerService.getAll(1000, 1).subscribe({
+      next: (res) => this.employers.set(this.unwrap<Employer>(res)),
+      error: () => this.employers.set([]),
+    });
+  }
+
   async novo(): Promise<void> {
     this.clearFeedback();
     const ref = this.modalService.openComponent(FormComponent, {
       title: 'Novo Local',
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'new' },
+      inputs: { mode: 'new', employers: this.employers() },
       buttons: [
         { text: 'Cancelar', variant: 'secondary', value: false },
         { text: 'Criar', variant: 'primary', value: true, submit: true },
@@ -137,7 +155,7 @@ export class LocationComponent implements OnInit {
       title: `Editar: ${item.nome}`,
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'edit', item },
+      inputs: { mode: 'edit', item, employers: this.employers() },
       buttons: [
         { text: 'Cancelar', variant: 'secondary', value: false },
         { text: 'Salvar', variant: 'primary', value: true, submit: true },

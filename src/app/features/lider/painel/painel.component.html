@@ -37,29 +37,29 @@
           ><i class="bi bi-list-check"></i
         ></span>
         <div>
-          <span class="kpi__value">{{ fmt(overall().count) }}</span>
-          <span class="kpi__label">Resultados</span>
+          <span class="kpi__value">{{ fmt(overall().count) }}</span
+          ><span class="kpi__label">Resultados</span>
         </div>
       </div>
       <div class="kpi">
         <span class="kpi__icon" style="--c: #7c3aed"><i class="bi bi-collection"></i></span>
         <div>
-          <span class="kpi__value">{{ fmt(overall().categorias) }}</span>
-          <span class="kpi__label">Categorias</span>
+          <span class="kpi__value">{{ fmt(overall().categorias) }}</span
+          ><span class="kpi__label">Categorias</span>
         </div>
       </div>
       <div class="kpi">
         <span class="kpi__icon" style="--c: var(--accent-ink)"><i class="bi bi-graph-up"></i></span>
         <div>
-          <span class="kpi__value">{{ fmt(overall().avg) }}</span>
-          <span class="kpi__label">Média geral</span>
+          <span class="kpi__value">{{ fmt(overall().avg) }}</span
+          ><span class="kpi__label">Média geral</span>
         </div>
       </div>
       <div class="kpi">
         <span class="kpi__icon" style="--c: var(--on)"><i class="bi bi-arrow-up-right"></i></span>
         <div>
-          <span class="kpi__value">{{ fmt(overall().max) }}</span>
-          <span class="kpi__label">Maior valor (alta)</span>
+          <span class="kpi__value">{{ fmt(overall().max) }}</span
+          ><span class="kpi__label">Maior valor (alta)</span>
         </div>
       </div>
       <div class="kpi">
@@ -67,13 +67,13 @@
           ><i class="bi bi-arrow-down-right"></i
         ></span>
         <div>
-          <span class="kpi__value">{{ fmt(overall().min) }}</span>
-          <span class="kpi__label">Menor valor (baixa)</span>
+          <span class="kpi__value">{{ fmt(overall().min) }}</span
+          ><span class="kpi__label">Menor valor (baixa)</span>
         </div>
       </div>
     </div>
 
-    <!-- Barras por categoria -->
+    <!-- Barras por categoria (Canvas) -->
     <div class="panel">
       <div class="panel__head">
         <h2 class="panel__title"><i class="bi bi-bar-chart-line"></i> Por categoria</h2>
@@ -104,92 +104,33 @@
           </button>
         </div>
       </div>
-
-      <div class="bars">
-        @for (c of stats(); track c.id; let i = $index) {
-          <div class="bar-row">
-            <span class="bar-row__label" [title]="c.nome">{{ c.nome }}</span>
-            <div class="bar-track">
-              <div
-                class="bar-fill"
-                [style.width.%]="barPct(c)"
-                [style.background]="colorAt(i)"
-              ></div>
-            </div>
-            <span class="bar-row__value">{{ fmt(metricValue(c)) }}</span>
-          </div>
-        }
+      <div class="chart-box" [style.height.px]="barBoxHeight()">
+        <app-chart [spec]="barSpec()" />
       </div>
     </div>
 
     <div class="panel-grid">
-      <!-- Faixa mín–máx -->
+      <!-- Faixa mín–máx (Canvas) -->
       <div class="panel">
         <div class="panel__head">
           <h2 class="panel__title">
             <i class="bi bi-arrows-expand"></i> Faixa (mín · média · máx)
           </h2>
         </div>
-        <div class="ranges">
-          @for (c of stats(); track c.id; let i = $index) {
-            <div class="range-row">
-              <span class="range-row__label" [title]="c.nome">{{ c.nome }}</span>
-              <div class="range-track">
-                <div
-                  class="range-span"
-                  [style.left.%]="rangeLeft(c)"
-                  [style.width.%]="rangeWidth(c)"
-                  [style.background]="colorAt(i)"
-                ></div>
-                <div
-                  class="range-avg"
-                  [style.left.%]="avgLeft(c)"
-                  [title]="'Média: ' + fmt(c.avg)"
-                ></div>
-              </div>
-              <span class="range-row__minmax">
-                <span class="tag tag--low">{{ fmt(c.min) }}</span>
-                <span class="tag tag--high">{{ fmt(c.max) }}</span>
-              </span>
-            </div>
-          }
+        <div class="chart-box" [style.height.px]="rangeBoxHeight()">
+          <app-chart [spec]="rangeSpec()" />
         </div>
       </div>
 
-      <!-- Distribuição (rosca) -->
+      <!-- Distribuição em rosca (Canvas) + legenda (HTML) -->
       <div class="panel">
         <div class="panel__head">
           <h2 class="panel__title"><i class="bi bi-pie-chart"></i> Distribuição de respostas</h2>
         </div>
         <div class="donut">
-          <svg
-            viewBox="0 0 160 160"
-            class="donut__svg"
-            role="img"
-            aria-label="Distribuição por categoria"
-          >
-            <g transform="rotate(-90 80 80)">
-              <circle cx="80" cy="80" r="60" fill="none" stroke="var(--line)" stroke-width="22" />
-              @for (seg of donut(); track seg.nome) {
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="60"
-                  fill="none"
-                  stroke-width="22"
-                  [attr.stroke]="seg.color"
-                  [attr.stroke-dasharray]="seg.dash"
-                  [attr.stroke-dashoffset]="seg.offset"
-                />
-              }
-            </g>
-            <text x="80" y="74" text-anchor="middle" class="donut__total">
-              {{ fmt(overall().count) }}
-            </text>
-            <text x="80" y="92" text-anchor="middle" class="donut__cap">respostas</text>
-          </svg>
+          <div class="donut__canvas"><app-chart [spec]="donutSpec()" /></div>
           <ul class="donut__legend">
-            @for (seg of donut(); track seg.nome) {
+            @for (seg of donutLegend(); track seg.nome) {
               <li class="legend-item">
                 <span class="legend-dot" [style.background]="seg.color"></span>
                 <span class="legend-name" [title]="seg.nome">{{ seg.nome }}</span>
@@ -221,7 +162,7 @@
             @for (c of stats(); track c.id; let i = $index) {
               <tr>
                 <td>
-                  <span class="legend-dot" [style.background]="colorAt(i)"></span> {{ c.nome }}
+                  <span class="legend-dot" [style.background]="colorFor(i)"></span> {{ c.nome }}
                 </td>
                 <td class="num">{{ fmt(c.count) }}</td>
                 <td class="num">

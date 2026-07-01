@@ -8,6 +8,8 @@ import { AnswerResult } from '../../../core/models/answer-result.model';
 import { AnswerService } from '../../../core/services/answer.service';
 import { CategoryService } from '../../../core/services/category-answer.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
+import { BarSpec, DonutSpec, RangeSpec } from '../../../core/services/chart.service';
+import { ChartComponent } from '../../../core/modals/chart/chart.component';
 
 type Metric = 'avg' | 'max' | 'min';
 
@@ -21,19 +23,10 @@ interface CatStat {
   sum: number;
 }
 
-interface DonutSeg {
-  nome: string;
-  count: number;
-  pct: number;
-  color: string;
-  dash: string;
-  offset: number;
-}
-
 @Component({
   selector: 'app-painel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ChartComponent],
   templateUrl: './painel.component.html',
   styleUrl: './painel.component.css',
 })
@@ -63,6 +56,9 @@ export class PainelComponent implements OnInit {
     '#ea580c',
     '#2563eb',
   ];
+
+  private readonly nf = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
+  fmt = (n: number): string => this.nf.format(n ?? 0);
 
   // ───────── agregação por categoria ─────────
   readonly stats = computed<CatStat[]>(() => {
@@ -119,60 +115,67 @@ export class PainelComponent implements OnInit {
 
   readonly hasData = computed(() => this.stats().length > 0);
 
-  // ───────── gráfico de barras (métrica selecionada) ─────────
-  metricValue(c: CatStat): number {
+  private metricValue(c: CatStat): number {
     const m = this.metric();
     return m === 'avg' ? c.avg : m === 'max' ? c.max : c.min;
   }
-  readonly metricMax = computed(() => Math.max(1, ...this.stats().map((c) => this.metricValue(c))));
-  barPct(c: CatStat): number {
-    return Math.max(2, (this.metricValue(c) / this.metricMax()) * 100);
-  }
-  colorAt(i: number): string {
+  private colorAt(i: number): string {
     return this.palette[i % this.palette.length];
   }
 
-  // ───────── faixa mín–máx ─────────
-  rangeLeft(c: CatStat): number {
-    const o = this.overall();
-    const span = o.max - o.min || 1;
-    return ((c.min - o.min) / span) * 100;
-  }
-  rangeWidth(c: CatStat): number {
-    const o = this.overall();
-    const span = o.max - o.min || 1;
-    return Math.max(1, ((c.max - c.min) / span) * 100);
-  }
-  avgLeft(c: CatStat): number {
-    const o = this.overall();
-    const span = o.max - o.min || 1;
-    return ((c.avg - o.min) / span) * 100;
-  }
+  // ───────── specs dos gráficos (Canvas) ─────────
+  readonly barSpec = computed<BarSpec>(() => ({
+    type: 'bar',
+    valueFormat: this.fmt,
+    data: this.stats().map((c, i) => ({
+      label: c.nome,
+      value: this.metricValue(c),
+      color: this.colorAt(i),
+    })),
+  }));
 
-  // ───────── rosca (distribuição de respostas) ─────────
-  readonly donut = computed<DonutSeg[]>(() => {
-    const s = this.stats();
-    const total = s.reduce((a, c) => a + c.count, 0);
-    const C = 2 * Math.PI * 60;
-    let acc = 0;
-    return s.map((c, i) => {
-      const f = total ? c.count / total : 0;
-      const seg: DonutSeg = {
-        nome: c.nome,
-        count: c.count,
-        pct: f * 100,
+  readonly rangeSpec = computed<RangeSpec>(() => {
+    const o = this.overall();
+    return {
+      type: 'range',
+      domainMin: o.min,
+      domainMax: o.max,
+      valueFormat: this.fmt,
+      data: this.stats().map((c, i) => ({
+        label: c.nome,
+        min: c.min,
+        avg: c.avg,
+        max: c.max,
         color: this.colorAt(i),
-        dash: `${f * C} ${C - f * C}`,
-        offset: -acc * C,
-      };
-      acc += f;
-      return seg;
-    });
+      })),
+    };
   });
 
-  fmt(n: number): string {
-    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(n ?? 0);
-  }
+  readonly donutSpec = computed<DonutSpec>(() => ({
+    type: 'donut',
+    centerTitle: this.fmt(this.overall().count),
+    centerSubtitle: 'respostas',
+    data: this.stats().map((c, i) => ({
+      label: c.nome,
+      value: c.count,
+      color: this.colorAt(i),
+    })),
+  }));
+
+  /** Legenda (HTML) da rosca. */
+  readonly donutLegend = computed(() => {
+    const total = this.overall().count || 1;
+    return this.stats().map((c, i) => ({
+      nome: c.nome,
+      count: c.count,
+      pct: (c.count / total) * 100,
+      color: this.colorAt(i),
+    }));
+  });
+
+  /** Altura (px) dos boxes de gráfico com base no nº de categorias. */
+  readonly barBoxHeight = computed(() => Math.max(120, this.stats().length * 38 + 16));
+  readonly rangeBoxHeight = computed(() => Math.max(120, this.stats().length * 40 + 16));
 
   ngOnInit(): void {
     this.reload();
@@ -204,4 +207,7 @@ export class PainelComponent implements OnInit {
       },
     });
   }
+
+  // expostos ao template
+  readonly colorFor = (i: number) => this.colorAt(i);
 }

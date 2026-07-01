@@ -1,0 +1,70 @@
+<!-- Barra de ações (não sai na impressão) -->
+<div class="toolbar no-print">
+  <div class="toolbar__info">
+    <strong>{{ title() }}</strong>
+    @if (rows().length) {
+      <span>{{ rows().length }} registro(s)</span>
+    }
+  </div>
+  <div class="toolbar__actions">
+    <button type="button" class="btn btn--ghost" (click)="exportCsv()" [disabled]="!rows().length">
+      <i class="bi bi-filetype-csv"></i> CSV
+    </button>
+    <button type="button" class="btn btn--primary" (click)="exportPdf()">
+      <i class="bi bi-file-earmark-pdf"></i> PDF
+    </button>
+  </div>
+</div>
+
+<!-- Área imprimível (é isso que vira o PDF) -->
+<div #printable class="doc">
+  <header class="doc__head">
+    <div>
+      <h1 class="doc__title">{{ title() }}</h1>
+      @if (subtitle()) {
+        <p class="doc__subtitle">{{ subtitle() }}</p>
+      }
+    </div>
+    <div class="doc__stamp">Emitido em {{ emitidoEm }}</div>
+  </header>
+
+  @if (meta().length) {
+    <ul class="doc__meta">
+      @for (m of meta(); track m.label) {
+        <li>
+          <span>{{ m.label }}</span
+          ><strong>{{ m.value }}</strong>
+        </li>
+      }
+    </ul>
+  }
+
+  <!-- Tabela padrão (quando columns forem informadas) -->
+  @if (columns().length) {
+    <table class="doc__table">
+      <thead>
+        <tr>
+          @for (col of columns(); track col.key) {
+            <th [style.text-align]="col.align || 'left'">{{ col.label || col.key }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track $index) {
+          <tr>
+            @for (col of columns(); track col.key) {
+              <td [style.text-align]="col.align || 'left'">{{ cell(row, col) }}</td>
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td class="doc__empty" [attr.colspan]="columns().length">Sem dados.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <!-- Conteúdo customizado projetado pelo componente pai -->
+  <ng-content></ng-content>
+</div>

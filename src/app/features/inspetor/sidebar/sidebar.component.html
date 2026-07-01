@@ -52,14 +52,18 @@
 
   <div class="sidebar-user">
     <div class="user-avatar">
-      {{ 'Inspetor'.trim()?.charAt(0)?.toUpperCase() ?? '?' }}
+      {{ auth.userProfile()?.employeeNome?.trim()?.charAt(0)?.toUpperCase() ?? '?' }}
     </div>
 
     @if (!layout.collapsed()) {
       <div class="user-info">
-        <div class="user-name" [title]="'Inspetor'">Inspetor</div>
+        <div class="user-name" [title]="auth.userProfile()?.employeeNome">
+          {{ auth.userProfile()?.employeeNome }}
+        </div>
 
-        <div class="user-job" [title]="'Inspetor'">Inspetor de Qualidade</div>
+        <div class="user-job" [title]="auth.userProfile()?.jobPositionNome">
+          {{ auth.userProfile()?.jobPositionNome }}
+        </div>
       </div>
     }
   </div>

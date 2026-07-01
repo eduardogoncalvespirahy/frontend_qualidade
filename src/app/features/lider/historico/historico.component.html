@@ -141,19 +141,28 @@
         <li class="tl-item">
           <div class="tl-marker"><i class="bi bi-clipboard-check"></i></div>
           <div class="tl-card">
-            <div class="tl-card__head">
+            <!-- cabeçalho — clicável -->
+            <div class="tl-card__head" style="cursor: pointer" (click)="toggleDetails(r)">
               <h3 class="tl-card__title">{{ r.formNome }}</h3>
-              <span class="tl-date"
-                ><i class="bi bi-calendar-event"></i> {{ data(r.dataEmissao) }}</span
-              >
+              <div style="display: flex; align-items: center; gap: 0.5rem">
+                <span class="tl-date">
+                  <i class="bi bi-calendar-event"></i> {{ data(r.dataEmissao) }}
+                </span>
+                <i
+                  class="bi"
+                  [class.bi-chevron-down]="expandedId() !== r.id"
+                  [class.bi-chevron-up]="expandedId() === r.id"
+                >
+                </i>
+              </div>
             </div>
 
             <div class="tl-meta">
               <span class="tl-chip"><i class="bi bi-person"></i> {{ r.userNome }}</span>
-              @if (r.userEmail) {
-                <span class="tl-chip tl-chip--muted"
-                  ><i class="bi bi-envelope"></i> {{ r.userEmail }}</span
-                >
+              <!-- @if (r.userEmail) {
+                <span class="tl-chip tl-chip--muted">
+                  <i class="bi bi-envelope"></i> {{ r.userEmail }}
+                </span>
               }
               @if (r.fileUrl) {
                 <a class="tl-chip tl-chip--file" [href]="r.fileUrl" target="_blank" rel="noopener">
@@ -161,14 +170,62 @@
                   <i class="bi bi-box-arrow-up-right"></i>
                 </a>
               } @else {
-                <span class="tl-chip tl-chip--file"
-                  ><i class="bi bi-paperclip"></i> {{ r.fileNome }}</span
-                >
-              }
+                <span class="tl-chip tl-chip--file">
+                  <i class="bi bi-paperclip"></i> {{ r.fileNome }}
+                </span>
+              } -->
             </div>
 
-            @if (r.observacao) {
-              <p class="tl-obs">{{ r.observacao }}</p>
+            <!-- área expandida -->
+            @if (expandedId() === r.id) {
+              <div class="tl-detail">
+                @if (expandedLoading() === r.id) {
+                  <p class="tl-detail__loading">
+                    <i class="bi bi-hourglass-split"></i> Carregando parâmetros…
+                  </p>
+                } @else if ((expandedData()[r.id] ?? []).length === 0) {
+                  <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
+                } @else {
+                  <table class="tl-detail__table">
+                    <!-- <thead>
+                      <tr>
+                        <th>Parâmetro</th>
+                        <th>Resposta</th>
+                      </tr>
+                    </thead> -->
+                    <tbody>
+                      @if (expandedId() === r.id) {
+                        <div class="tl-detail">
+                          @if (expandedLoading() === r.id) {
+                            <p class="tl-detail__loading">
+                              <i class="bi bi-hourglass-split"></i> Carregando parâmetros…
+                            </p>
+                          } @else if ((expandedData()[r.id] ?? []).length === 0) {
+                            <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
+                          } @else {
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                              @for (p of expandedData()[r.id]; track p.nome) {
+                                <div class="border rounded p-2" style="min-width:110px">
+                                  <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">{{ p.nome }}</div>
+                                  <div class="fw-bold fs-5">{{ p.resposta }}</div>
+                                </div>
+                              }
+                            </div>
+
+                            @if (r.observacao) {
+                              <div class="d-flex align-items-start gap-2 mt-2 p-2 border-start border-warning border-3 bg-warning-subtle rounded-end">
+                                <i class="bi bi-chat-left-text text-warning-emphasis"></i>
+                                <span class="text-warning-emphasis small">{{ r.observacao }}</span>
+                              </div>
+                            }
+
+                          }
+                        </div>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </div>
             }
 
             <div class="tl-card__foot">

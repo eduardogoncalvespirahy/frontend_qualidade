@@ -49,19 +49,25 @@ export class ModalEnvioComponent implements AfterViewInit {
   //assinatura modal
   protected readonly assinatura = signal('');
 
+  // pegar iduser da matricula
+  protected readonly userId = signal<string | null>(null);
+
   @ViewChild('signature')
   private signature!: SignatureComponent;
   //assinatura modal
 
-  ngAfterViewInit(): void {
-    const canvas = this.canvasRef.nativeElement;
-    this.ctx = canvas.getContext('2d')!;
-    this.ctx.strokeStyle = '#000';
-    this.ctx.lineWidth = 2;
-    this.ctx.lineCap = 'round';
+ngAfterViewInit(): void {
+  this.iniciarBuscaReativa(); // ← sempre chama, independente do canvas
 
-    this.iniciarBuscaReativa(); // ← adiciona aqui
-  }
+  if (!this.canvasRef?.nativeElement) return;
+  const canvas = this.canvasRef.nativeElement;
+  this.ctx = canvas.getContext('2d')!;
+  this.ctx.strokeStyle = '#000';
+  this.ctx.lineWidth = 2;
+  this.ctx.lineCap = 'round';
+}
+
+
 
   // Subject é como um "canal de eventos" — cada vez que o usuário digita,
   // jogamos o valor novo aqui dentro com .next()
@@ -102,7 +108,13 @@ export class ModalEnvioComponent implements AfterViewInit {
           );
         }),
       )
-      .subscribe((profiles) => {
+      .subscribe((profiles) => { 
+        console.log('PROFILES:', profiles?.data?.map(p => ({ 
+          matricula: p.employeeMatricula, 
+          userId: p.userId, 
+          nome: p.employeeNome 
+        })));
+        console.log('BUSCANDO POR:', this.matricula());
         // Aqui chegam os dados (ou null em caso de erro/vazio)
 
         if (!profiles) {
@@ -119,6 +131,8 @@ export class ModalEnvioComponent implements AfterViewInit {
 
         // Se achou, pega o nome. Se não achou, mostra '—'.
         this.nomeInspetor.set(found?.employeeNome ?? '—');
+        this.userId.set(found?.userId ?? null); // ← guarda o id real
+
         this.buscandoInspetor.set(false);
       });
   }
@@ -169,13 +183,14 @@ export class ModalEnvioComponent implements AfterViewInit {
   }
 
   // Retorna todos os dados prontos para o pai enviar ao backend
-    value() {
-    return {
-      observacao: this.observacao(),
-      userId:     this.matricula(),
-      assinatura: this.canvasRef.nativeElement.toDataURL(),
-      respostas:  this.respostas(),
-    };
-  }
+  value() {
+  return {
+    observacao: this.observacao(),
+    matricula:  this.matricula(),
+    userId:     this.userId(),
+    assinatura: this.canvasRef?.nativeElement?.toDataURL() ?? '',
+    respostas:  this.respostas(),
+  };
+}
 
 }

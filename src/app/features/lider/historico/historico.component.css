@@ -420,6 +420,61 @@ a.tl-chip--file:hover {
     flex-direction: column;
     gap: 4px;
   }
+  .tl-detail {
+  margin: .75rem 0 .5rem;
+  border-top: 1px solid #e9ecef;
+  padding-top: .75rem;
+}
+
+.tl-detail__loading,
+.tl-detail__empty {
+  font-size: .83rem;
+  color: #6c757d;
+  margin: 0;
+}
+
+.tl-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: .5rem;
+}
+
+.tl-detail__card {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: .6rem .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+
+.tl-detail__card-nome {
+  font-size: .72rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.tl-detail__obs {
+  margin-top: .6rem;
+  display: flex;
+  align-items: flex-start;
+  gap: .4rem;
+  font-size: .85rem;
+  color: #495057;
+  background: #fff8e1;
+  border-left: 3px solid #ffc107;
+  border-radius: 4px;
+  padding: .45rem .65rem;
+}
+
+
+.tl-detail__card-valor {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #212529;
+}
+
 }
 @media (prefers-reduced-motion: reduce) {
   *,

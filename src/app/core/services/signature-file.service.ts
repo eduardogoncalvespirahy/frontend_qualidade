@@ -11,7 +11,7 @@ import { SignatureFile, SignatureFileCreate } from '../models/signature-file.mod
 export class SignatureFileService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl = `${environment.apiUrl}/signature-files`;
+  private readonly apiUrl = `${environment.apiUrl}/files`;
 
   private readonly httpOptions = {
     headers: new HttpHeaders({ 'Content-Type': 'application/json' }),

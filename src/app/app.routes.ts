@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/guards/auth.guard';
+import { authGuard, roleGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
 
 export const routes: Routes = [
@@ -19,12 +19,13 @@ export const routes: Routes = [
     path: 'lider',
     title: 'Lider',
     loadChildren: () => import('./features/lider/lider.routes').then((m) => m.LiderRoutes),
-    canActivate: [authGuard],
+    canActivate: [authGuard, roleGuard('ADMIN','LIDER')],
   },
   {
     path: 'inspetor',
     title: 'Inspetor',
     loadChildren: () => import('./features/inspetor/inspetor.routes').then((m) => m.InspetorRoutes),
+    canActivate: [authGuard, roleGuard('ADMIN','INSPETOR')],
   },
   { path: '**', redirectTo: '' },
 ];

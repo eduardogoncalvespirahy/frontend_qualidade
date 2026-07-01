@@ -110,8 +110,8 @@
           @if (!layout.collapsed()) {
             <span>Relatório</span>
           }
-        </a>   
-        
+        </a>
+
         <a
           routerLink="/inspetor/historico"
           routerLinkActive="active"
@@ -123,8 +123,7 @@
           @if (!layout.collapsed()) {
             <span>Histórico</span>
           }
-        </a>           
-
+        </a>
       </nav>
     </div>
     <hr class="border opacity-75" />
@@ -148,5 +147,17 @@
         </a>
       </nav>
     </div>
+  </div>
+
+  <!-- Footer -->
+
+  <div class="sidebar-footer">
+    <button class="btn btn-outline-danger logout-btn" (click)="logout()">
+      <i class="bi bi-box-arrow-right"></i>
+
+      @if (!layout.collapsed()) {
+        <span>Sair</span>
+      }
+    </button>
   </div>
 </aside>

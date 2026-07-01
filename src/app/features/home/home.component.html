@@ -12,17 +12,29 @@
       </p>
 
       <div class="hero-actions">
-        <a class="btn btn-primary btn-lg" [routerLink]="['/login']">
-          <i class="bi bi-building-lock"></i>
+        @if (this.auth.roles().includes('ADMIN') || this.auth.roles().includes('LIDER')) {
+          <a class="btn btn-primary btn-lg" [routerLink]="['/lider']">
+            <i class="bi bi-building-lock"></i>
 
-          Área Administrativa
-        </a>
+            Área Líder
+          </a>
+        } 
+        
+        @if (this.auth.roles().includes('ADMIN') || this.auth.roles().includes('INSPETOR')) {
+          <a class="btn btn-outline-primary btn-lg" [routerLink]="['/inspetor']">
+            <i class="bi bi-person-badge"></i>
 
-        <a class="btn btn-outline-primary btn-lg" [routerLink]="['/inspetor']">
-          <i class="bi bi-person-badge"></i>
+            Área Inspetor
+          </a>
+        } 
+        
+        @if(this.auth.roles().length === 0) {
+          <a class="btn btn-outline-primary btn-lg" [routerLink]="['/login']">
+            <i class="bi bi-person-badge"></i>
 
-          Área Inspetor
-        </a>
+            Entrar
+          </a>
+        }
       </div>
     </div>
 

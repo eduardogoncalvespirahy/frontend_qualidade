@@ -93,7 +93,7 @@ export class LoginComponent {
     }
 
     this.loading.set(true);
-    
+
     this.lembrarAcesso(this.rememberAccess());
 
     this.auth
@@ -105,7 +105,16 @@ export class LoginComponent {
       )
       .subscribe({
         next: () => {
-          this.router.navigate(['/lider']);
+          if (
+            this.auth.roles().includes('ADMIN') ||
+            (this.auth.roles().includes('INSPETOR') && this.auth.roles().includes('LIDER'))
+          ) {
+            this.router.navigate(['/']);
+          } else if (this.auth.roles().includes('LIDER')) {
+            this.router.navigate(['/lider']);
+          } else if (this.auth.roles().includes('INSPETOR')) {
+            this.router.navigate(['/inspetor']);
+          }
         },
         error: (err) => {
           this.error.set(err?.error?.message ?? 'Não foi possível entrar. Verifique os dados.');

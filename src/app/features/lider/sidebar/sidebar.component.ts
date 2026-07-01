@@ -1,11 +1,11 @@
 import { Component, effect, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { AuthService } from '../../../core/services/auth.service';
-import { ModalService } from '../../../core/services/modal.service';
-import { ExitComponent } from '../../../core/modals/exit/exit.component';
-import { LayoutService } from '../../../core/services/layout.service';
-import { UserProfile } from '../../../core/models/user-profile.model';
 import { filter } from 'rxjs';
+import { UserProfile } from '../../../core/models/user-profile.model';
+import { LayoutService } from '../../../core/services/layout.service';
+import { ModalService } from '../../../core/services/modal.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { ExitComponent } from '../../../core/modals/exit/exit.component';
 
 @Component({
   selector: 'app-sidebar',

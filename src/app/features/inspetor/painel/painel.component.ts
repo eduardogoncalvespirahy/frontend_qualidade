@@ -26,6 +26,7 @@ import { ControlService } from '../../../core/services/control.service';
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
 import { LimitAnswer } from '../../../core/models/limit-answer.model';
+import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -531,9 +532,12 @@ export class PainelComponent implements OnInit {
   //  MODAL DE ENVIO — exclusivo do painel
   // ============================================================
 
-  readonly limitsMap = signal<Record<string, string>>({}); // answerId → limitsAnswerId
   private readonly modalService = inject(ModalService);
   private readonly limitsService = inject(LimitAnswerService);
+  private readonly machineAnswerResultService = inject(MachineAnswerResultService);
+
+  readonly limitsMap = signal<Record<string, string>>({}); // answerId → limitsAnswerId
+
   // Agrupa todos os parâmetros em um único bloco para exibição no modal de envio.
   protected readonly agrupados = computed(() => [
     { categoria: null as any, answers: this.answers() },
@@ -614,16 +618,37 @@ export class PainelComponent implements OnInit {
             })
             .subscribe({
               next: () => {
-                // 3. Salva as respostas de cada parâmetro
-                const ops = this.answers()
-                  .filter((a) => dados.respostas[a.id]?.trim())
-                  .map((a) =>
-                    this.answerResultService.create({
-                      AnswerId: a.id,
-                      resposta: dados.respostas[a.id],
-                      limitsAnswerId: this.limitsMap()[a.id] ?? null,
-                    }),
-                  );
+                // 3. Respostas — com máquina ou sem
+                // const temMaquina = this.machines().length > 0;
+                // const machineValues = this.machineParamValues();
+
+                let ops: ReturnType<typeof this.answerResultService.create>[] = [];
+
+                // if (temMaquina) {
+                //   // Uma entrada por combinação máquina × parâmetro
+                //   ops = Object.entries(machineValues)
+                //     .filter(([, valor]) => valor?.trim())
+                //     .map(([chave, valor]) => {
+                //       const [machineId, answerId] = chave.split('_');
+                //       return this.machineAnswerResultService.create({
+                //         machineId,
+                //         AnswerId: answerId,
+                //         resposta: valor,
+                //         limitsAnswerId: this.limitsMap()[answerId] ?? null,
+                //       });
+                //     });
+                // } else {
+                  // Fluxo original — sem máquina
+                  ops = this.answers()
+                    .filter((a) => dados.respostas[a.id]?.trim())
+                    .map((a) =>
+                      this.answerResultService.create({
+                        AnswerId: a.id,
+                        resposta: dados.respostas[a.id],
+                        limitsAnswerId: this.limitsMap()[a.id] ?? null,
+                      }),
+                    );
+                // }
 
                 if (!ops.length) {
                   this.saving.set(false);
@@ -642,6 +667,7 @@ export class PainelComponent implements OnInit {
                   },
                 });
               },
+
               error: () => {
                 this.saving.set(false);
                 this.error.set('Falhou ao registrar a inspeção.');
@@ -653,7 +679,7 @@ export class PainelComponent implements OnInit {
           this.error.set('Falhou ao salvar a assinatura.');
         },
       });
-  }
+}
 
   // ============================================================
   //  Trazendo Machines

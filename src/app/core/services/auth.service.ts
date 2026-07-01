@@ -2,10 +2,22 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 
-import { Observable, EMPTY, catchError, finalize, switchMap, tap, throwError } from 'rxjs';
+import {
+  Observable,
+  EMPTY,
+  catchError,
+  finalize,
+  forkJoin,
+  map,
+  of,
+  switchMap,
+  tap,
+  throwError,
+} from 'rxjs';
 
 import { CookieService } from './cookie.service';
 import { UserService } from './user.service';
+import { CredentialRoleService } from './credential-role.service';
 
 import { environment } from '../../../environments/environment';
 
@@ -26,6 +38,7 @@ export class AuthService {
   private readonly router = inject(Router);
 
   private readonly userService = inject(UserService);
+  private readonly credentialRoleService = inject(CredentialRoleService);
 
   // =====================================================
   // AUTH
@@ -59,6 +72,25 @@ export class AuthService {
 
   readonly isProfileLoaded = computed(() => this._userProfile() !== null);
 
+  // =====================================================
+  // ROLES
+  // =====================================================
+
+  private readonly _roles = signal<string[]>([]);
+
+  /** Nomes das roles da credencial autenticada. */
+  readonly roles = this._roles.asReadonly();
+
+  /** Verifica se a credencial autenticada possui uma role específica. */
+  hasRole(role: string): boolean {
+    return this._roles().includes(role);
+  }
+
+  /** Verifica se possui ao menos uma das roles informadas. */
+  hasAnyRole(...roles: string[]): boolean {
+    return roles.some((r) => this._roles().includes(r));
+  }
+
   constructor() {}
 
   // =====================================================
@@ -72,20 +104,8 @@ export class AuthService {
         this.insert(response);
       }),
 
-      switchMap(() => {
-        const userId = this.userId();
-
-        if (!userId) {
-          return throwError(() => new Error('UserId não encontrado'));
-        }
-
-        return this.userService.getByIdUserProfile(userId);
-      }),
-
-      tap((profile) => {
-        console.log('Perfil do usuário carregado:', profile);
-        this._userProfile.set(profile);
-      }),
+      // Carrega perfil + roles (reaproveita loadProfile).
+      switchMap(() => this.loadProfile()),
     );
   }
 
@@ -109,11 +129,12 @@ export class AuthService {
   }
 
   // =====================================================
-  // PROFILE
+  // PROFILE + ROLES
   // =====================================================
 
   loadProfile(): Observable<UserProfile> {
     const userId = this.userId();
+    const credentialId = this.credentialId();
 
     if (!userId) {
       return throwError(() => new Error('UserId não encontrado'));
@@ -125,10 +146,21 @@ export class AuthService {
 
     this._loading.set(true);
 
-    return this.userService.getByIdUserProfile(userId).pipe(
-      tap((profile) => {
+    return forkJoin({
+      profile: this.userService.getByIdUserProfile(userId),
+      // Se a falha nas roles não deve impedir o login, mantemos o catchError → [].
+      roles: credentialId
+        ? this.credentialRoleService
+            .getRoleNamesByCredential(credentialId)
+            .pipe(catchError(() => of<string[]>([])))
+        : of<string[]>([]),
+    }).pipe(
+      tap(({ profile, roles }) => {
         this._userProfile.set(profile);
+        this._roles.set(roles ?? []);
       }),
+
+      map(({ profile }) => profile),
 
       finalize(() => {
         this._loading.set(false);
@@ -160,6 +192,7 @@ export class AuthService {
 
   private clearProfile(): void {
     this._userProfile.set(null);
+    this._roles.set([]);
   }
 
   // =====================================================

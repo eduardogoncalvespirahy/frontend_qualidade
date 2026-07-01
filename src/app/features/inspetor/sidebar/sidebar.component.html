@@ -110,7 +110,21 @@
           @if (!layout.collapsed()) {
             <span>Relatório</span>
           }
-        </a>        
+        </a>   
+        
+        <a
+          routerLink="/inspetor/historico"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          class="sidebar-link"
+        >
+          <i class="bi bi-clock"></i>
+
+          @if (!layout.collapsed()) {
+            <span>Histórico</span>
+          }
+        </a>           
+
       </nav>
     </div>
     <hr class="border opacity-75" />

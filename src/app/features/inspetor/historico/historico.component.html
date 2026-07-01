@@ -1,0 +1,182 @@
+<section class="painel">
+  <header class="painel__head">
+    <div>
+      <span class="painel__eyebrow">Inspeções</span>
+      <h1 class="painel__title">Histórico</h1>
+      <p class="painel__subtitle">
+        Todas as inspeções registradas, com formulário, usuário e arquivo.
+      </p>
+    </div>
+    <button type="button" class="painel__reload" (click)="reload()" [disabled]="loading()">
+      <i class="bi bi-arrow-clockwise"></i> Atualizar
+    </button>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error" role="alert">
+      <i class="bi bi-exclamation-triangle"></i> {{ error() }}
+    </div>
+  }
+
+  <!-- Filtros -->
+  @if (!loading()) {
+    <div class="filters">
+      <div class="filters__bar">
+        <button
+          type="button"
+          class="filters__toggle"
+          [class.is-open]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <i class="bi bi-funnel"></i> <span>Filtros</span>
+          @if (activeFilterCount()) {
+            <span class="filters__count">{{ activeFilterCount() }}</span>
+          }
+          <i
+            class="bi"
+            [class.bi-chevron-down]="!filtersOpen()"
+            [class.bi-chevron-up]="filtersOpen()"
+          ></i>
+        </button>
+        <div class="filters__right">
+          <span class="filters__total">{{ filtered().length }} de {{ rows().length }}</span>
+          @if (hasFilter()) {
+            <button type="button" class="filters__clear" (click)="resetFilters()">
+              <i class="bi bi-x-lg"></i> Limpar
+            </button>
+          }
+        </div>
+      </div>
+
+      @if (filtersOpen()) {
+        <div class="filters__grid">
+          <label class="ff">
+            <span class="ff__label">Buscar</span>
+            <input
+              type="text"
+              class="ff__control"
+              placeholder="Formulário, usuário, observação…"
+              [ngModel]="filters().texto"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('texto', $event)"
+            />
+          </label>
+          <label class="ff">
+            <span class="ff__label">Usuário</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().userId"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('userId', $event)"
+            >
+              <option value="">Todos</option>
+              @for (opt of userOptions(); track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="ff">
+            <span class="ff__label">Formulário</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().formId"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('formId', $event)"
+            >
+              <option value="">Todos</option>
+              @for (opt of formOptions(); track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="ff">
+            <span class="ff__label">Emitido de</span>
+            <input
+              type="date"
+              class="ff__control"
+              [ngModel]="filters().de"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('de', $event)"
+            />
+          </label>
+          <label class="ff">
+            <span class="ff__label">Emitido até</span>
+            <input
+              type="date"
+              class="ff__control"
+              [ngModel]="filters().ate"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('ate', $event)"
+            />
+          </label>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Conteúdo -->
+  @if (loading()) {
+    <div class="timeline">
+      @for (s of [1, 2, 3, 4]; track s) {
+        <div class="tl-skeleton"></div>
+      }
+    </div>
+  } @else if (filtered().length === 0) {
+    <div class="empty">
+      <i class="bi bi-clock-history"></i>
+      <p>
+        {{
+          hasFilter() ? 'Nenhuma inspeção corresponde aos filtros.' : 'Nenhuma inspeção registrada.'
+        }}
+      </p>
+      @if (hasFilter()) {
+        <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+          Limpar filtros
+        </button>
+      }
+    </div>
+  } @else {
+    <ol class="timeline">
+      @for (r of filtered(); track trackById($index, r)) {
+        <li class="tl-item">
+          <div class="tl-marker"><i class="bi bi-clipboard-check"></i></div>
+          <div class="tl-card">
+            <div class="tl-card__head">
+              <h3 class="tl-card__title">{{ r.formNome }}</h3>
+              <span class="tl-date"
+                ><i class="bi bi-calendar-event"></i> {{ data(r.dataEmissao) }}</span
+              >
+            </div>
+
+            <div class="tl-meta">
+              <span class="tl-chip"><i class="bi bi-person"></i> {{ r.userNome }}</span>
+              @if (r.userEmail) {
+                <span class="tl-chip tl-chip--muted"
+                  ><i class="bi bi-envelope"></i> {{ r.userEmail }}</span
+                >
+              }
+              @if (r.fileUrl) {
+                <a class="tl-chip tl-chip--file" [href]="r.fileUrl" target="_blank" rel="noopener">
+                  <i class="bi bi-paperclip"></i> {{ r.fileNome }}
+                  <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+              } @else {
+                <span class="tl-chip tl-chip--file"
+                  ><i class="bi bi-paperclip"></i> {{ r.fileNome }}</span
+                >
+              }
+            </div>
+
+            @if (r.observacao) {
+              <p class="tl-obs">{{ r.observacao }}</p>
+            }
+
+            <div class="tl-card__foot">
+              <span><i class="bi bi-clock"></i> Registrado em {{ dataHora(r.dataCriacao) }}</span>
+            </div>
+          </div>
+        </li>
+      }
+    </ol>
+  }
+</section>

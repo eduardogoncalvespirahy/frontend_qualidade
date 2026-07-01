@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { PainelComponent } from './painel/painel.component';
 import { RelatorioComponent } from './relatorio/relatorio.component';
+import { HistoricoComponent } from './historico/historico.component';
 
 export const InspetorRoutes: Routes = [
   {
@@ -15,7 +16,11 @@ export const InspetorRoutes: Routes = [
       {
         path: 'relatorio',
         loadComponent: () => RelatorioComponent,
-      },      
+      },
+      {
+        path: 'historico',
+        loadComponent: () => HistoricoComponent,
+      },             
     ],
   },
   {

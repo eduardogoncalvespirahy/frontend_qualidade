@@ -1,1 +1,182 @@
-<p>relatorio works!</p>
+<section class="dash">
+  <header class="dash__head">
+    <div>
+      <span class="dash__eyebrow">Painel</span>
+      <h1 class="dash__title">Resultados por categoria</h1>
+      <p class="dash__subtitle">Altas, baixas e médias das respostas registradas.</p>
+    </div>
+    <button type="button" class="dash__reload" (click)="reload()" [disabled]="loading()">
+      <i class="bi bi-arrow-clockwise"></i> Atualizar
+    </button>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error" role="alert">
+      <i class="bi bi-exclamation-triangle"></i> {{ error() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="kpis">
+      @for (s of [1, 2, 3, 4, 5]; track s) {
+        <div class="kpi kpi--skeleton"></div>
+      }
+    </div>
+    <div class="panel panel--skeleton"></div>
+    <div class="panel panel--skeleton"></div>
+  } @else if (!hasData()) {
+    <div class="empty">
+      <i class="bi bi-bar-chart"></i>
+      <p>Nenhum resultado numérico encontrado para exibir métricas.</p>
+    </div>
+  } @else {
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi">
+        <span class="kpi__icon" style="--c: var(--accent-ink)"
+          ><i class="bi bi-list-check"></i
+        ></span>
+        <div>
+          <span class="kpi__value">{{ fmt(overall().count) }}</span
+          ><span class="kpi__label">Resultados</span>
+        </div>
+      </div>
+      <div class="kpi">
+        <span class="kpi__icon" style="--c: #7c3aed"><i class="bi bi-collection"></i></span>
+        <div>
+          <span class="kpi__value">{{ fmt(overall().categorias) }}</span
+          ><span class="kpi__label">Categorias</span>
+        </div>
+      </div>
+      <div class="kpi">
+        <span class="kpi__icon" style="--c: var(--accent-ink)"><i class="bi bi-graph-up"></i></span>
+        <div>
+          <span class="kpi__value">{{ fmt(overall().avg) }}</span
+          ><span class="kpi__label">Média geral</span>
+        </div>
+      </div>
+      <div class="kpi">
+        <span class="kpi__icon" style="--c: var(--on)"><i class="bi bi-arrow-up-right"></i></span>
+        <div>
+          <span class="kpi__value">{{ fmt(overall().max) }}</span
+          ><span class="kpi__label">Maior valor (alta)</span>
+        </div>
+      </div>
+      <div class="kpi">
+        <span class="kpi__icon" style="--c: var(--danger)"
+          ><i class="bi bi-arrow-down-right"></i
+        ></span>
+        <div>
+          <span class="kpi__value">{{ fmt(overall().min) }}</span
+          ><span class="kpi__label">Menor valor (baixa)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barras por categoria (Canvas) -->
+    <div class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title"><i class="bi bi-bar-chart-line"></i> Por categoria</h2>
+        <div class="seg" role="tablist">
+          <button
+            type="button"
+            class="seg__btn"
+            [class.is-active]="metric() === 'avg'"
+            (click)="metric.set('avg')"
+          >
+            Média
+          </button>
+          <button
+            type="button"
+            class="seg__btn"
+            [class.is-active]="metric() === 'max'"
+            (click)="metric.set('max')"
+          >
+            Alta
+          </button>
+          <button
+            type="button"
+            class="seg__btn"
+            [class.is-active]="metric() === 'min'"
+            (click)="metric.set('min')"
+          >
+            Baixa
+          </button>
+        </div>
+      </div>
+      <div class="chart-box" [style.height.px]="barBoxHeight()">
+        <app-chart [spec]="barSpec()" />
+      </div>
+    </div>
+
+    <div class="panel-grid">
+      <!-- Faixa mín–máx (Canvas) -->
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">
+            <i class="bi bi-arrows-expand"></i> Faixa (mín · média · máx)
+          </h2>
+        </div>
+        <div class="chart-box" [style.height.px]="rangeBoxHeight()">
+          <app-chart [spec]="rangeSpec()" />
+        </div>
+      </div>
+
+      <!-- Distribuição em rosca (Canvas) + legenda (HTML) -->
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title"><i class="bi bi-pie-chart"></i> Distribuição de respostas</h2>
+        </div>
+        <div class="donut">
+          <div class="donut__canvas"><app-chart [spec]="donutSpec()" /></div>
+          <ul class="donut__legend">
+            @for (seg of donutLegend(); track seg.nome) {
+              <li class="legend-item">
+                <span class="legend-dot" [style.background]="seg.color"></span>
+                <span class="legend-name" [title]="seg.nome">{{ seg.nome }}</span>
+                <span class="legend-val">{{ fmt(seg.count) }} · {{ fmt(seg.pct) }}%</span>
+              </li>
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title"><i class="bi bi-table"></i> Detalhamento</h2>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Categoria</th>
+              <th class="num">Respostas</th>
+              <th class="num">Baixa</th>
+              <th class="num">Média</th>
+              <th class="num">Alta</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of stats(); track c.id; let i = $index) {
+              <tr>
+                <td>
+                  <span class="legend-dot" [style.background]="colorFor(i)"></span> {{ c.nome }}
+                </td>
+                <td class="num">{{ fmt(c.count) }}</td>
+                <td class="num">
+                  <span class="tag tag--low">{{ fmt(c.min) }}</span>
+                </td>
+                <td class="num strong">{{ fmt(c.avg) }}</td>
+                <td class="num">
+                  <span class="tag tag--high">{{ fmt(c.max) }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</section>

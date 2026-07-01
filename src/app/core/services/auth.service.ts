@@ -15,7 +15,7 @@ import { UserProfile } from '../models/user-profile.model';
 const TOKEN_KEY = 'aq_token';
 const REFRESH_KEY = 'aq_refresh';
 const USER_ID = 'aq_userId';
-const CREDENTIAL_ID = 'aq_credentialId';
+// const CREDENTIAL_ID = 'aq_credentialId';
 
 @Injectable({
   providedIn: 'root',
@@ -41,9 +41,9 @@ export class AuthService {
 
   readonly userId = this._userId.asReadonly();
 
-  private readonly _credentialId = signal<string | null>(this.read(CREDENTIAL_ID));
+  // private readonly _credentialId = signal<string | null>(this.read(CREDENTIAL_ID));
 
-  readonly credentialId = this._credentialId.asReadonly();
+  // readonly credentialId = this._credentialId.asReadonly();
 
   // =====================================================
   // PROFILE
@@ -68,6 +68,7 @@ export class AuthService {
   login(request: LoginRequest): Observable<UserProfile> {
     return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, request).pipe(
       tap((response) => {
+        console.log('Login bem-sucedido:', response);
         this.insert(response);
       }),
 
@@ -82,6 +83,7 @@ export class AuthService {
       }),
 
       tap((profile) => {
+        console.log('Perfil do usuário carregado:', profile);
         this._userProfile.set(profile);
       }),
     );
@@ -179,11 +181,11 @@ export class AuthService {
     this.write(TOKEN_KEY, response.token);
     this.write(REFRESH_KEY, response.refreshToken);
     this.write(USER_ID, response.userId);
-    this.write(CREDENTIAL_ID, response.credentialId);
+    // this.write(CREDENTIAL_ID, response.credentialId);
 
     this._token.set(response.token);
     this._userId.set(response.userId);
-    this._credentialId.set(response.credentialId);
+    // this._credentialId.set(response.credentialId);
   }
 
   private read(key: string): string | null {
@@ -203,10 +205,10 @@ export class AuthService {
     this.cookie.delete(TOKEN_KEY);
     this.cookie.delete(REFRESH_KEY);
     this.cookie.delete(USER_ID);
-    this.cookie.delete(CREDENTIAL_ID);
+    // this.cookie.delete(CREDENTIAL_ID);
 
     this._token.set(null);
     this._userId.set(null);
-    this._credentialId.set(null);
+    // this._credentialId.set(null);
   }
 }

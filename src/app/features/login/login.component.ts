@@ -116,7 +116,7 @@ export class LoginComponent {
   protected lembrarAcesso(status: boolean): void {
     if (!status) {
       this.rememberAccess.set(false);
-      this.cookieService.delete('acesso');
+      this.cookieService.delete('aq_access');
       return;
     }
 
@@ -127,7 +127,7 @@ export class LoginComponent {
     }
 
     this.cookieService.set(
-      'acesso',
+      'aq_access',
       JSON.stringify({
         identifierType: this.identifierType(),
         identifier,
@@ -142,7 +142,7 @@ export class LoginComponent {
   }
 
   protected recuperarAcesso(): void {
-    const acessoCookie = this.cookieService.get('acesso');
+    const acessoCookie = this.cookieService.get('aq_access');
 
     if (!acessoCookie) {
       return;
@@ -159,7 +159,7 @@ export class LoginComponent {
     } catch (error) {
       console.error('Cookie de acesso inválido.', error);
 
-      this.cookieService.delete('acesso');
+      this.cookieService.delete('aq_access');
     }
   }
 }

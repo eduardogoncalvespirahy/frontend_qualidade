@@ -26,6 +26,10 @@ export class CredentialRoleService {
     return this.http.get<CredentialRole>(`${this.apiUrl}/${credentialId}`);
   }
 
+  getRoleNamesByCredential(credentialId: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/roles/credential/${credentialId}`);
+  }
+
   delete(credentialId: string, roleId: string): Observable<CredentialRole> {
     return this.http.delete<CredentialRole>(`${this.apiUrl}/${credentialId}/${roleId}`);
   }

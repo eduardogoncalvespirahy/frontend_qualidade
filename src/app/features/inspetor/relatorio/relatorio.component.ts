@@ -1,13 +1,23 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 
 import { Answer } from '../../../core/models/answer.model';
+import { Form } from '../../../core/models/form.model';
+import { Section } from '../../../core/models/section.model';
+import { Location } from '../../../core/models/location.model';
 import { Category } from '../../../core/models/category-answer.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
+
 import { AnswerService } from '../../../core/services/answer.service';
+import { FormService } from '../../../core/services/form.service';
+import { SectionService } from '../../../core/services/section.service';
+import { LocationService } from '../../../core/services/location.service';
 import { CategoryService } from '../../../core/services/category-answer.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
+import { AuthService } from '../../../core/services/auth.service';
+
 import { BarSpec, DonutSpec, RangeSpec } from '../../../core/services/chart.service';
 import { ChartComponent } from '../../../core/modals/chart/chart.component';
 
@@ -29,7 +39,7 @@ interface CatStat {
 @Component({
   selector: 'app-relatorio',
   standalone: true,
-  imports: [CommonModule, ChartComponent],
+  imports: [CommonModule, FormsModule, ChartComponent],
   templateUrl: './relatorio.component.html',
   styleUrl: './relatorio.component.css',
 })
@@ -37,15 +47,25 @@ export class RelatorioComponent implements OnInit {
   private readonly answerService = inject(AnswerService);
   private readonly categoryService = inject(CategoryService);
   private readonly resultService = inject(AnswerResultService);
+  private readonly formService = inject(FormService);
+  private readonly sectionService = inject(SectionService);
+  private readonly locationService = inject(LocationService);
+  private readonly auth = inject(AuthService);
 
   readonly answers = signal<Answer[]>([]);
   readonly categories = signal<Category[]>([]);
   readonly results = signal<AnswerResult[]>([]);
+  readonly forms = signal<Form[]>([]);
+  readonly sections = signal<Section[]>([]);
+  readonly locations = signal<Location[]>([]);
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
   readonly metric = signal<Metric>('avg');
+
+  /** Filtro por local escolhido pelo usuário ('' = todos os permitidos). */
+  readonly locationFilter = signal<string>('');
 
   private readonly palette = [
     '#0d6efd',
@@ -63,13 +83,93 @@ export class RelatorioComponent implements OnInit {
   private readonly nf = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
   fmt = (n: number): string => this.nf.format(n ?? 0);
 
+  // ───────── permissões de local (credentialLocation) ─────────
+  /** Nomes dos locais liberados para a credencial logada. */
+  readonly allowedLocations = computed(() => this.auth.locations());
+
+  private isLocationAllowed(loc: Location | null | undefined): boolean {
+    if (!loc) return false;
+    const allowed = this.allowedLocations();
+    if (allowed.length === 0) return true; // sem restrição
+    return allowed.includes(loc.nome) || allowed.includes(loc.id);
+  }
+
+  /**
+   * Conjunto de formIds cujo local a credencial pode ver.
+   * Location(permitida) → employerId → Section → Form.
+   * null = sem restrição (liberar todos).
+   */
+  readonly permittedFormIds = computed<Set<string> | null>(() => {
+    const allowed = this.allowedLocations();
+    if (allowed.length === 0) return null;
+
+    const employerIds = new Set(
+      this.locations()
+        .filter((l) => this.isLocationAllowed(l))
+        .map((l) => l.employerId),
+    );
+    const sectionIds = new Set(
+      this.sections()
+        .filter((s) => employerIds.has(s.employerId))
+        .map((s) => s.id),
+    );
+    return new Set(
+      this.forms()
+        .filter((f) => sectionIds.has(f.sectionId))
+        .map((f) => f.id),
+    );
+  });
+
+  /** Respostas restritas aos formulários de locais permitidos + filtro por local. */
+  readonly scopedResults = computed<AnswerResult[]>(() => {
+    const p = this.permittedFormIds();
+    const locId = this.locationFilter();
+
+    // Sem restrição de permissão e sem filtro de local → comportamento original.
+    if (!p && !locId) return this.results();
+
+    const ansById = new Map(this.answers().map((a) => [a.id, a]));
+    const formEmp = this.formEmployerById();
+    const selEmp = locId ? (this.locationEmployerById().get(locId) ?? '__none__') : null;
+
+    return this.results().filter((r) => {
+      const ans = ansById.get(r.AnswerId);
+      if (!ans) return false;
+      if (p && !p.has(ans.formId)) return false; // permissão
+      if (selEmp !== null && formEmp.get(ans.formId) !== selEmp) return false; // filtro de local
+      return true;
+    });
+  });
+
+  // ───────── mapas / opções para o filtro por local ─────────
+  /** formId → employerId (via section.employerId). */
+  private readonly formEmployerById = computed(() => {
+    const secEmp = new Map(this.sections().map((s) => [s.id, s.employerId]));
+    const m = new Map<string, string>();
+    for (const f of this.forms()) m.set(f.id, secEmp.get(f.sectionId) ?? '');
+    return m;
+  });
+
+  /** locationId → employerId. */
+  private readonly locationEmployerById = computed(
+    () => new Map(this.locations().map((l) => [l.id, l.employerId])),
+  );
+
+  /** Opções de local para o filtro — só os permitidos pela credencial. */
+  readonly locationOptions = computed(() =>
+    this.locations()
+      .filter((l) => this.isLocationAllowed(l))
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .map((l) => ({ value: l.id, label: l.nome })),
+  );
+
   // ───────── agregação por categoria ─────────
   readonly stats = computed<CatStat[]>(() => {
     const ansById = new Map(this.answers().map((a) => [a.id, a]));
     const catById = new Map(this.categories().map((c) => [String(c.id), c]));
 
     const groups = new Map<string, { nome: string; values: number[] }>();
-    for (const r of this.results()) {
+    for (const r of this.scopedResults()) {
       const ans = ansById.get(r.AnswerId);
       const key = ans ? String(ans.categoryId) : '__none__';
       const nome = ans
@@ -197,11 +297,17 @@ export class RelatorioComponent implements OnInit {
       categories: this.categoryService.getAll(1000, 1),
       answers: this.answerService.getAll(1000, 1),
       results: this.resultService.getAll(1000, 1),
+      forms: this.formService.getAll(1000, 1),
+      sections: this.sectionService.getAll(1000, 1),
+      locations: this.locationService.getAll(1000, 1),
     }).subscribe({
-      next: ({ categories, answers, results }) => {
+      next: ({ categories, answers, results, forms, sections, locations }) => {
         this.categories.set(this.unwrap<Category>(categories));
         this.answers.set(this.unwrap<Answer>(answers));
         this.results.set(this.unwrap<AnswerResult>(results));
+        this.forms.set(this.unwrap<Form>(forms));
+        this.sections.set(this.unwrap<Section>(sections));
+        this.locations.set(this.unwrap<Location>(locations));
         this.loading.set(false);
       },
       error: () => {

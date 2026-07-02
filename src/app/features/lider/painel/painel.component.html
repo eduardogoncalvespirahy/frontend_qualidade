@@ -7,6 +7,15 @@
     </div>
 
     <div class="dash__actions">
+      @if (hasData()) {
+        <button type="button" class="dash__reload" (click)="exportCsv()" title="Exportar CSV">
+          <i class="bi bi-filetype-csv"></i> CSV
+        </button>
+        <button type="button" class="dash__reload" (click)="exportPdf()" title="Exportar PDF">
+          <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
+      }
+
       <label class="dash__filter">
         <span class="dash__filter-label">Local</span>
         <select

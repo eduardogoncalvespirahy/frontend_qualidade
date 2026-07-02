@@ -183,47 +183,64 @@
                   <p class="tl-detail__loading">
                     <i class="bi bi-hourglass-split"></i> Carregando parâmetros…
                   </p>
+                } @else if (expandedMachineData()[r.id]) {
+                  <!-- modo máquina: tabela pivô -->
+                  <div class="overflow-auto">
+                    <table class="table table-sm table-bordered mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th class="text-muted small">Máquina</th>
+                          @for (a of expandedMachineData()[r.id].answers; track a.id) {
+                            <th class="text-muted small">{{ a.nome }}</th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (m of expandedMachineData()[r.id].maquinas; track m.id) {
+                          <tr>
+                            <td class="fw-semibold small">{{ m.nome }}</td>
+                            @for (a of expandedMachineData()[r.id].answers; track a.id) {
+                              <td class="text-center">
+                                <span class="badge text-bg-light border fw-semibold text-dark">
+                                  {{ expandedMachineData()[r.id].cells[m.id + '_' + a.id] || '—' }}
+                                </span>
+                              </td>
+                            }
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
                 } @else if ((expandedData()[r.id] ?? []).length === 0) {
                   <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
                 } @else {
-                  <table class="tl-detail__table">
-                    <!-- <thead>
-                      <tr>
-                        <th>Parâmetro</th>
-                        <th>Resposta</th>
-                      </tr>
-                    </thead> -->
-                    <tbody>
-                      @if (expandedId() === r.id) {
-                        <div class="tl-detail">
-                          @if (expandedLoading() === r.id) {
-                            <p class="tl-detail__loading">
-                              <i class="bi bi-hourglass-split"></i> Carregando parâmetros…
-                            </p>
-                          } @else if ((expandedData()[r.id] ?? []).length === 0) {
-                            <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
-                          } @else {
-                            <div class="d-flex flex-wrap gap-2 mt-2">
-                              @for (p of expandedData()[r.id]; track p.nome) {
-                                <div class="border rounded p-2" style="min-width:110px">
-                                  <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">{{ p.nome }}</div>
-                                  <div class="fw-bold fs-5">{{ p.resposta }}</div>
-                                </div>
-                              }
-                            </div>
-
-                            @if (r.observacao) {
-                              <div class="d-flex align-items-start gap-2 mt-2 p-2 border-start border-warning border-3 bg-warning-subtle rounded-end">
-                                <i class="bi bi-chat-left-text text-warning-emphasis"></i>
-                                <span class="text-warning-emphasis small">{{ r.observacao }}</span>
-                              </div>
-                            }
-
-                          }
+                  <!-- modo normal: cards -->
+                  <div class="d-flex flex-wrap gap-2 mt-2">
+                    @for (p of expandedData()[r.id]; track p.nome) {
+                      <div class="border rounded p-2" style="min-width: 110px">
+                        <div
+                          class="text-muted"
+                          style="
+                            font-size: 0.72rem;
+                            text-transform: uppercase;
+                            letter-spacing: 0.04em;
+                          "
+                        >
+                          {{ p.nome }}
                         </div>
-                      }
-                    </tbody>
-                  </table>
+                        <div class="fw-bold fs-5">{{ p.resposta }}</div>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (r.observacao && expandedLoading() !== r.id) {
+                  <div
+                    class="d-flex align-items-start gap-2 mt-2 p-2 border-start border-warning border-3 bg-warning-subtle rounded-end"
+                  >
+                    <i class="bi bi-chat-left-text text-warning-emphasis"></i>
+                    <span class="text-warning-emphasis small">{{ r.observacao }}</span>
+                  </div>
                 }
               </div>
             }

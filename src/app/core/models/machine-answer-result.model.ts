@@ -2,7 +2,7 @@
 export interface MachineAnswerResult {
   id: string;
   machineId: string;
-  machineAnswerId: string;
+  answerId: string;
   resposta: string;
   limitsAnswerId: string | null;
   dataCriacao: Date;
@@ -12,7 +12,7 @@ export interface MachineAnswerResult {
 // Payload para registrar uma nova resposta de máquina
 export interface MachineAnswerResultCreate {
   machineId: string;
-  machineAnswerId: string;
+  answerId: string;
   resposta: string;
   limitsAnswerId?: string | null;
   dataCriacao?: Date;
@@ -22,7 +22,7 @@ export interface MachineAnswerResultCreate {
 // Payload para atualizar uma resposta de máquina existente
 export interface MachineAnswerResultUpdate {
   machineId: string;
-  machineAnswerId: string;
+  answerId: string;
   resposta: string;
   limitsAnswerId?: string | null;
   dataCriacao?: Date;

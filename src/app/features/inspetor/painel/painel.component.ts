@@ -785,74 +785,86 @@ export class PainelComponent implements OnInit {
   private readonly controlService = inject(ControlService);
 
   private salvarEnvio(dados: {
-    userId: string | null;
-    observacao: string;
-    assinatura: string;
-    respostas: Record<string, string>;
-  }): void {
-    this.saving.set(true);
+  userId:           string | null;
+  observacao:       string;
+  assinatura:       string;
+  respostas:        Record<string, string>;
+  machineRespostas: Record<string, string>;
+  temMaquina:       boolean;
+}): void {
+  this.saving.set(true);
 
-    // 1. Salva a assinatura
-    this.signatureFileService
-      .create({
-        nome: `assinatura_${dados.userId}_${Date.now()}`,
-        conteudo: dados.assinatura,
-        mimeType: 'image/png',
-        extensao: 'png',
-      })
-      .subscribe({
-        next: (file) => {
-          // 2. Cria o Control (registro da inspeção)
-          this.controlService
-            .create({
-              formId: this.selectedForm()!.id,
-              userId: dados.userId ?? '',
-              fileId: file.id,
-              observacao: dados.observacao || null,
-              dataEmissao: new Date(),
-            })
-            .subscribe({
-              next: () => {
-                // 3. Salva as respostas de cada parâmetro
-                const ops = this.answers()
-                  .filter((a) => dados.respostas[a.id]?.trim())
-                  .map((a) =>
-                    this.answerResultService.create({
-                      AnswerId: a.id,
-                      resposta: dados.respostas[a.id],
-                      limitsAnswerId: this.limitsMap()[a.id] ?? null,
-                    }),
-                  );
+  this.signatureFileService.create({
+    nome:     `assinatura_${dados.userId}_${Date.now()}`,
+    conteudo:  dados.assinatura,
+    mimeType: 'image/png',
+    extensao: 'png',
+  }).subscribe({
+    next: (file) => {
+      this.controlService.create({
+        formId:      this.selectedForm()!.id,
+        userId:      dados.userId ?? '',
+        fileId:      file.id,
+        observacao:  dados.observacao || null,
+        dataEmissao: new Date(),
+      }).subscribe({
+        next: () => {
+          let ops: Observable<unknown>[] = [];
 
-                if (!ops.length) {
-                  this.saving.set(false);
-                  this.success.set('Inspeção enviada com sucesso!');
-                  return;
-                }
-
-                forkJoin(ops).subscribe({
-                  next: () => {
-                    this.saving.set(false);
-                    this.success.set('Inspeção enviada com sucesso!');
-                  },
-                  error: () => {
-                    this.saving.set(false);
-                    this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
-                  },
+          if (dados.temMaquina) {
+            ops = Object.entries(dados.machineRespostas)
+              .filter(([, valor]) => valor?.trim())
+              .map(([chave, valor]) => {
+                const [machineId, answerId] = chave.split('_');
+                return this.machineAnswerResultService.create({
+                  machineId,
+                  answerId: answerId,
+                  resposta: valor,
+                  limitsAnswerId: this.limitsMap()[answerId] ?? null,
                 });
-              },
-              error: () => {
-                this.saving.set(false);
-                this.error.set('Falhou ao registrar a inspeção.');
-              },
-            });
+              });
+          } else {
+            ops = this.answers()
+              .filter((a) => dados.respostas[a.id]?.trim())
+              .map((a) =>
+                this.answerResultService.create({
+                  AnswerId: a.id,
+                  resposta: dados.respostas[a.id],
+                  limitsAnswerId: this.limitsMap()[a.id] ?? null,
+                }),
+              );
+          }
+
+          if (!ops.length) {
+            this.saving.set(false);
+            this.success.set('Inspeção enviada com sucesso!');
+            return;
+          }
+
+          forkJoin(ops).subscribe({
+            next: () => {
+              this.saving.set(false);
+              this.success.set('Inspeção enviada com sucesso!');
+            },
+            error: () => {
+              this.saving.set(false);
+              this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
+            },
+          });
         },
         error: () => {
           this.saving.set(false);
-          this.error.set('Falhou ao salvar a assinatura.');
+          this.error.set('Falhou ao registrar a inspeção.');
         },
       });
-  }
+    },
+    error: () => {
+      this.saving.set(false);
+      this.error.set('Falhou ao salvar a assinatura.');
+    },
+  });
+}
+
 
   // ============================================================
   //  Trazendo Machines

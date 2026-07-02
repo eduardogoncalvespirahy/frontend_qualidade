@@ -16,6 +16,7 @@ import { catchError, debounceTime, distinctUntilChanged, of, Subject, switchMap 
 import { UserService } from '../../../../core/services/user.service';
 
 import { SignatureComponent } from '../../../../core/modals/signature/signature.component';
+import { Machine } from '../../../../core/models/machine.model';
 
 @Component({
   selector: 'app-painel-modal-envio',
@@ -39,6 +40,11 @@ export class ModalEnvioComponent implements AfterViewInit {
   // Campos preenchidos dentro do modal
   protected readonly observacao = signal('');
   protected readonly matricula = signal('');
+
+  // maquinas
+  readonly machines         = input<Machine[]>([]);
+  readonly machineResposta = input<Record<string, string>>({});
+
 
   // Canvas de assinatura
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -65,8 +71,11 @@ ngAfterViewInit(): void {
   this.ctx.strokeStyle = '#000';
   this.ctx.lineWidth = 2;
   this.ctx.lineCap = 'round';
+  console.log('MACHINE RESPOSTAS:', this.machineRespostas());
+
 }
 
+readonly machineRespostas = input<Record<string, string>>({});
 
 
   // Subject é como um "canal de eventos" — cada vez que o usuário digita,
@@ -183,14 +192,17 @@ ngAfterViewInit(): void {
   }
 
   // Retorna todos os dados prontos para o pai enviar ao backend
-  value() {
+value() {
   return {
-    observacao: this.observacao(),
-    matricula:  this.matricula(),
-    userId:     this.userId(),
-    assinatura: this.canvasRef?.nativeElement?.toDataURL() ?? '',
-    respostas:  this.respostas(),
+    observacao:       this.observacao(),
+    matricula:        this.matricula(),
+    userId:           this.userId(),
+    assinatura:       this.assinatura(),
+    respostas:        this.respostas(),
+    machineRespostas: this.machineRespostas(),
+    temMaquina:       this.machines().length > 0,
   };
 }
+
 
 }

@@ -19,9 +19,11 @@
 
   <!-- Corpo principal: duas colunas -->
   <div class="row g-4">
+    
     <!-- Coluna esquerda: respostas + matrícula + observação -->
     <div class="col-12 col-lg-7 d-flex flex-column gap-3">
       <!-- Tabela de respostas -->
+       
       <div>
         <h6
           class="text-uppercase fw-bold text-muted mb-2"
@@ -30,20 +32,57 @@
           <i class="bi bi-list-check me-1"></i>Respostas
         </h6>
         <div class="border rounded-3 overflow-hidden">
-          @for (grupo of agrupados(); track $index) {
-            @for (answer of grupo.answers; track answer.id) {
-              <div
-                class="d-flex justify-content-between align-items-start px-3 py-2"
-                [class.border-top]="!$first"
-              >
-                <span class="text-muted small me-3" style="line-height: 1.3">{{
-                  answer.nome
-                }}</span>
-                <span class="badge text-bg-light border fw-semibold text-dark text-nowrap">
-                  {{ respostas()[answer.id] || '—' }}
-                </span>
-              </div>
-            }
+          @if (machines().length > 0) {
+            <!-- Tabela pivô: máquinas × parâmetros -->
+            <div class="border rounded-3 overflow-auto">
+              <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="text-muted small">Máquina</th>
+                    @for (grupo of agrupados(); track $index) {
+                      @for (answer of grupo.answers; track answer.id) {
+                        <th class="text-muted small">{{ answer.nome }}</th>
+                      }
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (m of machines(); track m.id) {
+                    <tr>
+                      <td class="fw-semibold small">{{ m.nome }}</td>
+                      @for (grupo of agrupados(); track $index) {
+                        @for (answer of grupo.answers; track answer.id) {
+                          <td class="text-center">
+                            <span class="badge text-bg-light border fw-semibold text-dark">
+                              {{ machineRespostas()[m.id + '_' + answer.id] || '—' }}
+                            </span>
+                          </td>
+                        }
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <!-- Lista original sem máquinas -->
+            <div class="border rounded-3 overflow-hidden">
+              @for (grupo of agrupados(); track $index) {
+                @for (answer of grupo.answers; track answer.id) {
+                  <div
+                    class="d-flex justify-content-between align-items-start px-3 py-2"
+                    [class.border-top]="!$first"
+                  >
+                    <span class="text-muted small me-3" style="line-height: 1.3">{{
+                      answer.nome
+                    }}</span>
+                    <span class="badge text-bg-light border fw-semibold text-dark text-nowrap">
+                      {{ respostas()[answer.id] || '—' }}
+                    </span>
+                  </div>
+                }
+              }
+            </div>
           }
         </div>
       </div>
@@ -128,11 +167,7 @@
         </button>
       </div> -->
 
-
-      <app-signature
-          #signature
-          (signatureChange)="assinatura.set($event)">
-      </app-signature>
+      <app-signature #signature (signatureChange)="assinatura.set($event)"> </app-signature>
 
       <p class="text-muted small mb-0 text-center">
         Assine dentro da área acima com o mouse ou dedo

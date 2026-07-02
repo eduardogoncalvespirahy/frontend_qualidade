@@ -10,7 +10,7 @@ import { FormComponent } from './add-configs/form/form.component';
 
 import { AuthService } from '../../../core/services/auth.service';
 
-type ConfigSection = 'location' | 'section' | 'form' | 'machine' | 'param' | 'registration';
+type ConfigSection = 'section' | 'form' | 'machine' | 'param' | 'location' | 'registration';
 
 interface ConfigItem {
   key: ConfigSection;
@@ -41,12 +41,6 @@ export class ConfigComponent {
 
   private readonly allSections: ConfigItem[] = [
     {
-      key: 'location',
-      label: 'Locais',
-      icon: 'bi-geo-alt',
-      description: 'Gerenciamento dos Locais',
-    },
-    {
       key: 'section',
       label: 'Seções',
       icon: 'bi-building',
@@ -71,11 +65,18 @@ export class ConfigComponent {
       description: 'Configurações do sistema',
     },
     {
+      key: 'location',
+      label: 'Locais',
+      icon: 'bi-geo-alt',
+      description: 'Gerenciamento dos Locais',
+      roles: ['ADMIN'],      
+    },    
+    {
       key: 'registration',
       label: 'Cadastro',
       icon: 'bi-person-vcard',
       description: 'Informações cadastrais',
-      roles: ['ADMIN'], // ⚠️ apenas ADMIN — ajuste o nome da role conforme seu backend
+      roles: ['ADMIN'],
     },
   ];
 
@@ -110,21 +111,21 @@ export class ConfigComponent {
     }
   }
 
-  readonly pageTitles: Record<ConfigSection, string> = {
-    location: 'Locais',
+  readonly pageTitles: Record<ConfigSection, string> = {    
     section: 'Seções',
     form: 'Formularios',
     machine: 'Máquinas',
     param: 'Parâmetros',
+    location: 'Locais',    
     registration: 'Cadastro',
   };
 
-  readonly pageDescriptions: Record<ConfigSection, string> = {
-    location: 'Gerencie os locais vinculadas ao sistema.',
+  readonly pageDescriptions: Record<ConfigSection, string> = {    
     section: 'Gerencie as seções vinculadas ao sistema.',
     form: 'Gerencie os formularios vinculadas ao sistema.',
     machine: 'Gerencie as máquinas vinculadas ao sistema.',
     param: 'Configure parâmetros operacionais e comportamentos.',
+    location: 'Gerencie os locais vinculadas ao sistema.',    
     registration: 'Gerencie informações cadastrais.',
   };
 }

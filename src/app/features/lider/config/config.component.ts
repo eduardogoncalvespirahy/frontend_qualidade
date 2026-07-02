@@ -92,14 +92,14 @@ export class ConfigComponent {
     this.allSections.filter((s) => !s.roles?.length || this.auth.hasAnyRole(...s.roles)),
   );
 
-  readonly activeSection = signal<ConfigSection>('location');
+  readonly activeSection = signal<ConfigSection>('section');
 
   constructor() {
     // Se a seção ativa deixar de ser permitida (ex.: perda de role/sessão),
     // volta para uma seção segura.
     effect(() => {
       if (!this.canAccess(this.activeSection())) {
-        this.activeSection.set('location');
+        this.activeSection.set('section');
       }
     });
   }

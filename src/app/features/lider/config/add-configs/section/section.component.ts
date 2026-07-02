@@ -9,6 +9,7 @@ import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { EmployerService } from '../../../../../core/services/employer.service';
 import { ModalService } from '../../../../../core/services/modal.service';
+import { AuthService } from '../../../../../core/services/auth.service';
 import { FormComponent } from './modals/form/form.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 
@@ -37,6 +38,7 @@ export class SectionComponent implements OnInit {
   private readonly sectionService = inject(SectionService);
   private readonly employerService = inject(EmployerService);
   private readonly modalService = inject(ModalService);
+  private readonly auth = inject(AuthService);
 
   // ───────── navegação ─────────
   readonly step = signal<Step>('location');
@@ -46,6 +48,23 @@ export class SectionComponent implements OnInit {
   readonly sections = signal<Section[]>([]);
   readonly employers = signal<Employer[]>([]); // catálogo de empresas
   readonly selectedLocation = signal<Location | null>(null);
+
+  // ───────── permissões de local (credentialLocation) ─────────
+  /** Nomes dos locais liberados para a credencial logada. */
+  readonly allowedLocations = computed(() => this.auth.locations());
+
+  /**
+   * Um local é permitido para a credencial?
+   * - Lista vazia = sem restrição (libera tudo, ex.: admin).
+   * - Caso contrário, precisa constar em allowedLocations (por nome ou id).
+   *   Troque `return true` por `return false` se vazio = nenhum acesso.
+   */
+  private isLocationAllowed(loc: Location | null | undefined): boolean {
+    if (!loc) return false;
+    const allowed = this.allowedLocations();
+    if (allowed.length === 0) return true;
+    return allowed.includes(loc.nome) || allowed.includes(loc.id);
+  }
 
   // ───────── feedback ─────────
   readonly loading = signal(false);
@@ -95,9 +114,14 @@ export class SectionComponent implements OnInit {
     return true;
   }
 
+  /** Só os locais permitidos pela credencial (base para lista e opções de filtro). */
+  private readonly permittedLocations = computed(() =>
+    this.locations().filter((l) => this.isLocationAllowed(l)),
+  );
+
   readonly filteredLocations = computed(() => {
     const f = this.filters();
-    return this.locations().filter(
+    return this.permittedLocations().filter(
       (l) =>
         this.textMatch(l.nome, f.nome) &&
         this.textMatch(l.descricao, f.descricao) &&
@@ -119,7 +143,7 @@ export class SectionComponent implements OnInit {
   });
 
   readonly locationOptions = computed(() =>
-    [...this.locations()]
+    [...this.permittedLocations()]
       .sort((a, b) => a.nome.localeCompare(b.nome))
       .map((l) => ({ value: l.id, label: l.nome })),
   );
@@ -168,7 +192,16 @@ export class SectionComponent implements OnInit {
 
   private loadSections(): void {
     this.startLoading();
-    const employerId = this.selectedLocation()?.employerId;
+    const location = this.selectedLocation();
+
+    // Blindagem: sem local permitido → não carrega seções.
+    if (!location || !this.isLocationAllowed(location)) {
+      this.sections.set([]);
+      this.loading.set(false);
+      return;
+    }
+
+    const employerId = location.employerId;
     this.sectionService.getAll(1000, 1).subscribe({
       next: (res) => {
         const all = this.unwrap<Section>(res);
@@ -184,6 +217,11 @@ export class SectionComponent implements OnInit {
   // ============================================================
 
   selectLocation(loc: Location): void {
+    // Blindagem: não permite abrir seções de um local sem permissão.
+    if (!this.isLocationAllowed(loc)) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     this.clearFeedback();
     this.resetFilters();
     this.selectedLocation.set(loc);
@@ -209,6 +247,11 @@ export class SectionComponent implements OnInit {
 
   async novaSecao(): Promise<void> {
     this.clearFeedback();
+    // Só cria seção se o local atual for permitido.
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     const employerId = this.selectedLocation()?.employerId ?? '';
     const ref = this.modalService.openComponent(FormComponent, {
       title: 'Nova Seção',
@@ -229,6 +272,11 @@ export class SectionComponent implements OnInit {
 
   async editarSecao(item: Section): Promise<void> {
     this.clearFeedback();
+    // Só edita se o local atual for permitido.
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     const employerId = this.selectedLocation()?.employerId ?? item.employerId;
     const ref = this.modalService.openComponent(FormComponent, {
       title: `Editar: ${item.nome}`,
@@ -248,6 +296,11 @@ export class SectionComponent implements OnInit {
   }
 
   async excluirSecao(item: Section): Promise<void> {
+    // Só exclui se o local atual for permitido.
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     if (!(await this.confirmDelete(item.nome))) return;
     this.sectionService.delete(item.id).subscribe({
       next: () => this.done('Seção excluída.', () => this.loadSections()),

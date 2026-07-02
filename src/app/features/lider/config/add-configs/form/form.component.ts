@@ -9,6 +9,7 @@ import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { FormService } from '../../../../../core/services/form.service';
 import { ModalService } from '../../../../../core/services/modal.service';
+import { AuthService } from '../../../../../core/services/auth.service';
 import { FormularioFormComponent } from './modals/form/form.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 
@@ -37,6 +38,7 @@ export class FormComponent implements OnInit {
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
   private readonly modalService = inject(ModalService);
+  private readonly auth = inject(AuthService);
 
   // ───────── navegação ─────────
   readonly step = signal<Step>('location');
@@ -48,6 +50,23 @@ export class FormComponent implements OnInit {
   readonly selectedLocation = signal<Location | null>(null);
   readonly selectedSection = signal<Section | null>(null);
 
+  // ───────── permissões de local (credentialLocation) ─────────
+  /** Nomes dos locais liberados para a credencial logada. */
+  readonly allowedLocations = computed(() => this.auth.locations());
+
+  /**
+   * Um local é permitido para a credencial?
+   * - Lista vazia = sem restrição (libera tudo, ex.: admin).
+   * - Caso contrário, precisa constar em allowedLocations (por nome ou id).
+   *   Troque `return true` por `return false` se vazio = nenhum acesso.
+   */
+  private isLocationAllowed(loc: Location | null | undefined): boolean {
+    if (!loc) return false;
+    const allowed = this.allowedLocations();
+    if (allowed.length === 0) return true;
+    return allowed.includes(loc.nome) || allowed.includes(loc.id);
+  }
+
   // ───────── feedback ─────────
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -56,8 +75,14 @@ export class FormComponent implements OnInit {
   // ───────── filtros ─────────
   readonly filtersOpen = signal(false);
   private readonly emptyFilters: Filters = {
-    nome: '', descricao: '', locationId: '', status: 'all',
-    criadoDe: '', criadoAte: '', alteradoDe: '', alteradoAte: '',
+    nome: '',
+    descricao: '',
+    locationId: '',
+    status: 'all',
+    criadoDe: '',
+    criadoAte: '',
+    alteradoDe: '',
+    alteradoAte: '',
   };
   readonly filters = signal<Filters>({ ...this.emptyFilters });
 
@@ -90,9 +115,14 @@ export class FormComponent implements OnInit {
     return true;
   }
 
+  /** Só os locais permitidos pela credencial (base para lista e opções de filtro). */
+  private readonly permittedLocations = computed(() =>
+    this.locations().filter((l) => this.isLocationAllowed(l)),
+  );
+
   readonly filteredLocations = computed(() => {
     const f = this.filters();
-    return this.locations().filter(
+    return this.permittedLocations().filter(
       (l) =>
         this.textMatch(l.nome, f.nome) &&
         this.textMatch(l.descricao, f.descricao) &&
@@ -126,14 +156,16 @@ export class FormComponent implements OnInit {
   });
 
   readonly locationOptions = computed(() =>
-    [...this.locations()]
+    [...this.permittedLocations()]
       .sort((a, b) => a.nome.localeCompare(b.nome))
       .map((l) => ({ value: l.id, label: l.nome })),
   );
 
   // ───────── títulos ─────────
   private readonly titles: Record<Step, string> = {
-    location: 'Locais', section: 'Seções', form: 'Formulários',
+    location: 'Locais',
+    section: 'Seções',
+    form: 'Formulários',
   };
   private readonly descriptions: Record<Step, string> = {
     location: 'Selecione um local para gerenciar seus formularios.',
@@ -170,7 +202,16 @@ export class FormComponent implements OnInit {
 
   private loadSections(): void {
     this.startLoading();
-    const employerId = this.selectedLocation()?.employerId;
+    const location = this.selectedLocation();
+
+    // Blindagem: sem local permitido → não carrega seções.
+    if (!location || !this.isLocationAllowed(location)) {
+      this.sections.set([]);
+      this.loading.set(false);
+      return;
+    }
+
+    const employerId = location.employerId;
     this.sectionService.getAll(1000, 1).subscribe({
       next: (res) => {
         const all = this.unwrap<Section>(res);
@@ -199,6 +240,11 @@ export class FormComponent implements OnInit {
   // ============================================================
 
   selectLocation(loc: Location): void {
+    // Blindagem: não permite abrir um local sem permissão.
+    if (!this.isLocationAllowed(loc)) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     this.clearFeedback();
     this.resetFilters();
     this.selectedLocation.set(loc);
@@ -245,6 +291,11 @@ export class FormComponent implements OnInit {
 
   async novoForm(): Promise<void> {
     this.clearFeedback();
+    // Só cria se o local atual for permitido.
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     const sec = this.selectedSection();
     if (!sec) return;
     const ref = this.modalService.openComponent(FormularioFormComponent, {
@@ -266,6 +317,11 @@ export class FormComponent implements OnInit {
 
   async editarForm(item: Form): Promise<void> {
     this.clearFeedback();
+    // Só edita se o local atual for permitido.
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     const sec = this.selectedSection();
     const ref = this.modalService.openComponent(FormularioFormComponent, {
       title: `Editar: ${item.nome}`,
@@ -277,7 +333,12 @@ export class FormComponent implements OnInit {
     if (!(await ref.result)) return;
     const v = ref.instance.value();
     this.formService
-      .update(item.id, { sectionId: item.sectionId, nome: v.nome, descricao: v.descricao, status: v.status })
+      .update(item.id, {
+        sectionId: item.sectionId,
+        nome: v.nome,
+        descricao: v.descricao,
+        status: v.status,
+      })
       .subscribe({
         next: () => this.done('Formulário atualizado.', () => this.loadForms()),
         error: () => this.error.set('Erro ao atualizar o formulário.'),
@@ -285,6 +346,11 @@ export class FormComponent implements OnInit {
   }
 
   async excluirForm(item: Form): Promise<void> {
+    // Só exclui se o local atual for permitido.
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     if (!(await this.confirmDelete(item.nome))) return;
     this.formService.delete(item.id).subscribe({
       next: () => this.done('Formulário excluído.', () => this.loadForms()),

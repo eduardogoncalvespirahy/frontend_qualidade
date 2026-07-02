@@ -5,9 +5,26 @@
       <h1 class="dash__title">Resultados por categoria</h1>
       <p class="dash__subtitle">Altas, baixas e médias das respostas registradas.</p>
     </div>
-    <button type="button" class="dash__reload" (click)="reload()" [disabled]="loading()">
-      <i class="bi bi-arrow-clockwise"></i> Atualizar
-    </button>
+
+    <div class="dash__actions">
+      <label class="dash__filter">
+        <span class="dash__filter-label">Local</span>
+        <select
+          [ngModel]="locationFilter()"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="locationFilter.set($event)"
+        >
+          <option value="">Todos os locais</option>
+          @for (opt of locationOptions(); track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </label>
+
+      <button type="button" class="dash__reload" (click)="reload()" [disabled]="loading()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+    </div>
   </header>
 
   @if (error()) {

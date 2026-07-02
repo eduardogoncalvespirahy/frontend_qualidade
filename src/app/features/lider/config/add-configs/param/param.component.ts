@@ -17,6 +17,7 @@ import { LimitAnswerService } from '../../../../../core/services/limit-answer.se
 import { AnswerGroupsService } from '../../../../../core/services/answer-group.service';
 import { AnswerGroupItemsService } from '../../../../../core/services/answer-groups-items.service';
 import { ModalService } from '../../../../../core/services/modal.service';
+import { AuthService } from '../../../../../core/services/auth.service';
 
 import { DetailComponent, ParamItem, ParamType } from './modals/detail/detail.component';
 import { FormComponent } from './modals/form/form.component';
@@ -53,6 +54,7 @@ export class ParamComponent implements OnInit {
   private readonly answerGroupsService = inject(AnswerGroupsService);
   private readonly answerGroupItemsService = inject(AnswerGroupItemsService);
   private readonly modalService = inject(ModalService);
+  private readonly auth = inject(AuthService);
 
   // ───────── navegação ─────────
   readonly step = signal<Step>('location');
@@ -74,6 +76,32 @@ export class ParamComponent implements OnInit {
   readonly selectedLocation = signal<Location | null>(null);
   readonly selectedSection = signal<Section | null>(null);
   readonly selectedForm = signal<Form | null>(null);
+
+  // ───────── permissões de local (credentialLocation) ─────────
+  /** Nomes dos locais liberados para a credencial logada. */
+  readonly allowedLocations = computed(() => this.auth.locations());
+
+  /**
+   * Um local é permitido para a credencial?
+   * - Lista vazia = sem restrição (libera tudo, ex.: admin).
+   * - Caso contrário, precisa constar em allowedLocations (por nome ou id).
+   *   Troque `return true` por `return false` se vazio = nenhum acesso.
+   */
+  private isLocationAllowed(loc: Location | null | undefined): boolean {
+    if (!loc) return false;
+    const allowed = this.allowedLocations();
+    if (allowed.length === 0) return true;
+    return allowed.includes(loc.nome) || allowed.includes(loc.id);
+  }
+
+  /** Guarda de acesso para ações que mutam dados. */
+  private guardLocation(): boolean {
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return false;
+    }
+    return true;
+  }
 
   // ───────── feedback ─────────
   readonly loading = signal(false);
@@ -132,9 +160,14 @@ export class ParamComponent implements OnInit {
     return true;
   }
 
+  /** Só os locais permitidos pela credencial (base para lista e opções de filtro). */
+  private readonly permittedLocations = computed(() =>
+    this.locations().filter((l) => this.isLocationAllowed(l)),
+  );
+
   readonly filteredLocations = computed(() => {
     const f = this.filters();
-    return this.locations().filter(
+    return this.permittedLocations().filter(
       (l) =>
         this.textMatch(l.nome, f.nome) &&
         this.textMatch(l.descricao, f.descricao) &&
@@ -220,7 +253,7 @@ export class ParamComponent implements OnInit {
   }
 
   readonly locationOptions = computed(() =>
-    [...this.locations()]
+    [...this.permittedLocations()]
       .sort((a, b) => a.nome.localeCompare(b.nome))
       .map((l) => ({ value: l.id, label: l.nome })),
   );
@@ -278,9 +311,18 @@ export class ParamComponent implements OnInit {
 
   private loadSections(): void {
     this.startLoading();
+    const location = this.selectedLocation();
+
+    // Blindagem: sem local permitido → não carrega seções.
+    if (!location || !this.isLocationAllowed(location)) {
+      this.sections.set([]);
+      this.loading.set(false);
+      return;
+    }
+
     this.sectionService.getAll(1000, 1).subscribe({
       next: (res) => {
-        const employerId = this.selectedLocation()?.employerId;
+        const employerId = location.employerId;
         const all = this.unwrap<Section>(res);
         this.sections.set(employerId ? all.filter((s) => s.employerId === employerId) : all);
         this.loading.set(false);
@@ -345,6 +387,11 @@ export class ParamComponent implements OnInit {
   // ============================================================
 
   selectLocation(loc: Location): void {
+    // Blindagem: não permite abrir um local sem permissão.
+    if (!this.isLocationAllowed(loc)) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     this.clearFeedback();
     this.resetFilters();
     this.selectedLocation.set(loc);
@@ -429,6 +476,8 @@ export class ParamComponent implements OnInit {
   // ============================================================
 
   async detalhar(answer: Answer): Promise<void> {
+    if (!this.guardLocation()) return;
+
     const ref = this.modalService.openComponent(DetailComponent, {
       title: answer.nome ?? '',
       size: 'lg',
@@ -457,6 +506,8 @@ export class ParamComponent implements OnInit {
   }
 
   async novo(): Promise<void> {
+    if (!this.guardLocation()) return;
+
     const formId = this.selectedForm()?.id;
     if (!formId) return;
 
@@ -571,6 +622,8 @@ export class ParamComponent implements OnInit {
 
   /** Cria um grupo vinculado ao formulário atual. */
   criarGrupo(): void {
+    if (!this.guardLocation()) return;
+
     const nome = this.newGroupNome().trim();
     const formId = this.selectedForm()?.id;
     if (!nome || !formId) return;
@@ -587,6 +640,8 @@ export class ParamComponent implements OnInit {
   }
 
   excluirGrupo(groupId: string): void {
+    if (!this.guardLocation()) return;
+
     this.answerGroupsService.delete(groupId).subscribe({
       next: () => {
         if (this.activeGroup() === groupId) this.activeGroup.set('');
@@ -603,6 +658,8 @@ export class ParamComponent implements OnInit {
    * significa apagar o vínculo antigo e criar um novo.
    */
   setParamGroup(answer: Answer, groupId: string): void {
+    if (!this.guardLocation()) return;
+
     const current = this.groupItemByAnswer().get(answer.id) ?? null;
     const target = groupId || '';
     const curGroup = current?.answerGroupId ?? '';

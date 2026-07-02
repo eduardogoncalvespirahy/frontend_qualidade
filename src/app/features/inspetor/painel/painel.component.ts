@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { readonly } from '@angular/forms/signals';
 
 import { SignatureFile } from '../../../core/models/signature-file.model';
 import { Machine } from '../../../core/models/machine.model';
@@ -22,11 +21,15 @@ import { AnswerResultService } from '../../../core/services/answer-result.servic
 import { ModalService } from '../../../core/services/modal.service';
 import { SignatureFileService } from '../../../core/services/signature-file.service';
 import { ControlService } from '../../../core/services/control.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
 import { LimitAnswer } from '../../../core/models/limit-answer.model';
 import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
+
+// ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
+import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -56,6 +59,7 @@ export class PainelComponent implements OnInit {
   private readonly formService = inject(FormService);
   private readonly answerService = inject(AnswerService);
   private readonly answerResultService = inject(AnswerResultService);
+  private readonly auth = inject(AuthService);
 
   // ───────── navegação ─────────
   readonly step = signal<Step>('location');
@@ -82,6 +86,18 @@ export class PainelComponent implements OnInit {
 
   // valor atual já gravado no banco para cada answerId (a última linha existente)
   readonly existingResults = signal<Record<string, AnswerResult | null>>({});
+
+  // ───────── permissões de local (credentialLocation) ─────────
+  /** Nomes das locations liberadas para a credencial logada. */
+  readonly allowedLocations = computed(() => this.auth.locations());
+
+  /** Uma location é permitida para a credencial? (vazio = sem restrição). */
+  private isLocationAllowed(loc: Location | null | undefined): boolean {
+    if (!loc) return false;
+    const allowed = this.allowedLocations();
+    if (allowed.length === 0) return true; // sem restrição definida (ex.: admin)
+    return allowed.includes(loc.nome) || allowed.includes(loc.id);
+  }
 
   // ───────── filtros de busca (por campo das interfaces) ─────────
   readonly filtersOpen = signal(false);
@@ -137,8 +153,11 @@ export class PainelComponent implements OnInit {
 
   readonly filteredLocations = computed(() => {
     const f = this.filters();
+
     return this.locations().filter(
       (l) =>
+        // Restringe às locations permitidas pela credencial (credentialLocation).
+        this.isLocationAllowed(l) &&
         this.textMatch(l.nome, f.nome) &&
         this.textMatch(l.descricao, f.descricao) &&
         this.textMatch(l.employerId, f.employerId) &&
@@ -180,7 +199,7 @@ export class PainelComponent implements OnInit {
   /** IDs de employer disponíveis no nível atual. */
   readonly employerIdOptions = computed<string[]>(() => {
     if (this.step() === 'location') {
-      return this.distinct(this.locations().map((l) => l.employerId));
+      return this.distinct(this.filteredLocations().map((l) => l.employerId));
     }
     if (this.step() === 'section') {
       return this.distinct(this.sections().map((s) => s.employerId));
@@ -333,6 +352,11 @@ export class PainelComponent implements OnInit {
   // ============================================================
 
   selectLocation(loc: Location): void {
+    // Blindagem: não permite avançar para um local fora das permissões.
+    if (!this.isLocationAllowed(loc)) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
     this.clearFeedback();
     this.resetFilters();
     this.selectedLocation.set(loc);
@@ -529,6 +553,175 @@ export class PainelComponent implements OnInit {
   }
 
   // ============================================================
+  //  EXPORTAÇÃO (CSV / PDF) — adapta-se à etapa atual
+  // ============================================================
+
+  private readonly exporter = inject(FileExportService);
+
+  /** Há algo para exportar na etapa atual? */
+  readonly canExport = computed(() => {
+    switch (this.step()) {
+      case 'location':
+        return this.filteredLocations().length > 0;
+      case 'section':
+        return this.filteredSections().length > 0;
+      case 'form':
+        return this.filteredForms().length > 0;
+      case 'parameters':
+        return this.answers().length > 0;
+    }
+  });
+
+  private statusLabel(status: number): string {
+    return status === 1 ? 'Ativo' : 'Inativo';
+  }
+  private fmtDate(d: Date | string | null | undefined): string {
+    if (!d) return '';
+    const t = new Date(d);
+    return isNaN(t.getTime()) ? '' : t.toLocaleDateString('pt-BR');
+  }
+
+  /** Monta título/colunas/linhas conforme a etapa atual do drill-down. */
+  private buildExport(): {
+    title: string;
+    subtitle: string;
+    filename: string;
+    orientation: 'portrait' | 'landscape';
+    columns: ExportColumn[];
+    rows: Record<string, unknown>[];
+    meta: { label: string; value: string }[];
+  } {
+    const step = this.step();
+    const loc = this.selectedLocation()?.nome ?? '';
+    const sec = this.selectedSection()?.nome ?? '';
+    const fm = this.selectedForm()?.nome ?? '';
+
+    if (step === 'location') {
+      return {
+        title: 'Locais',
+        subtitle: '',
+        filename: 'locais',
+        orientation: 'landscape',
+        meta: [{ label: 'Total', value: String(this.filteredLocations().length) }],
+        columns: [
+          { key: 'nome', label: 'Nome' },
+          { key: 'descricao', label: 'Descrição' },
+          { key: 'employerId', label: 'Empregador' },
+          { key: 'status', label: 'Status', align: 'center' },
+        ],
+        rows: this.filteredLocations().map((l) => ({
+          nome: l.nome,
+          descricao: l.descricao ?? '',
+          employerId: l.employerId,
+          status: this.statusLabel(l.status),
+        })),
+      };
+    }
+
+    if (step === 'section') {
+      return {
+        title: 'Seções',
+        subtitle: loc,
+        filename: 'secoes',
+        orientation: 'landscape',
+        meta: [
+          { label: 'Local', value: loc },
+          { label: 'Total', value: String(this.filteredSections().length) },
+        ],
+        columns: [
+          { key: 'nome', label: 'Nome' },
+          { key: 'descricao', label: 'Descrição' },
+          { key: 'status', label: 'Status', align: 'center' },
+          { key: 'criado', label: 'Criado em' },
+          { key: 'alterado', label: 'Alterado em' },
+        ],
+        rows: this.filteredSections().map((s) => ({
+          nome: s.nome,
+          descricao: s.descricao ?? '',
+          status: this.statusLabel(s.status),
+          criado: this.fmtDate(s.dataCriacao),
+          alterado: this.fmtDate(s.dataAlteracao),
+        })),
+      };
+    }
+
+    if (step === 'form') {
+      const secById = new Map(this.sections().map((s) => [s.id, s.nome]));
+      return {
+        title: 'Formulários',
+        subtitle: `${loc} › ${sec}`,
+        filename: 'formularios',
+        orientation: 'landscape',
+        meta: [
+          { label: 'Local', value: loc },
+          { label: 'Seção', value: sec },
+          { label: 'Total', value: String(this.filteredForms().length) },
+        ],
+        columns: [
+          { key: 'nome', label: 'Nome' },
+          { key: 'descricao', label: 'Descrição' },
+          { key: 'secao', label: 'Seção' },
+          { key: 'status', label: 'Status', align: 'center' },
+          { key: 'criado', label: 'Criado em' },
+        ],
+        rows: this.filteredForms().map((f) => ({
+          nome: f.nome,
+          descricao: f.descricao ?? '',
+          secao: secById.get(f.sectionId) ?? f.sectionId,
+          status: this.statusLabel(f.status),
+          criado: this.fmtDate(f.dataCriacao),
+        })),
+      };
+    }
+
+    // parameters
+    return {
+      title: 'Parâmetros',
+      subtitle: `${loc} › ${sec} › ${fm}`,
+      filename: `parametros-${fm || 'formulario'}`,
+      orientation: 'portrait',
+      meta: [
+        { label: 'Local', value: loc },
+        { label: 'Seção', value: sec },
+        { label: 'Formulário', value: fm },
+        { label: 'Parâmetros', value: String(this.answers().length) },
+      ],
+      columns: [
+        { key: 'parametro', label: 'Parâmetro' },
+        { key: 'descricao', label: 'Descrição' },
+        { key: 'atual', label: 'Valor atual', align: 'right' },
+        { key: 'informado', label: 'Valor informado', align: 'right' },
+        { key: 'alterado', label: 'Alterado?', align: 'center' },
+      ],
+      rows: this.answers().map((a) => ({
+        parametro: a.nome,
+        descricao: a.descricao ?? '',
+        atual: this.existingResults()[a.id]?.resposta ?? '',
+        informado: this.paramValues()[a.id] ?? '',
+        alterado: this.isChanged(a.id) ? 'Sim' : 'Não',
+      })),
+    };
+  }
+
+  /** Baixa um CSV do que está visível na etapa atual. */
+  exportCsv(): void {
+    const cfg = this.buildExport();
+    this.exporter.downloadCsv(cfg.rows, { filename: cfg.filename, columns: cfg.columns });
+  }
+
+  /** Gera um PDF do que está visível na etapa atual (sem instanciar componentes). */
+  exportPdf(): void {
+    const cfg = this.buildExport();
+    this.exporter.printTable(cfg.columns, cfg.rows, {
+      title: cfg.title,
+      subtitle: cfg.subtitle,
+      meta: cfg.meta,
+      filename: cfg.filename,
+      orientation: cfg.orientation,
+    });
+  }
+
+  // ============================================================
   //  MODAL DE ENVIO — exclusivo do painel
   // ============================================================
 
@@ -620,8 +813,15 @@ export class PainelComponent implements OnInit {
             })
             .subscribe({
               next: () => {
+<<<<<<< HEAD
                 // 3. Salva as respostas de cada parâmetro
                 const ops = this.answers()
+=======
+                // 3. Respostas — fluxo sem máquina
+                let ops: ReturnType<typeof this.answerResultService.create>[] = [];
+
+                ops = this.answers()
+>>>>>>> fdda675cf6c16924145a64840f53fffd22796012
                   .filter((a) => dados.respostas[a.id]?.trim())
                   .map((a) =>
                     this.answerResultService.create({

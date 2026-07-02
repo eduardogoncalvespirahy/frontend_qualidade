@@ -5,7 +5,7 @@ import { LayoutService } from '../../../core/services/layout.service';
 import { HomeComponent } from './home/home.component';
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-dashboard-lider',
   standalone: true,
   imports: [RouterOutlet, SidebarComponent, HomeComponent],
   templateUrl: './dashboard.component.html',

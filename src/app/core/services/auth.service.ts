@@ -116,7 +116,6 @@ export class AuthService {
   login(request: LoginRequest): Observable<UserProfile> {
     return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, request).pipe(
       tap((response) => {
-        console.log('Login bem-sucedido:', response);
         this.insert(response);
       }),
 

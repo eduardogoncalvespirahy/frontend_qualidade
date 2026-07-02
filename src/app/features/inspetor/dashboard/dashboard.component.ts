@@ -5,7 +5,7 @@ import { SidebarComponent } from '../sidebar/sidebar.component';
 import { HomeComponent } from './home/home.component';
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-dashboard-inspetor',
   standalone: true,  
   imports: [RouterOutlet, SidebarComponent, HomeComponent],
   templateUrl: './dashboard.component.html',

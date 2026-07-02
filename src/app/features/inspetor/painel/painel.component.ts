@@ -813,15 +813,8 @@ export class PainelComponent implements OnInit {
             })
             .subscribe({
               next: () => {
-<<<<<<< HEAD
                 // 3. Salva as respostas de cada parâmetro
                 const ops = this.answers()
-=======
-                // 3. Respostas — fluxo sem máquina
-                let ops: ReturnType<typeof this.answerResultService.create>[] = [];
-
-                ops = this.answers()
->>>>>>> fdda675cf6c16924145a64840f53fffd22796012
                   .filter((a) => dados.respostas[a.id]?.trim())
                   .map((a) =>
                     this.answerResultService.create({

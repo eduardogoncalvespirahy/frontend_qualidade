@@ -18,6 +18,7 @@ import {
 import { CookieService } from './cookie.service';
 import { UserService } from './user.service';
 import { CredentialRoleService } from './credential-role.service';
+import { CredentialLocationService } from './credential-location.service';
 
 import { environment } from '../../../environments/environment';
 
@@ -39,6 +40,7 @@ export class AuthService {
 
   private readonly userService = inject(UserService);
   private readonly credentialRoleService = inject(CredentialRoleService);
+  private readonly credentialLocationService = inject(CredentialLocationService);
 
   // =====================================================
   // AUTH
@@ -77,18 +79,32 @@ export class AuthService {
   // =====================================================
 
   private readonly _roles = signal<string[]>([]);
+  private readonly _locations = signal<string[]>([]);
 
   /** Nomes das roles da credencial autenticada. */
   readonly roles = this._roles.asReadonly();
+
+  /** Nomes das locations da credencial autenticada. */
+  readonly locations = this._locations.asReadonly();
 
   /** Verifica se a credencial autenticada possui uma role específica. */
   hasRole(role: string): boolean {
     return this._roles().includes(role);
   }
 
+  /** Verifica se a credencial autenticada possui uma location específica. */
+  hasLocation(location: string): boolean {
+    return this._locations().includes(location);
+  }
+
   /** Verifica se possui ao menos uma das roles informadas. */
   hasAnyRole(...roles: string[]): boolean {
     return roles.some((r) => this._roles().includes(r));
+  }
+
+  /** Verifica se possui ao menos uma das locations informadas. */
+  hasAnyLocation(...locations: string[]): boolean {
+    return locations.some((l) => this._locations().includes(l));
   }
 
   constructor() {}
@@ -129,7 +145,7 @@ export class AuthService {
   }
 
   // =====================================================
-  // PROFILE + ROLES
+  // PROFILE + ROLES + LOCATIONS
   // =====================================================
 
   loadProfile(): Observable<UserProfile> {
@@ -154,10 +170,18 @@ export class AuthService {
             .getRoleNamesByCredential(credentialId)
             .pipe(catchError(() => of<string[]>([])))
         : of<string[]>([]),
+
+      // Se a falha nas locations não deve impedir o login, mantemos o catchError → [].
+      locations: credentialId
+        ? this.credentialLocationService
+            .getLocationNamesByCredential(credentialId)
+            .pipe(catchError(() => of<string[]>([])))
+        : of<string[]>([]),
     }).pipe(
-      tap(({ profile, roles }) => {
+      tap(({ profile, roles, locations }) => {
         this._userProfile.set(profile);
         this._roles.set(roles ?? []);
+        this._locations.set(locations ?? []);
       }),
 
       map(({ profile }) => profile),
@@ -193,6 +217,7 @@ export class AuthService {
   private clearProfile(): void {
     this._userProfile.set(null);
     this._roles.set([]);
+    this._locations.set([]);
   }
 
   // =====================================================

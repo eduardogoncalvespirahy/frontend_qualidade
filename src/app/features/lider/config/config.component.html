@@ -1,47 +1,31 @@
 <div class="config-page">
-
   <div class="config-card">
-
     <!-- SIDEBAR -->
 
     <aside class="config-sidebar">
-
       <div class="sidebar-header">
-
         <div class="sidebar-logo">
           <i class="bi bi-gear-fill"></i>
         </div>
 
         <div>
-          <h5 class="mb-0 fw-bold">
-            Configurações
-          </h5>
+          <h5 class="mb-0 fw-bold">Configurações</h5>
 
-          <small class="text-muted">
-            Administração do sistema
-          </small>
+          <small class="text-muted">Administração do sistema</small>
         </div>
-
       </div>
 
       <nav class="config-nav">
-
-        @for (section of sections; track section.key) {
-
+        @for (section of sections(); track section.key) {
           <button
             type="button"
             class="config-nav-item"
             [class.active]="activeSection() === section.key"
-            (click)="activeSection.set(section.key)"
+            (click)="select(section.key)"
           >
-
-            <i
-              class="bi"
-              [class]="section.icon"
-            ></i>
+            <i class="bi" [class]="section.icon"></i>
 
             <div>
-
               <div class="nav-title">
                 {{ section.label }}
               </div>
@@ -49,25 +33,17 @@
               <div class="nav-description">
                 {{ section.description }}
               </div>
-
             </div>
-
           </button>
-
         }
-
       </nav>
-
     </aside>
 
     <!-- CONTEÚDO -->
 
     <main class="config-content">
-
       <div class="content-header">
-
         <div>
-
           <h2 class="content-title">
             {{ pageTitles[activeSection()] }}
           </h2>
@@ -75,23 +51,19 @@
           <p class="content-description">
             {{ pageDescriptions[activeSection()] }}
           </p>
-
         </div>
-
       </div>
 
       <div class="content-body">
-
         @switch (activeSection()) {
-
           @case ('location') {
             <app-location />
           }
-          
+
           @case ('section') {
             <app-section />
           }
-          
+
           @case ('form') {
             <app-form />
           }
@@ -105,15 +77,17 @@
           }
 
           @case ('registration') {
-            <app-registration />
+            @if (canAccess('registration')) {
+              <app-registration />
+            } @else {
+              <div class="text-center text-muted py-5">
+                <i class="bi bi-shield-lock fs-1 d-block mb-2"></i>
+                Você não tem permissão para acessar esta área.
+              </div>
+            }
           }
-
         }
-
       </div>
-
     </main>
-
   </div>
-
 </div>

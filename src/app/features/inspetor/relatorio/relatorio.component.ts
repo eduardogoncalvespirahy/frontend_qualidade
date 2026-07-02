@@ -11,6 +11,9 @@ import { AnswerResultService } from '../../../core/services/answer-result.servic
 import { BarSpec, DonutSpec, RangeSpec } from '../../../core/services/chart.service';
 import { ChartComponent } from '../../../core/modals/chart/chart.component';
 
+import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
+import { FileExportLayoutComponent } from '../../../core/modals/file-export-layout/file-export-layout.component';
+
 type Metric = 'avg' | 'max' | 'min';
 
 interface CatStat {
@@ -210,4 +213,76 @@ export class RelatorioComponent implements OnInit {
 
   // expostos ao template
   readonly colorFor = (i: number) => this.colorAt(i);
+
+  // ============================================================
+  //  EXPORTAÇÃO (CSV / PDF)
+  // ============================================================
+
+  private readonly exporter = inject(FileExportService);
+
+  /** Monta título/colunas/linhas do detalhamento por categoria. */
+  private buildExport(): {
+    title: string;
+    subtitle: string;
+    filename: string;
+    columns: ExportColumn[];
+    rows: Record<string, unknown>[];
+    meta: { label: string; value: string }[];
+  } {
+    const o = this.overall();
+    return {
+      title: 'Resultados por categoria',
+      subtitle: 'Altas, baixas e médias das respostas registradas',
+      filename: 'relatorio-categorias',
+      meta: [
+        { label: 'Resultados', value: this.fmt(o.count) },
+        { label: 'Categorias', value: this.fmt(o.categorias) },
+        { label: 'Média geral', value: this.fmt(o.avg) },
+        { label: 'Maior (alta)', value: this.fmt(o.max) },
+        { label: 'Menor (baixa)', value: this.fmt(o.min) },
+      ],
+      columns: [
+        { key: 'categoria', label: 'Categoria' },
+        { key: 'respostas', label: 'Respostas', align: 'right' },
+        { key: 'baixa', label: 'Baixa', align: 'right' },
+        { key: 'media', label: 'Média', align: 'right' },
+        { key: 'alta', label: 'Alta', align: 'right' },
+      ],
+      rows: this.stats().map((c) => ({
+        categoria: c.nome,
+        respostas: this.fmt(c.count),
+        baixa: this.fmt(c.min),
+        media: this.fmt(c.avg),
+        alta: this.fmt(c.max),
+      })),
+    };
+  }
+
+  /** Baixa o detalhamento em CSV (delimitador ';' p/ Excel pt-BR). */
+  exportCsv(): void {
+    const cfg = this.buildExport();
+    this.exporter.downloadCsv(cfg.rows, {
+      filename: cfg.filename,
+      columns: cfg.columns,
+      delimiter: ';',
+    });
+  }
+
+  /** Gera um PDF (via FileExportLayoutComponent) do detalhamento. */
+  exportPdf(): void {
+    const cfg = this.buildExport();
+    this.exporter.pdfFromComponent(
+      FileExportLayoutComponent,
+      {
+        title: cfg.title,
+        subtitle: cfg.subtitle,
+        filename: cfg.filename,
+        columns: cfg.columns,
+        rows: cfg.rows,
+        meta: cfg.meta,
+        orientation: 'portrait',
+      },
+      { filename: cfg.filename, orientation: 'portrait' },
+    );
+  }
 }

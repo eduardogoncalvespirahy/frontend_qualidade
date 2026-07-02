@@ -37,6 +37,12 @@ export interface PdfOptions {
   margin?: string;
 }
 
+export interface PdfTableOptions extends PdfOptions {
+  title?: string;
+  subtitle?: string;
+  meta?: { label: string; value: string }[];
+}
+
 /**
  * Serviço de geração de arquivos (CSV e PDF) sem dependências externas.
  *
@@ -84,8 +90,7 @@ export class FileExportService {
 
   private escapeCsv(value: unknown, delimiter: string): string {
     const s = value == null ? '' : String(value);
-    const mustQuote =
-      s.includes(delimiter) || s.includes('"') || s.includes('\n') || s.includes('\r');
+    const mustQuote = s.includes(delimiter) || s.includes('"') || s.includes('\n') || s.includes('\r');
     const escaped = s.replace(/"/g, '""');
     return mustQuote ? `"${escaped}"` : escaped;
   }
@@ -123,8 +128,15 @@ export class FileExportService {
     const title = options.filename ?? 'documento';
 
     // Reaproveita os estilos da página (inclui o CSS encapsulado do Angular).
+    // Links com href ABSOLUTO para não resolverem contra a URL da rota atual.
     const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map((n) => n.outerHTML)
+      .map((n) => {
+        if (n.tagName === 'LINK') {
+          const href = (n as HTMLLinkElement).href; // já resolvido para absoluto
+          return `<link rel="stylesheet" href="${href}">`;
+        }
+        return n.outerHTML;
+      })
       .join('\n');
 
     const iframe = document.createElement('iframe');
@@ -147,7 +159,9 @@ export class FileExportService {
 
     doc.open();
     doc.write(
-      `<!doctype html><html lang="pt-br"><head><meta charset="utf-8"><title>${title}</title>` +
+      `<!doctype html><html lang="pt-br"><head><meta charset="utf-8">` +
+        `<base href="${document.baseURI}">` +
+        `<title>${title}</title>` +
         styles +
         `<style>` +
         `@page{size:${orientation};margin:${margin};}` +
@@ -174,6 +188,95 @@ export class FileExportService {
       // fallback de limpeza
       setTimeout(cleanup, 60000);
     };
+  }
+
+  // ===================================================================
+  // PDF de TABELA a partir de dados (sem depender de componentes)
+  // ===================================================================
+  /**
+   * Gera um relatório em PDF (via impressão) a partir de colunas + linhas.
+   * Não instancia componentes — o layout é montado com HTML/estilos embutidos.
+   */
+  printTable<T extends Record<string, unknown>>(
+    columns: ExportColumn<T>[],
+    rows: T[],
+    options: PdfTableOptions = {},
+  ): void {
+    this.printHtml(this.buildTableHtml(columns, rows, options), options);
+  }
+
+  private buildTableHtml<T extends Record<string, unknown>>(
+    columns: ExportColumn<T>[],
+    rows: T[],
+    options: PdfTableOptions,
+  ): string {
+    const esc = (v: unknown) =>
+      (v == null ? '' : String(v))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const emitido = new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'long',
+      timeStyle: 'short',
+    }).format(new Date());
+
+    const head = columns
+      .map(
+        (c) =>
+          `<th style="text-align:${c.align ?? 'left'};padding:9px 10px;border-bottom:1px solid #e2e8f0;` +
+          `background:#f8fafc;text-transform:uppercase;font-size:11px;letter-spacing:.04em;color:#64748b;">` +
+          `${esc(c.label ?? c.key)}</th>`,
+      )
+      .join('');
+
+    const body = rows.length
+      ? rows
+          .map(
+            (row) =>
+              `<tr>` +
+              columns
+                .map((c) => {
+                  const raw = row[c.key];
+                  const val = c.format ? c.format(raw, row) : raw;
+                  return `<td style="text-align:${c.align ?? 'left'};padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:13px;">${esc(val)}</td>`;
+                })
+                .join('') +
+              `</tr>`,
+          )
+          .join('')
+      : `<tr><td colspan="${columns.length}" style="padding:20px;text-align:center;color:#64748b;">Sem dados.</td></tr>`;
+
+    const metaHtml = (options.meta ?? []).length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:10px 26px;margin:0 0 18px;">` +
+        (options.meta ?? [])
+          .map(
+            (m) =>
+              `<div style="display:flex;flex-direction:column;font-size:13px;">` +
+              `<span style="color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">${esc(m.label)}</span>` +
+              `<strong>${esc(m.value)}</strong></div>`,
+          )
+          .join('') +
+        `</div>`
+      : '';
+
+    const subtitle = options.subtitle
+      ? `<p style="margin:4px 0 0;color:#64748b;font-size:14px;">${esc(options.subtitle)}</p>`
+      : '';
+
+    return (
+      `<div style="font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#0f172a;">` +
+      `<header style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;` +
+      `padding-bottom:16px;border-bottom:2px solid #e2e8f0;margin-bottom:18px;">` +
+      `<div><h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em;">${esc(options.title ?? 'Relatório')}</h1>${subtitle}</div>` +
+      `<div style="font-size:12px;color:#64748b;white-space:nowrap;">Emitido em ${esc(emitido)}</div>` +
+      `</header>` +
+      metaHtml +
+      `<table style="width:100%;border-collapse:collapse;">` +
+      `<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
+      `</div>`
+    );
   }
 
   // ===================================================================
@@ -213,8 +316,12 @@ export class FileExportService {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
 
-    const target = (host.firstElementChild as HTMLElement) ?? host;
-    this.printElement(target, options);
+    // Clona o host (preserva os atributos de encapsulamento do Angular, então
+    // o CSS do componente continua válido) e remove o posicionamento off-screen.
+    // Imprime o host INTEIRO — a barra de ações some pelo .no-print e o .doc aparece.
+    const clone = host.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('style');
+    this.printHtml(clone.outerHTML, options);
 
     // limpa após enviar para impressão
     setTimeout(() => {

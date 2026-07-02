@@ -429,3 +429,23 @@ a.tl-chip--file:hover {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ───────── Ações de exportação no cabeçalho ───────── */
+.painel__actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: none;
+}
+@media (max-width: 560px) {
+  .painel__head {
+    align-items: stretch;
+  }
+  .painel__actions {
+    width: 100%;
+  }
+  .painel__actions .painel__reload {
+    flex: 1;
+    justify-content: center;
+  }
+}

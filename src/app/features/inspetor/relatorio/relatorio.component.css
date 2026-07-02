@@ -66,6 +66,11 @@
   color: var(--muted);
   font-size: 15px;
 }
+.dash__actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .dash__reload {
   display: inline-flex;
   align-items: center;
@@ -372,6 +377,13 @@
     font-size: 21px;
   }
   .donut {
+    justify-content: center;
+  }
+  .dash__actions {
+    width: 100%;
+  }
+  .dash__actions .dash__reload {
+    flex: 1;
     justify-content: center;
   }
 }

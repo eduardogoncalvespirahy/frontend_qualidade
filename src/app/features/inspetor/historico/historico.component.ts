@@ -12,6 +12,8 @@ import { FormService } from '../../../core/services/form.service';
 import { UserService } from '../../../core/services/user.service';
 import { FileService } from '../../../core/services/file.service';
 
+import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
+
 type FileLike = Record<string, unknown>;
 
 interface HistoryRow {
@@ -220,5 +222,89 @@ export class HistoricoComponent implements OnInit {
 
   trackById(_: number, r: HistoryRow): string {
     return r.id;
+  }
+
+  // ============================================================
+  //  EXPORTAÇÃO (CSV / PDF) — exporta a timeline filtrada
+  // ============================================================
+
+  private readonly exporter = inject(FileExportService);
+
+  /** Há algo para exportar? */
+  readonly canExport = computed(() => this.filtered().length > 0);
+
+  /** Descrição dos filtros ativos (usada como subtítulo do relatório). */
+  private filtroResumo(): string {
+    const f = this.filters();
+    const partes: string[] = [];
+    if (f.texto) partes.push(`busca "${f.texto}"`);
+    if (f.userId)
+      partes.push(
+        `usuário ${this.userOptions().find((o) => o.value === f.userId)?.label ?? f.userId}`,
+      );
+    if (f.formId)
+      partes.push(
+        `formulário ${this.formOptions().find((o) => o.value === f.formId)?.label ?? f.formId}`,
+      );
+    if (f.de) partes.push(`de ${this.data(f.de)}`);
+    if (f.ate) partes.push(`até ${this.data(f.ate)}`);
+    return partes.length ? `Filtros: ${partes.join(' · ')}` : 'Todas as inspeções registradas';
+  }
+
+  /** Monta colunas + linhas a partir da timeline filtrada. */
+  private buildExport(): {
+    title: string;
+    subtitle: string;
+    filename: string;
+    columns: ExportColumn[];
+    rows: Record<string, unknown>[];
+    meta: { label: string; value: string }[];
+  } {
+    return {
+      title: 'Histórico de inspeções',
+      subtitle: this.filtroResumo(),
+      filename: 'historico-inspecoes',
+      meta: [{ label: 'Inspeções', value: String(this.filtered().length) }],
+      columns: [
+        { key: 'formulario', label: 'Formulário' },
+        { key: 'usuario', label: 'Usuário' },
+        { key: 'email', label: 'E-mail' },
+        { key: 'arquivo', label: 'Arquivo' },
+        { key: 'observacao', label: 'Observação' },
+        { key: 'emissao', label: 'Emissão' },
+        { key: 'registro', label: 'Registrado em' },
+      ],
+      rows: this.filtered().map((r) => ({
+        formulario: r.formNome,
+        usuario: r.userNome,
+        email: r.userEmail,
+        arquivo: r.fileNome,
+        observacao: r.observacao ?? '',
+        emissao: this.data(r.dataEmissao),
+        registro: this.dataHora(r.dataCriacao),
+      })),
+    };
+  }
+
+  /** Baixa a timeline filtrada em CSV (delimitador ';' p/ Excel pt-BR). */
+  exportCsv(): void {
+    const cfg = this.buildExport();
+    this.exporter.downloadCsv(cfg.rows, {
+      filename: cfg.filename,
+      columns: cfg.columns,
+      delimiter: ';',
+    });
+  }
+
+  /** Gera um PDF da timeline filtrada (via impressão, sem instanciar componentes). */
+  exportPdf(): void {
+    const cfg = this.buildExport();
+    this.exporter.printTable(cfg.columns, cfg.rows, {
+      title: cfg.title,
+      subtitle: cfg.subtitle,
+      meta: cfg.meta,
+      filename: cfg.filename,
+      orientation: 'landscape',
+    });
   }
 }

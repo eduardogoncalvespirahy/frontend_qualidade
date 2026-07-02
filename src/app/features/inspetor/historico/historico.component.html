@@ -7,9 +7,19 @@
         Todas as inspeções registradas, com formulário, usuário e arquivo.
       </p>
     </div>
-    <button type="button" class="painel__reload" (click)="reload()" [disabled]="loading()">
-      <i class="bi bi-arrow-clockwise"></i> Atualizar
-    </button>
+    <div class="painel__actions">
+      @if (canExport()) {
+        <button type="button" class="painel__reload" (click)="exportCsv()" title="Exportar CSV">
+          <i class="bi bi-filetype-csv"></i> CSV
+        </button>
+        <button type="button" class="painel__reload" (click)="exportPdf()" title="Exportar PDF">
+          <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
+      }
+      <button type="button" class="painel__reload" (click)="reload()" [disabled]="loading()">
+        <i class="bi bi-arrow-clockwise"></i> Atualizar
+      </button>
+    </div>
   </header>
 
   @if (error()) {

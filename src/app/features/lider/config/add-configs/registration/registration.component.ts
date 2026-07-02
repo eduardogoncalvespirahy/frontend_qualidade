@@ -8,22 +8,25 @@ import { UserService } from '../../../../../core/services/user.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { SystemService } from '../../../../../core/services/system.service';
 import { EmployeeService } from '../../../../../core/services/employee.service';
+import { LocationService } from '../../../../../core/services/location.service';
 import { CredentialService } from '../../../../../core/services/credential.service';
 import { CredentialRoleService } from '../../../../../core/services/credential-role.service';
+import { CredentialLocationService } from '../../../../../core/services/credential-location.service';
 
 import { User } from '../../../../../core/models/user.model';
 import { Role } from '../../../../../core/models/role.model';
 import { System } from '../../../../../core/models/system.model';
 import { Employee } from '../../../../../core/models/employee.model';
+import { Location } from '../../../../../core/models/location.model';
 import { Credential } from '../../../../../core/models/credential.model';
-import { CredentialRole } from '../../../../../core/models/credential-role.model';
 
 import { FormComponent } from './modals/form/form.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 import { CredentialFormComponent } from './modals/credential-form/credential-form.component';
 import { CredentialRoleFormComponent } from './modals/credential-role-form/credential-role-form.component';
+import { CredentialLocationFormComponent } from './modals/credential-location-form/credential-location-form.component';
 
-type Step = 'user' | 'credential' | 'role';
+type Step = 'user' | 'credential' | 'role' | 'location';
 
 interface Filters {
   // usuário
@@ -51,9 +54,11 @@ export class RegistrationComponent implements OnInit {
   private readonly userService = inject(UserService);
   private readonly credentialService = inject(CredentialService);
   private readonly credentialRoleService = inject(CredentialRoleService);
+  private readonly credentialLocationService = inject(CredentialLocationService);
   private readonly roleService = inject(RoleService);
   private readonly systemService = inject(SystemService);
   private readonly employeeService = inject(EmployeeService);
+  private readonly locationService = inject(LocationService);
   private readonly modalService = inject(ModalService);
 
   // ───────── navegação (sempre inicia em 'user') ─────────
@@ -62,10 +67,15 @@ export class RegistrationComponent implements OnInit {
   // ───────── coleções / seleção ─────────
   readonly users = signal<User[]>([]);
   readonly credentials = signal<Credential[]>([]);
-  readonly currentRole = signal<CredentialRole | null>(null);
   readonly roles = signal<Role[]>([]); // catálogo de regras (papéis)
   readonly systems = signal<System[]>([]); // catálogo de sistemas
   readonly employees = signal<Employee[]>([]); // catálogo de funcionários
+  readonly locationsCatalog = signal<Location[]>([]); // catálogo de locais
+
+  // Nomes (ou ids) das regras vinculadas à credencial atual (credentialRole).
+  readonly assignedRoleNames = signal<string[]>([]);
+  // Nomes (ou ids) dos locais vinculados à credencial atual (credentialLocation).
+  readonly assignedLocationNames = signal<string[]>([]);
 
   // ── combobox de busca de funcionário (filtro) ──
   readonly employeeFilterQuery = signal('');
@@ -154,11 +164,51 @@ export class RegistrationComponent implements OnInit {
     return this.roles().filter((r) => !sys || r.systemId === sys);
   });
 
-  /** Nome amigável de uma regra a partir do seu id. */
-  roleNome(roleId: string | null | undefined): string {
-    if (!roleId) return '';
-    return this.roles().find((r) => r.id === roleId)?.nome ?? roleId;
-  }
+  // ───────── regras da credencial (credentialRole — N:1) ─────────
+
+  /**
+   * Regras atualmente vinculadas à credencial, resolvidas contra o catálogo.
+   * getRoleNamesByCredential devolve nomes; casamos por nome OU id
+   * para tolerar ambos os formatos. Se não achar, id fica '' (remover desabilitado).
+   */
+  readonly credentialRoles = computed<{ id: string; nome: string }[]>(() => {
+    const catalog = this.roles();
+    return this.assignedRoleNames().map((token) => {
+      const hit = catalog.find((r) => r.nome === token || r.id === token);
+      return { id: hit?.id ?? '', nome: hit?.nome ?? token };
+    });
+  });
+
+  /** Regras do sistema da credencial que ainda NÃO estão vinculadas (modal de adicionar). */
+  readonly availableRoles = computed<{ id: string; nome: string }[]>(() => {
+    const assigned = this.assignedRoleNames();
+    return this.rolesForCredential()
+      .filter((r) => !assigned.some((token) => token === r.nome || token === r.id))
+      .map((r) => ({ id: r.id, nome: r.nome }));
+  });
+
+  // ───────── locais da credencial (credentialLocation — N:1) ─────────
+
+  /**
+   * Locais atualmente vinculados à credencial, resolvidos contra o catálogo.
+   * getLocationNamesByCredential devolve nomes; casamos por nome OU id
+   * para tolerar ambos os formatos. Se não achar, id fica '' (remover desabilitado).
+   */
+  readonly credentialLocations = computed<{ id: string; nome: string }[]>(() => {
+    const catalog = this.locationsCatalog();
+    return this.assignedLocationNames().map((token) => {
+      const hit = catalog.find((l) => l.nome === token || l.id === token);
+      return { id: hit?.id ?? '', nome: hit?.nome ?? token };
+    });
+  });
+
+  /** Locais do catálogo que ainda NÃO estão vinculados (para o modal de adicionar). */
+  readonly availableLocations = computed<{ id: string; nome: string }[]>(() => {
+    const assigned = this.assignedLocationNames();
+    return this.locationsCatalog()
+      .filter((l) => !assigned.some((token) => token === l.nome || token === l.id))
+      .map((l) => ({ id: l.id, nome: l.nome }));
+  });
 
   /** Nome amigável de um sistema a partir do seu id. */
   systemNome(systemId: string | null | undefined): string {
@@ -221,12 +271,14 @@ export class RegistrationComponent implements OnInit {
   private readonly titles: Record<Step, string> = {
     user: 'Usuários',
     credential: 'Credenciais',
-    role: 'Regra da credencial',
+    role: 'Regras da credencial',
+    location: 'Locais da credencial',
   };
   private readonly descriptions: Record<Step, string> = {
     user: 'Selecione um usuário para gerenciar suas credenciais.',
     credential: 'Gerencie as credenciais deste usuário.',
-    role: 'Vincule ou remova a regra desta credencial.',
+    role: 'Vincule ou remova as regras desta credencial.',
+    location: 'Vincule ou remova os locais que esta credencial pode acessar.',
   };
   readonly pageTitle = computed(() => this.titles[this.step()]);
   readonly pageDescription = computed(() => this.descriptions[this.step()]);
@@ -236,6 +288,7 @@ export class RegistrationComponent implements OnInit {
     this.loadRoles();
     this.loadSystems();
     this.loadEmployees();
+    this.loadLocationsCatalog();
   }
 
   private loadRoles(): void {
@@ -259,6 +312,13 @@ export class RegistrationComponent implements OnInit {
     });
   }
 
+  private loadLocationsCatalog(): void {
+    this.locationService.getAll(1000, 1).subscribe({
+      next: (res) => this.locationsCatalog.set(this.unwrap<Location>(res)),
+      error: () => this.locationsCatalog.set([]),
+    });
+  }
+
   // ============================================================
   //  CARREGAMENTO
   // ============================================================
@@ -269,14 +329,13 @@ export class RegistrationComponent implements OnInit {
     return (r?.['data'] ?? r?.['items'] ?? r?.['results'] ?? []) as T[];
   }
 
-  /** getByCredential pode devolver objeto único, nulo ou (defensivamente) lista. */
-  private firstRole(res: unknown): CredentialRole | null {
-    if (!res) return null;
-    if (Array.isArray(res)) return (res[0] as CredentialRole) ?? null;
+  /** Normaliza a resposta de nomes (regras/locais) para string[]. */
+  private toNameList(res: unknown): string[] {
+    if (!res) return [];
+    if (Array.isArray(res)) return res as string[];
     const r = res as Record<string, unknown>;
-    if (Array.isArray(r['data'])) return (r['data'] as CredentialRole[])[0] ?? null;
-    if (r['roleId']) return res as CredentialRole;
-    return null;
+    if (Array.isArray(r['data'])) return r['data'] as string[];
+    return [];
   }
 
   loadUsers(): void {
@@ -303,22 +362,43 @@ export class RegistrationComponent implements OnInit {
     });
   }
 
-  loadRole(): void {
+  loadCredentialRoles(): void {
     this.startLoading();
     const credentialId = this.selectedCredential()?.id;
     if (!credentialId) {
-      this.currentRole.set(null);
+      this.assignedRoleNames.set([]);
       this.loading.set(false);
       return;
     }
-    this.credentialRoleService.getByCredential(credentialId).subscribe({
+    this.credentialRoleService.getRoleNamesByCredential(credentialId).subscribe({
       next: (res) => {
-        this.currentRole.set(this.firstRole(res));
+        this.assignedRoleNames.set(this.toNameList(res));
         this.loading.set(false);
       },
-      // ausência de regra costuma vir como 404 — tratamos como "sem regra".
+      // sem regras costuma vir vazio/404 — tratamos como "nenhuma regra".
       error: () => {
-        this.currentRole.set(null);
+        this.assignedRoleNames.set([]);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  loadCredentialLocations(): void {
+    this.startLoading();
+    const credentialId = this.selectedCredential()?.id;
+    if (!credentialId) {
+      this.assignedLocationNames.set([]);
+      this.loading.set(false);
+      return;
+    }
+    this.credentialLocationService.getLocationNamesByCredential(credentialId).subscribe({
+      next: (res) => {
+        this.assignedLocationNames.set(this.toNameList(res));
+        this.loading.set(false);
+      },
+      // sem locais costuma vir vazio/404 — tratamos como "nenhum local".
+      error: () => {
+        this.assignedLocationNames.set([]);
         this.loading.set(false);
       },
     });
@@ -336,17 +416,27 @@ export class RegistrationComponent implements OnInit {
     this.loadCredentials();
   }
 
+  /** Clique no card da credencial → gestão das REGRAS (N:1). */
   selectCredential(c: Credential): void {
     this.clearFeedback();
     this.resetFilters();
     this.selectedCredential.set(c);
     this.step.set('role');
-    this.loadRole();
+    this.loadCredentialRoles();
+  }
+
+  /** Botão "Locais" no card da credencial → gestão dos LOCAIS (N:1). */
+  openLocations(c: Credential): void {
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedCredential.set(c);
+    this.step.set('location');
+    this.loadCredentialLocations();
   }
 
   back(): void {
     this.clearFeedback();
-    if (this.step() === 'role') this.goToCredentials();
+    if (this.step() === 'role' || this.step() === 'location') this.goToCredentials();
     else if (this.step() === 'credential') this.goToUsers();
   }
 
@@ -356,7 +446,8 @@ export class RegistrationComponent implements OnInit {
     this.selectedUser.set(null);
     this.selectedCredential.set(null);
     this.credentials.set([]);
-    this.currentRole.set(null);
+    this.assignedRoleNames.set([]);
+    this.assignedLocationNames.set([]);
     this.step.set('user');
   }
 
@@ -365,7 +456,8 @@ export class RegistrationComponent implements OnInit {
     this.clearFeedback();
     this.resetFilters();
     this.selectedCredential.set(null);
-    this.currentRole.set(null);
+    this.assignedRoleNames.set([]);
+    this.assignedLocationNames.set([]);
     this.step.set('credential');
   }
 
@@ -490,57 +582,110 @@ export class RegistrationComponent implements OnInit {
   }
 
   // ============================================================
-  //  REGRA DA CREDENCIAL (1 por credencial)
+  //  REGRAS DA CREDENCIAL (N por credencial)
   // ============================================================
 
-  async atribuirRegra(): Promise<void> {
+  /** Abre o modal de multi-seleção e vincula as regras escolhidas. */
+  async adicionarRegras(): Promise<void> {
     this.clearFeedback();
     const credentialId = this.selectedCredential()?.id;
     if (!credentialId) return;
-    const atual = this.currentRole();
 
-    const ref = this.modalService.openComponent(CredentialRoleFormComponent, {
-      title: atual ? 'Trocar regra' : 'Atribuir regra',
-      size: 'lg',
-      backdrop: 'static',
-      inputs: { currentRoleId: atual?.roleId ?? '', roles: this.rolesForCredential() },
-      buttons: this.crudButtons(atual ? 'Salvar' : 'Atribuir'),
-    });
-    if (!(await ref.result)) return;
-    const { roleId } = ref.instance.value();
-    if (!roleId) {
-      this.error.set('Selecione uma regra.');
+    const disponiveis = this.availableRoles();
+    if (!disponiveis.length) {
+      this.error.set('Não há regras disponíveis para adicionar.');
       return;
     }
 
-    const criar = () =>
-      this.credentialRoleService.create({ credentialId, roleId }).subscribe({
-        next: () => this.done('Regra vinculada.', () => this.loadRole()),
-        error: () => this.error.set('Erro ao vincular a regra.'),
-      });
+    const ref = this.modalService.openComponent(CredentialRoleFormComponent, {
+      title: 'Adicionar regras',
+      size: 'lg',
+      backdrop: 'static',
+      inputs: { availableRoles: disponiveis },
+      buttons: this.crudButtons('Adicionar'),
+    });
+    if (!(await ref.result)) return;
 
-    // Como a relação é 1:1, trocar = remover a anterior e criar a nova.
-    if (atual && atual.roleId !== roleId) {
-      this.credentialRoleService.delete(credentialId, atual.roleId).subscribe({
-        next: () => criar(),
-        error: () => this.error.set('Erro ao substituir a regra.'),
-      });
-    } else if (!atual) {
-      criar();
-    } else {
-      // mesma regra: nada a fazer
-      this.success.set('A regra já está vinculada.');
+    const { roleIds } = ref.instance.value();
+    if (!roleIds.length) {
+      this.error.set('Selecione ao menos uma regra.');
+      return;
     }
+
+    // Um vínculo por regra selecionada.
+    const requisicoes = roleIds.map((roleId) =>
+      this.credentialRoleService.create({ credentialId, roleId }),
+    );
+    forkJoin(requisicoes).subscribe({
+      next: () =>
+        this.done(`${roleIds.length} regra(s) vinculada(s).`, () => this.loadCredentialRoles()),
+      error: () => this.error.set('Erro ao vincular uma ou mais regras.'),
+    });
   }
 
-  async removerRegra(): Promise<void> {
+  /** Remove uma regra vinculada. Requer o id resolvido no catálogo. */
+  async removerRegra(role: { id: string; nome: string }): Promise<void> {
     const credentialId = this.selectedCredential()?.id;
-    const roleId = this.currentRole()?.roleId;
-    if (!credentialId || !roleId) return;
-    if (!(await this.confirmDelete('a regra desta credencial'))) return;
-    this.credentialRoleService.delete(credentialId, roleId).subscribe({
-      next: () => this.done('Regra removida.', () => this.loadRole()),
+    if (!credentialId || !role.id) return;
+    if (!(await this.confirmDelete(`a regra "${role.nome}"`))) return;
+    this.credentialRoleService.delete(credentialId, role.id).subscribe({
+      next: () => this.done('Regra removida.', () => this.loadCredentialRoles()),
       error: () => this.error.set('Erro ao remover a regra.'),
+    });
+  }
+
+  // ============================================================
+  //  LOCAIS DA CREDENCIAL (N por credencial)
+  // ============================================================
+
+  /** Abre o modal de multi-seleção e vincula os locais escolhidos. */
+  async adicionarLocais(): Promise<void> {
+    this.clearFeedback();
+    const credentialId = this.selectedCredential()?.id;
+    if (!credentialId) return;
+
+    const disponiveis = this.availableLocations();
+    if (!disponiveis.length) {
+      this.error.set('Não há locais disponíveis para adicionar.');
+      return;
+    }
+
+    const ref = this.modalService.openComponent(CredentialLocationFormComponent, {
+      title: 'Adicionar locais',
+      size: 'lg',
+      backdrop: 'static',
+      inputs: { availableLocations: disponiveis },
+      buttons: this.crudButtons('Adicionar'),
+    });
+    if (!(await ref.result)) return;
+
+    const { locationIds } = ref.instance.value();
+    if (!locationIds.length) {
+      this.error.set('Selecione ao menos um local.');
+      return;
+    }
+
+    // Um vínculo por local selecionado.
+    const requisicoes = locationIds.map((locationId) =>
+      this.credentialLocationService.create({ credentialId, locationId }),
+    );
+    forkJoin(requisicoes).subscribe({
+      next: () =>
+        this.done(`${locationIds.length} local(is) vinculado(s).`, () =>
+          this.loadCredentialLocations(),
+        ),
+      error: () => this.error.set('Erro ao vincular um ou mais locais.'),
+    });
+  }
+
+  /** Remove um local vinculado. Requer o id resolvido no catálogo. */
+  async removerLocal(loc: { id: string; nome: string }): Promise<void> {
+    const credentialId = this.selectedCredential()?.id;
+    if (!credentialId || !loc.id) return;
+    if (!(await this.confirmDelete(`o local "${loc.nome}"`))) return;
+    this.credentialLocationService.delete(credentialId, loc.id).subscribe({
+      next: () => this.done('Local removido.', () => this.loadCredentialLocations()),
+      error: () => this.error.set('Erro ao remover o local.'),
     });
   }
 

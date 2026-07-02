@@ -37,11 +37,15 @@
           </button>
         </li>
       }
-      @if (selectedCredential()) {
+      @if (selectedCredential() && (step() === 'role' || step() === 'location')) {
         <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
         <li class="chip chip--active">
           <span class="chip__btn chip__btn--static">
-            <i class="bi bi-shield-lock"></i> <span class="chip__label">Regra</span>
+            @if (step() === 'location') {
+              <i class="bi bi-geo-alt"></i> <span class="chip__label">Locais</span>
+            } @else {
+              <i class="bi bi-shield-lock"></i> <span class="chip__label">Regras</span>
+            }
           </span>
         </li>
       }
@@ -59,8 +63,8 @@
     </div>
   }
 
-  <!-- Filtros (não exibidos no nível de regra) -->
-  @if (!loading() && step() !== 'role') {
+  <!-- Filtros (não exibidos nos níveis de regra e de locais) -->
+  @if (!loading() && step() !== 'role' && step() !== 'location') {
     <div class="filters">
       <div class="filters__bar">
         <button
@@ -324,6 +328,14 @@
                   <button
                     type="button"
                     class="card__del"
+                    title="Locais"
+                    (click)="$event.stopPropagation(); openLocations(c)"
+                  >
+                    <i class="bi bi-geo-alt"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="card__del"
                     title="Editar"
                     (click)="$event.stopPropagation(); editarCredencial(c)"
                   >
@@ -368,39 +380,33 @@
         }
       }
 
-      <!-- ───── REGRA ───── -->
+      <!-- ───── REGRAS ───── -->
       @case ('role') {
         <div class="grid">
-          <button type="button" class="card card--add" (click)="atribuirRegra()">
-            <span class="card__icon card__icon--add"
-              ><i
-                class="bi"
-                [class.bi-plus-lg]="!currentRole()"
-                [class.bi-arrow-repeat]="currentRole()"
-              ></i
-            ></span>
-            <h3 class="card__title">{{ currentRole() ? 'Trocar regra' : 'Atribuir regra' }}</h3>
-            <p class="card__desc">
-              {{
-                currentRole()
-                  ? 'Substituir a regra vinculada.'
-                  : 'Vincular uma regra a esta credencial.'
-              }}
-            </p>
+          <button type="button" class="card card--add" (click)="adicionarRegras()">
+            <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
+            <h3 class="card__title">Adicionar regras</h3>
+            <p class="card__desc">Vincular uma ou mais regras a esta credencial.</p>
           </button>
 
-          @if (currentRole(); as cr) {
+          @for (role of credentialRoles(); track role.nome) {
             <div class="card">
               <div class="card__top">
                 <span class="card__icon"><i class="bi bi-shield-lock"></i></span>
                 <div class="card__top-right">
                   <span class="badge badge--on">Vinculada</span>
-                  <button type="button" class="card__del" title="Remover" (click)="removerRegra()">
+                  <button
+                    type="button"
+                    class="card__del"
+                    title="Remover"
+                    [disabled]="!role.id"
+                    (click)="removerRegra(role)"
+                  >
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
               </div>
-              <h3 class="card__title">{{ roleNome(cr.roleId) }}</h3>
+              <h3 class="card__title">{{ role.nome }}</h3>
               <p class="card__desc">Regra vinculada a esta credencial.</p>
               <span class="card__meta"
                 ><i class="bi bi-key"></i> {{ systemNome(selectedCredential()?.systemId) }}</span
@@ -409,10 +415,53 @@
           }
         </div>
 
-        @if (!currentRole()) {
+        @if (!credentialRoles().length) {
           <div class="empty">
             <i class="bi bi-shield-slash"></i>
             <p>Nenhuma regra vinculada a esta credencial.</p>
+          </div>
+        }
+      }
+
+      <!-- ───── LOCAIS ───── -->
+      @case ('location') {
+        <div class="grid">
+          <button type="button" class="card card--add" (click)="adicionarLocais()">
+            <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
+            <h3 class="card__title">Adicionar locais</h3>
+            <p class="card__desc">Vincular um ou mais locais a esta credencial.</p>
+          </button>
+
+          @for (loc of credentialLocations(); track loc.nome) {
+            <div class="card">
+              <div class="card__top">
+                <span class="card__icon"><i class="bi bi-geo-alt"></i></span>
+                <div class="card__top-right">
+                  <span class="badge badge--on">Vinculado</span>
+                  <button
+                    type="button"
+                    class="card__del"
+                    title="Remover"
+                    [disabled]="!loc.id"
+                    (click)="removerLocal(loc)"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <h3 class="card__title">{{ loc.nome }}</h3>
+              <p class="card__desc">Local acessível por esta credencial.</p>
+              <span class="card__meta"
+                ><i class="bi bi-key"></i> {{ systemNome(selectedCredential()?.systemId) }}</span
+              >
+            </div>
+          }
+        </div>
+
+        @if (!credentialLocations().length) {
+          <div class="empty">
+            <i class="bi bi-geo-alt"></i>
+            <p>Nenhum local vinculado a esta credencial.</p>
           </div>
         }
       }

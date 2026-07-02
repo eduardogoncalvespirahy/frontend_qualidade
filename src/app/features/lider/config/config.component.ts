@@ -10,7 +10,7 @@ import { FormComponent } from './add-configs/form/form.component';
 
 import { AuthService } from '../../../core/services/auth.service';
 
-type ConfigSection = 'section' | 'form' | 'machine' | 'param' | 'location' | 'registration';
+type ConfigSection = 'section' | 'form' | 'param' | 'machine' | 'location' | 'registration';
 
 interface ConfigItem {
   key: ConfigSection;
@@ -53,17 +53,17 @@ export class ConfigComponent {
       description: 'Gerenciamento dos Formularios',
     },
     {
-      key: 'machine',
-      label: 'Máquinas',
-      icon: 'bi-cpu',
-      description: 'Gerenciamento das máquinas',
-    },
-    {
       key: 'param',
       label: 'Parâmetros',
       icon: 'bi-sliders',
       description: 'Configurações do sistema',
     },
+    {
+      key: 'machine',
+      label: 'Máquinas',
+      icon: 'bi-cpu',
+      description: 'Gerenciamento das máquinas',
+    },    
     {
       key: 'location',
       label: 'Locais',
@@ -114,8 +114,8 @@ export class ConfigComponent {
   readonly pageTitles: Record<ConfigSection, string> = {    
     section: 'Seções',
     form: 'Formularios',
-    machine: 'Máquinas',
     param: 'Parâmetros',
+    machine: 'Máquinas',
     location: 'Locais',    
     registration: 'Cadastro',
   };
@@ -123,8 +123,8 @@ export class ConfigComponent {
   readonly pageDescriptions: Record<ConfigSection, string> = {    
     section: 'Gerencie as seções vinculadas ao sistema.',
     form: 'Gerencie os formularios vinculadas ao sistema.',
-    machine: 'Gerencie as máquinas vinculadas ao sistema.',
     param: 'Configure parâmetros operacionais e comportamentos.',
+    machine: 'Gerencie as máquinas vinculadas ao sistema.',
     location: 'Gerencie os locais vinculadas ao sistema.',    
     registration: 'Gerencie informações cadastrais.',
   };

@@ -11,7 +11,7 @@ import { PaginatedResult } from '../models/paginated.model';
 export class BreakFormService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl = `${environment.apiUrl}/break-forms`;
+  private readonly apiUrl = `${environment.apiUrl}/breaks-forms`;
 
   private readonly httpOptions = {
     headers: new HttpHeaders({

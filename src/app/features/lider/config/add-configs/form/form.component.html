@@ -42,9 +42,25 @@
       }
       @if (selectedSection()) {
         <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip" [class.chip--active]="step() === 'form'">
+          <button
+            type="button"
+            class="chip__btn"
+            [disabled]="!selectedForm() || step() === 'form'"
+            (click)="goToForms()"
+          >
+            <i class="bi bi-card-checklist"></i>
+            <span class="chip__label">{{
+              step() === 'break' && selectedForm() ? selectedForm()!.nome : 'Formulários'
+            }}</span>
+          </button>
+        </li>
+      }
+      @if (selectedForm() && step() === 'break') {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
         <li class="chip chip--active">
           <span class="chip__btn chip__btn--static">
-            <i class="bi bi-card-checklist"></i> <span class="chip__label">Formulários</span>
+            <i class="bi bi-pause-circle"></i> <span class="chip__label">Paradas</span>
           </span>
         </li>
       }
@@ -62,8 +78,8 @@
     </div>
   }
 
-  <!-- Filtros -->
-  @if (!loading()) {
+  <!-- Filtros (ocultos na etapa de paradas) -->
+  @if (!loading() && step() !== 'break') {
     <div class="filters">
       <div class="filters__bar">
         <button
@@ -293,6 +309,14 @@
                   <button
                     type="button"
                     class="card__del"
+                    title="Paradas"
+                    (click)="$event.stopPropagation(); openBreaks(fm)"
+                  >
+                    <i class="bi bi-pause-circle"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="card__del"
                     title="Excluir"
                     (click)="$event.stopPropagation(); excluirForm(fm)"
                   >
@@ -323,6 +347,13 @@
               </button>
             }
           </div>
+        }
+      }
+
+      <!-- PARADAS do formulário selecionado -->
+      @case ('break') {
+        @if (selectedForm()) {
+          <app-break-form [formId]="selectedForm()!.id" />
         }
       }
     }

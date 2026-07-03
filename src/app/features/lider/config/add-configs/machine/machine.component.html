@@ -62,10 +62,27 @@
 
       @if (selectedForm()) {
         <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
+        <li class="chip" [class.chip--active]="step() === 'machine'">
+          <button
+            type="button"
+            class="chip__btn"
+            [disabled]="!selectedMachine() || step() === 'machine'"
+            (click)="goToMachines()"
+          >
+            <i class="bi bi-cpu"></i>
+            <span class="chip__label">{{
+              step() === 'break' && selectedMachine() ? selectedMachine()!.nome : 'Máquinas'
+            }}</span>
+          </button>
+        </li>
+      }
+
+      @if (selectedMachine() && step() === 'break') {
+        <li class="trail__sep"><i class="bi bi-chevron-right"></i></li>
         <li class="chip chip--active">
           <span class="chip__btn chip__btn--static">
-            <i class="bi bi-cpu"></i>
-            <span class="chip__label">Máquinas</span>
+            <i class="bi bi-pause-circle"></i>
+            <span class="chip__label">Paradas</span>
           </span>
         </li>
       }
@@ -84,8 +101,8 @@
     </div>
   }
 
-  <!-- Filtros por campo -->
-  @if (!loading()) {
+  <!-- Filtros por campo (ocultos na etapa de paradas) -->
+  @if (!loading() && step() !== 'break') {
     <div class="filters">
       <div class="filters__bar">
         <button
@@ -363,17 +380,27 @@
           </button>
 
           @for (m of filteredMachines(); track trackById($index, m)) {
-            <button type="button" class="card" (click)="detalhar(m)">
+            <div class="card" (click)="detalhar(m)">
               <div class="card__top">
                 <span class="card__icon"><i class="bi bi-cpu"></i></span>
-                <span class="badge" [class.badge--on]="isAtivo(m.status)">
-                  {{ isAtivo(m.status) ? 'Ativo' : 'Inativo' }}
-                </span>
+                <div class="card__top-right">
+                  <span class="badge" [class.badge--on]="isAtivo(m.status)">
+                    {{ isAtivo(m.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                  <button
+                    type="button"
+                    class="card__del"
+                    title="Paradas"
+                    (click)="$event.stopPropagation(); openBreaks(m)"
+                  >
+                    <i class="bi bi-pause-circle"></i>
+                  </button>
+                </div>
               </div>
               <h3 class="card__title">{{ m.nome }}</h3>
               <p class="card__desc">{{ m.descricao || 'Sem descrição' }}</p>
               <span class="card__go">Ver detalhes <i class="bi bi-arrow-right"></i></span>
-            </button>
+            </div>
           }
         </div>
 
@@ -385,6 +412,13 @@
               Limpar filtros
             </button>
           </div>
+        }
+      }
+
+      <!-- ───── PARADAS da máquina selecionada ───── -->
+      @case ('break') {
+        @if (selectedMachine()) {
+          <app-break-machine [machineId]="selectedMachine()!.id" />
         }
       }
     }

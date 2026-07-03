@@ -17,8 +17,9 @@ import { AuthService } from '../../../../../core/services/auth.service';
 import { FormComponent } from './modals/form/form.component';
 import { DetailComponent } from './modals/detail/detail.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
+import { BreakMachineComponent } from './modals/break-machine/break-machine.component';
 
-type Step = 'location' | 'section' | 'form' | 'machine';
+type Step = 'location' | 'section' | 'form' | 'machine' | 'break';
 
 /** Campos filtráveis derivados das interfaces (sem o id). */
 interface Filters {
@@ -36,7 +37,7 @@ interface Filters {
 @Component({
   selector: 'app-machine',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollTopComponent],
+  imports: [CommonModule, FormsModule, ScrollTopComponent, BreakMachineComponent],
   templateUrl: './machine.component.html',
   styleUrl: './machine.component.css',
 })
@@ -61,6 +62,7 @@ export class MachineComponent implements OnInit {
   readonly selectedLocation = signal<Location | null>(null);
   readonly selectedSection = signal<Section | null>(null);
   readonly selectedForm = signal<Form | null>(null);
+  readonly selectedMachine = signal<Machine | null>(null); // máquina cujas paradas serão geridas
 
   // ───────── permissões de local (credentialLocation) ─────────
   /** Nomes dos locais liberados para a credencial logada. */
@@ -223,12 +225,14 @@ export class MachineComponent implements OnInit {
     section: 'Seções',
     form: 'Formulários',
     machine: 'Máquinas',
+    break: 'Paradas',
   };
   private readonly descriptions: Record<Step, string> = {
     location: 'Selecione um local para gerenciar suas maquinas.',
     section: 'Selecione uma seção para gerenciar suas maquinas.',
     form: 'Selecione um formulário para gerenciar suas maquinas.',
     machine: 'Gerencie as máquinas vinculadas deste formulário.',
+    break: 'Gerencie as paradas desta máquina.',
   };
 
   readonly pageTitle = computed(() => this.titles[this.step()]);
@@ -341,6 +345,14 @@ export class MachineComponent implements OnInit {
     this.loadMachines();
   }
 
+  /** Abre a gestão de paradas da máquina. */
+  openBreaks(machine: Machine): void {
+    if (!this.guardLocation()) return;
+    this.clearFeedback();
+    this.selectedMachine.set(machine);
+    this.step.set('break');
+  }
+
   // ============================================================
   //  RETROCEDER / NAVEGAR PELA TRILHA
   // ============================================================
@@ -348,6 +360,9 @@ export class MachineComponent implements OnInit {
   back(): void {
     this.clearFeedback();
     switch (this.step()) {
+      case 'break':
+        this.goToMachines();
+        break;
       case 'machine':
         this.goToForms();
         break;
@@ -366,6 +381,7 @@ export class MachineComponent implements OnInit {
     this.selectedLocation.set(null);
     this.selectedSection.set(null);
     this.selectedForm.set(null);
+    this.selectedMachine.set(null);
     this.sections.set([]);
     this.forms.set([]);
     this.machines.set([]);
@@ -378,6 +394,7 @@ export class MachineComponent implements OnInit {
     this.resetFilters();
     this.selectedSection.set(null);
     this.selectedForm.set(null);
+    this.selectedMachine.set(null);
     this.forms.set([]);
     this.machines.set([]);
     this.step.set('section');
@@ -388,8 +405,18 @@ export class MachineComponent implements OnInit {
     this.clearFeedback();
     this.resetFilters();
     this.selectedForm.set(null);
+    this.selectedMachine.set(null);
     this.machines.set([]);
     this.step.set('form');
+  }
+
+  /** Volta da etapa de paradas para a lista de máquinas. */
+  goToMachines(): void {
+    if (!this.selectedForm()) return;
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedMachine.set(null);
+    this.step.set('machine');
   }
 
   // ============================================================

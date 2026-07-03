@@ -12,8 +12,9 @@ import { ModalService } from '../../../../../core/services/modal.service';
 import { AuthService } from '../../../../../core/services/auth.service';
 import { FormularioFormComponent } from './modals/form/form.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
+import { BreakFormComponent } from './modals/break-form/break-form.component';
 
-type Step = 'location' | 'section' | 'form';
+type Step = 'location' | 'section' | 'form' | 'break';
 
 interface Filters {
   nome: string;
@@ -29,7 +30,7 @@ interface Filters {
 @Component({
   selector: 'app-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollTopComponent],
+  imports: [CommonModule, FormsModule, ScrollTopComponent, BreakFormComponent],
   templateUrl: './form.component.html',
   styleUrl: './form.component.css',
 })
@@ -49,6 +50,7 @@ export class FormComponent implements OnInit {
   readonly forms = signal<Form[]>([]);
   readonly selectedLocation = signal<Location | null>(null);
   readonly selectedSection = signal<Section | null>(null);
+  readonly selectedForm = signal<Form | null>(null); // formulário cujas paradas serão geridas
 
   // ───────── permissões de local (credentialLocation) ─────────
   /** Nomes dos locais liberados para a credencial logada. */
@@ -166,11 +168,13 @@ export class FormComponent implements OnInit {
     location: 'Locais',
     section: 'Seções',
     form: 'Formulários',
+    break: 'Paradas',
   };
   private readonly descriptions: Record<Step, string> = {
     location: 'Selecione um local para gerenciar seus formularios.',
     section: 'Selecione uma seção para gerenciar seus formularios.',
     form: 'Gerencie os formulários desta seção.',
+    break: 'Gerencie as paradas deste formulário.',
   };
   readonly pageTitle = computed(() => this.titles[this.step()]);
   readonly pageDescription = computed(() => this.descriptions[this.step()]);
@@ -260,9 +264,21 @@ export class FormComponent implements OnInit {
     this.loadForms();
   }
 
+  /** Abre a gestão de paradas do formulário. */
+  openBreaks(form: Form): void {
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
+    this.clearFeedback();
+    this.selectedForm.set(form);
+    this.step.set('break');
+  }
+
   back(): void {
     this.clearFeedback();
-    if (this.step() === 'form') this.goToSections();
+    if (this.step() === 'break') this.goToForms();
+    else if (this.step() === 'form') this.goToSections();
     else if (this.step() === 'section') this.goToLocations();
   }
 
@@ -271,6 +287,7 @@ export class FormComponent implements OnInit {
     this.resetFilters();
     this.selectedLocation.set(null);
     this.selectedSection.set(null);
+    this.selectedForm.set(null);
     this.sections.set([]);
     this.forms.set([]);
     this.step.set('location');
@@ -281,8 +298,17 @@ export class FormComponent implements OnInit {
     this.clearFeedback();
     this.resetFilters();
     this.selectedSection.set(null);
+    this.selectedForm.set(null);
     this.forms.set([]);
     this.step.set('section');
+  }
+
+  goToForms(): void {
+    if (!this.selectedSection()) return;
+    this.clearFeedback();
+    this.resetFilters();
+    this.selectedForm.set(null);
+    this.step.set('form');
   }
 
   // ============================================================

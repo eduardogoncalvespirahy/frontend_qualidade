@@ -1,0 +1,130 @@
+<section class="brk">
+  <header class="brk__head">
+    <div>
+      <span class="brk__eyebrow">Paradas</span>
+      <h2 class="brk__title">Paradas da máquina</h2>
+    </div>
+    <button type="button" class="btn btn--primary" (click)="toggleForm()">
+      <i class="bi" [class.bi-plus-lg]="!formOpen()" [class.bi-x-lg]="formOpen()"></i>
+      {{ formOpen() ? 'Cancelar' : 'Nova parada' }}
+    </button>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error"><i class="bi bi-exclamation-triangle"></i> {{ error() }}</div>
+  }
+  @if (success()) {
+    <div class="alert alert--success"><i class="bi bi-check-circle"></i> {{ success() }}</div>
+  }
+
+  <!-- Form de criação -->
+  @if (formOpen()) {
+    <div class="brk__form">
+      <div class="ff">
+        <label class="ff__label" for="brk-ini">Hora de início</label>
+        <input
+          id="brk-ini"
+          type="datetime-local"
+          class="ff__control"
+          [ngModel]="novo().horaInicio"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="updateNovo('horaInicio', $event)"
+        />
+      </div>
+      <div class="ff">
+        <label class="ff__label" for="brk-fim">Hora de fim</label>
+        <input
+          id="brk-fim"
+          type="datetime-local"
+          class="ff__control"
+          [ngModel]="novo().horaFim"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="updateNovo('horaFim', $event)"
+        />
+      </div>
+      <div class="ff ff--wide">
+        <label class="ff__label" for="brk-motivo">Motivo (opcional)</label>
+        <input
+          id="brk-motivo"
+          type="text"
+          class="ff__control"
+          placeholder="Ex.: manutenção, troca de turno…"
+          [ngModel]="novo().motivo"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="updateNovo('motivo', $event)"
+        />
+      </div>
+      <div class="brk__form-actions">
+        <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="criar()">
+          <i class="bi bi-check-lg"></i> Criar parada
+        </button>
+      </div>
+      <p class="brk__hint">
+        <i class="bi bi-info-circle"></i>
+        O início deve ser agora ou depois; o fim, sempre após o início.
+      </p>
+    </div>
+  }
+
+  <!-- Lista -->
+  @if (loading()) {
+    <div class="brk__grid">
+      @for (s of [1, 2, 3]; track s) {
+        <div class="brk-card brk-card--skeleton"></div>
+      }
+    </div>
+  } @else if (ordenadas().length === 0) {
+    <div class="empty">
+      <i class="bi bi-pause-circle"></i>
+      <p>Nenhuma parada registrada para esta máquina.</p>
+    </div>
+  } @else {
+    <div class="brk__grid">
+      @for (b of ordenadas(); track trackById($index, b)) {
+        <div class="brk-card" [class.is-off]="!ativa(b)">
+          <div class="brk-card__top">
+            <span class="brk-card__icon"><i class="bi bi-pause-circle"></i></span>
+            <span
+              class="badge"
+              [class.badge--on]="ativa(b)"
+              [class.badge--sched]="label(b) === 'Agendada'"
+              [class.badge--exp]="label(b) === 'Expirada'"
+            >
+              {{ label(b) }}
+            </span>
+          </div>
+
+          <div class="brk-card__times">
+            <span><i class="bi bi-play-fill"></i> {{ fmt(b.horaInicio) }}</span>
+            <span><i class="bi bi-stop-fill"></i> {{ fmt(b.horaFim) }}</span>
+          </div>
+
+          @if (b.motivo) {
+            <p class="brk-card__motivo">{{ b.motivo }}</p>
+          }
+
+          <div class="brk-card__actions">
+            @if (podeDesativar(b)) {
+              <button
+                type="button"
+                class="btn btn--ghost"
+                [disabled]="saving()"
+                (click)="desativar(b)"
+              >
+                <i class="bi bi-toggle-off"></i> Desativar
+              </button>
+            }
+            @if (podeAtivar(b)) {
+              <button type="button" class="btn btn--ok" [disabled]="saving()" (click)="ativar(b)">
+                <i class="bi bi-toggle-on"></i> Ativar
+              </button>
+            }
+            @if (expirada(b)) {
+              <span class="brk-card__note"><i class="bi bi-clock-history"></i> Encerrada</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>

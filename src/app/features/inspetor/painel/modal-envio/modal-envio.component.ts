@@ -42,9 +42,8 @@ export class ModalEnvioComponent implements AfterViewInit {
   protected readonly matricula = signal('');
 
   // maquinas
-  readonly machines         = input<Machine[]>([]);
+  readonly machines = input<Machine[]>([]);
   readonly machineResposta = input<Record<string, string>>({});
-
 
   // Canvas de assinatura
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -62,21 +61,19 @@ export class ModalEnvioComponent implements AfterViewInit {
   private signature!: SignatureComponent;
   //assinatura modal
 
-ngAfterViewInit(): void {
-  this.iniciarBuscaReativa(); // ← sempre chama, independente do canvas
+  ngAfterViewInit(): void {
+    this.iniciarBuscaReativa(); // ← sempre chama, independente do canvas
 
-  if (!this.canvasRef?.nativeElement) return;
-  const canvas = this.canvasRef.nativeElement;
-  this.ctx = canvas.getContext('2d')!;
-  this.ctx.strokeStyle = '#000';
-  this.ctx.lineWidth = 2;
-  this.ctx.lineCap = 'round';
-  console.log('MACHINE RESPOSTAS:', this.machineRespostas());
+    if (!this.canvasRef?.nativeElement) return;
+    const canvas = this.canvasRef.nativeElement;
+    this.ctx = canvas.getContext('2d')!;
+    this.ctx.strokeStyle = '#000';
+    this.ctx.lineWidth = 2;
+    this.ctx.lineCap = 'round';
+    console.log('MACHINE RESPOSTAS:', this.machineRespostas());
+  }
 
-}
-
-readonly machineRespostas = input<Record<string, string>>({});
-
+  readonly machineRespostas = input<Record<string, string>>({});
 
   // Subject é como um "canal de eventos" — cada vez que o usuário digita,
   // jogamos o valor novo aqui dentro com .next()
@@ -117,12 +114,15 @@ readonly machineRespostas = input<Record<string, string>>({});
           );
         }),
       )
-      .subscribe((profiles) => { 
-        console.log('PROFILES:', profiles?.data?.map(p => ({ 
-          matricula: p.employeeMatricula, 
-          userId: p.userId, 
-          nome: p.employeeNome 
-        })));
+      .subscribe((profiles) => {
+        console.log(
+          'PROFILES:',
+          profiles?.data?.map((p) => ({
+            matricula: p.employeeMatricula,
+            userId: p.userId,
+            nome: p.employeeNome,
+          })),
+        );
         console.log('BUSCANDO POR:', this.matricula());
         // Aqui chegam os dados (ou null em caso de erro/vazio)
 
@@ -192,17 +192,15 @@ readonly machineRespostas = input<Record<string, string>>({});
   }
 
   // Retorna todos os dados prontos para o pai enviar ao backend
-value() {
-  return {
-    observacao:       this.observacao(),
-    matricula:        this.matricula(),
-    userId:           this.userId(),
-    assinatura:       this.assinatura(),
-    respostas:        this.respostas(),
-    machineRespostas: this.machineRespostas(),
-    temMaquina:       this.machines().length > 0,
-  };
-}
-
-
+  value() {
+    return {
+      observacao: this.observacao(),
+      matricula: this.matricula(),
+      userId: this.userId(),
+      assinatura: this.assinatura(),
+      respostas: this.respostas(),
+      machineRespostas: this.machineRespostas(),
+      temMaquina: this.machines().length > 0,
+    };
+  }
 }

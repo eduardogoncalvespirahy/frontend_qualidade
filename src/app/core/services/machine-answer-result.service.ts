@@ -31,10 +31,10 @@ export class MachineAnswerResultService {
     return this.http.get<MachineAnswerResult>(`${this.apiUrl}/${id}`);
   }
 
-  // Busca todas as respostas de um parâmetro de máquina específico
-  getByMachineAnswerId(machineAnswerId: string): Observable<MachineAnswerResult[]> {
+  // Busca a resposta de um parâmetro de máquina específico mais atual
+  getByAnswerId(answerId: string): Observable<MachineAnswerResult[]> {
     return this.http.get<MachineAnswerResult[]>(
-      `${this.apiUrl}/machine-answer/${machineAnswerId}`,
+      `${this.apiUrl}/answer/${answerId}`,
     );
   }
 

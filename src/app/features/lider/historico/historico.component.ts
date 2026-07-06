@@ -283,9 +283,9 @@ export class HistoricoComponent implements OnInit {
   this.expandedLoading.set(row.id);
 
   forkJoin({
-    answers:        this.answerService.getAll(1000, 1).pipe(catchError(() => of(null))),
-    answerResults:  this.answerResultService.getControlIdAll(row.id).pipe(catchError(() => of([]))),
-    machineResults: this.machineAnswerResultService.getControlIdAll(row.id).pipe(catchError(() => of([]))),
+    answers:        this.answerService.getAll(1000, 1).pipe(catchError((err) => of([...err]))),
+    answerResults:  this.answerResultService.getControlIdAll(row.id).pipe(catchError((err) => of([...err]))),
+    machineResults: this.machineAnswerResultService.getControlIdAll(row.id).pipe(catchError((err) => of([...err]))),
   }).subscribe({
     next: ({ answers, answerResults, machineResults }) => {
       const allAnswers = this.unwrap<Answer>(answers).filter(a => a.formId === row.formId);

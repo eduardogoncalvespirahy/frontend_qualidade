@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 
+import { SignatureFile } from '../../../core/models/signature-file.model';
 import { Machine } from '../../../core/models/machine.model';
 import { Location } from '../../../core/models/location.model';
 import { Section } from '../../../core/models/section.model';
@@ -27,6 +28,7 @@ import { LimitAnswerService } from '../../../core/services/limit-answer.service'
 import { LimitAnswer } from '../../../core/models/limit-answer.model';
 import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
 
+// ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
 import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
@@ -474,43 +476,43 @@ export class PainelComponent implements OnInit {
     }, 0);
   });
 
-  save(): void {
-    this.clearFeedback();
+  // save(): void {
+  //   this.clearFeedback();
 
-    const values = this.paramValues();
-    const existing = this.existingResults();
-    const ops: Observable<AnswerResult>[] = [];
+  //   const values = this.paramValues();
+  //   const existing = this.existingResults();
+  //   const ops: Observable<AnswerResult>[] = [];
 
-    for (const a of this.answers()) {
-      const value = (values[a.id] ?? '').trim();
-      if (!value) continue;
+  //   for (const a of this.answers()) {
+  //     const value = (values[a.id] ?? '').trim();
+  //     if (!value) continue;
 
-      const prev = existing[a.id];
-      if (prev && prev.resposta === value) continue; // sem alteração → ignora
+  //     const prev = existing[a.id];
+  //     if (prev && prev.resposta === value) continue; // sem alteração → ignora
 
-      // Sem constraint de answerId único: cada alteração gera uma nova linha
-      // (o valor anterior fica preservado como histórico).
-      ops.push(this.answerResultService.create({ AnswerId: a.id, resposta: value }));
-    }
+  //     // Sem constraint de answerId único: cada alteração gera uma nova linha
+  //     // (o valor anterior fica preservado como histórico).
+  //     ops.push(this.answerResultService.create({ AnswerId: a.id, resposta: value }));
+  //   }
 
-    if (ops.length === 0) {
-      this.error.set('Nenhuma alteração para salvar.');
-      return;
-    }
+  //   if (ops.length === 0) {
+  //     this.error.set('Nenhuma alteração para salvar.');
+  //     return;
+  //   }
 
-    this.saving.set(true);
-    forkJoin(ops).subscribe({
-      next: () => {
-        this.saving.set(false);
-        this.success.set(`${ops.length} resposta(s) salva(s) com sucesso.`);
-        this.refreshResults(); // recarrega os "valores atuais"
-      },
-      error: () => {
-        this.saving.set(false);
-        this.error.set('Erro ao salvar as respostas. Tente novamente.');
-      },
-    });
-  }
+  //   this.saving.set(true);
+  //   forkJoin(ops).subscribe({
+  //     next: () => {
+  //       this.saving.set(false);
+  //       this.success.set(`${ops.length} resposta(s) salva(s) com sucesso.`);
+  //       this.refreshResults(); // recarrega os "valores atuais"
+  //     },
+  //     error: () => {
+  //       this.saving.set(false);
+  //       this.error.set('Erro ao salvar as respostas. Tente novamente.');
+  //     },
+  //   });
+  // }
 
   /** Recarrega os valores gravados após salvar. */
   private refreshResults(): void {
@@ -790,6 +792,10 @@ export class PainelComponent implements OnInit {
     machineRespostas: Record<string, string>;
     temMaquina: boolean;
   }): void {
+    // pra não salvar
+    this.paramValues.set({});
+    this.machineParamValues.set({});
+
     this.saving.set(true);
 
     this.signatureFileService
@@ -810,7 +816,7 @@ export class PainelComponent implements OnInit {
               dataEmissao: new Date(),
             })
             .subscribe({
-              next: () => {
+              next: (control) => {
                 let ops: Observable<unknown>[] = [];
 
                 if (dados.temMaquina) {
@@ -821,6 +827,7 @@ export class PainelComponent implements OnInit {
                       return this.machineAnswerResultService.create({
                         machineId,
                         answerId: answerId,
+                        controlId: control.id,
                         resposta: valor,
                         limitsAnswerId: this.limitsMap()[answerId] ?? null,
                       });
@@ -831,6 +838,7 @@ export class PainelComponent implements OnInit {
                     .map((a) =>
                       this.answerResultService.create({
                         AnswerId: a.id,
+                        controlId: control.id,
                         resposta: dados.respostas[a.id],
                         limitsAnswerId: this.limitsMap()[a.id] ?? null,
                       }),
@@ -838,6 +846,8 @@ export class PainelComponent implements OnInit {
                 }
 
                 if (!ops.length) {
+                  this.paramValues.set({});
+                  this.machineParamValues.set({});
                   this.saving.set(false);
                   this.success.set('Inspeção enviada com sucesso!');
                   return;
@@ -845,6 +855,8 @@ export class PainelComponent implements OnInit {
 
                 forkJoin(ops).subscribe({
                   next: () => {
+                    this.paramValues.set({});
+                    this.machineParamValues.set({});
                     this.saving.set(false);
                     this.success.set('Inspeção enviada com sucesso!');
                   },

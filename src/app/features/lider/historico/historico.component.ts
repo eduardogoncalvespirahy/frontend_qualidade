@@ -271,85 +271,60 @@ export class HistoricoComponent implements OnInit {
   // ───────── Para Layout do HTML ─────────
 
   toggleDetails(row: HistoryRow): void {
-    if (this.expandedId() === row.id) {
-      this.expandedId.set(null);
-      return;
-    }
-
-    // Blindagem: não expande detalhes de um local fora do escopo.
-    if (!this.isFormAllowed(row.formId)) {
-      this.error.set('Você não tem acesso a este local.');
-      return;
-    }
-
-    this.expandedId.set(row.id);
-
-    // já carregou antes — usa cache
-    if (this.expandedData()[row.id] || this.expandedMachineData()[row.id]) return;
-
-    this.expandedLoading.set(row.id);
-
-    this.answerService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const answers = this.unwrap<Answer>(res).filter((a) => a.formId === row.formId);
-
-        if (!answers.length) {
-          this.expandedData.update((d) => ({ ...d, [row.id]: [] }));
-          this.expandedLoading.set(null);
-          return;
-        }
-
-        // busca machine_answer_result e answer_result em paralelo
-        forkJoin({
-          machineResults: this.machineAnswerResultService
-            .getAll(1000, 1)
-            .pipe(catchError(() => of(null))),
-          answerResults: forkJoin(
-            answers.map((a) =>
-              this.answerResultService.getByAnswerId(a.id).pipe(catchError(() => of([]))),
-            ),
-          ),
-        }).subscribe({
-          next: ({ machineResults, answerResults }) => {
-            const allMachine = this.unwrap<MachineAnswerResult>(machineResults).filter((r) =>
-              answers.some((a) => a.id === r.answerId),
-            );
-
-            if (allMachine.length > 0) {
-              const machineIds = [...new Set(allMachine.map((r) => r.machineId))];
-              const maquinas = machineIds.map((id) => ({ id, nome: id }));
-              const cells: Record<string, string> = {};
-              allMachine.forEach((r) => {
-                cells[`${r.machineId}_${r.answerId}`] = r.resposta;
-              });
-              this.expandedMachineData.update((d) => ({
-                ...d,
-                [row.id]: {
-                  maquinas,
-                  answers: answers.map((a) => ({ id: a.id, nome: a.nome })),
-                  cells,
-                },
-              }));
-            } else {
-              // modo normal — lista parâmetro + resposta
-              const linhas = answers.map((a, i) => {
-                const resultados = (answerResults[i] ?? []) as AnswerResult[];
-                const ultimo = resultados.sort(
-                  (x, y) => new Date(y.dataCriacao).getTime() - new Date(x.dataCriacao).getTime(),
-                )[0];
-                return { nome: a.nome, resposta: ultimo?.resposta ?? '—' };
-              });
-              this.expandedData.update((d) => ({ ...d, [row.id]: linhas }));
-            }
-
-            this.expandedLoading.set(null);
-          },
-          error: () => this.expandedLoading.set(null),
-        });
-      },
-      error: () => this.expandedLoading.set(null),
-    });
+  if (this.expandedId() === row.id) {
+    this.expandedId.set(null);
+    return;
   }
+
+  this.expandedId.set(row.id);
+
+  if (this.expandedData()[row.id] || this.expandedMachineData()[row.id]) return;
+
+  this.expandedLoading.set(row.id);
+
+  forkJoin({
+    answers:        this.answerService.getAll(1000, 1).pipe(catchError(() => of(null))),
+    answerResults:  this.answerResultService.getControlIdAll(row.id).pipe(catchError(() => of([]))),
+    machineResults: this.machineAnswerResultService.getControlIdAll(row.id).pipe(catchError(() => of([]))),
+  }).subscribe({
+    next: ({ answers, answerResults, machineResults }) => {
+      const allAnswers = this.unwrap<Answer>(answers).filter(a => a.formId === row.formId);
+      const allMachine = this.unwrap<MachineAnswerResult>(machineResults)
+        .filter(r => allAnswers.some(a => a.id === r.answerId));
+
+      if (allMachine.length > 0) {
+        const machineIds = [...new Set(allMachine.map(r => r.machineId))];
+        const maquinas = machineIds.map(id => ({ id, nome: id }));
+        const cells: Record<string, string> = {};
+        allMachine.forEach(r => {
+          cells[`${r.machineId}_${r.answerId}`] = r.resposta;
+        });
+        this.expandedMachineData.update(d => ({
+          ...d,
+          [row.id]: {
+            maquinas,
+            answers: allAnswers.map(a => ({ id: a.id, nome: a.nome })),
+            cells,
+          },
+        }));
+      } else {
+        const resultMap = new Map(
+          this.unwrap<AnswerResult>(answerResults).map(r => [r.AnswerId, r])
+        );
+
+        const linhas = allAnswers.map(a => ({
+          nome:     a.nome,
+          resposta: resultMap.get(a.id)?.resposta ?? '—',
+        }));
+        this.expandedData.update(d => ({ ...d, [row.id]: linhas }));
+      }
+
+      this.expandedLoading.set(null);
+    },
+    error: () => this.expandedLoading.set(null),
+  });
+}
+
 
   // ───────── linhas do histórico (mais recentes primeiro) ─────────
   readonly rows = computed<HistoryRow[]>(() => {

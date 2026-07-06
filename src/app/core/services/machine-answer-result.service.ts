@@ -24,6 +24,7 @@ export class MachineAnswerResultService {
   };
 
   create(data: MachineAnswerResultCreate): Observable<MachineAnswerResult> {
+    console.log('Criando resposta de máquina com os seguintes dados:', data);
     return this.http.post<MachineAnswerResult>(this.apiUrl, data, this.httpOptions);
   }
 

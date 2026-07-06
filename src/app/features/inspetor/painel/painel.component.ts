@@ -883,13 +883,23 @@ export class PainelComponent implements OnInit {
                     if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
 
                     resultOps.push(
-                      this.machineAnswerResultService.create({
-                        machineId,
-                        answerId,
-                        controlId: control.id,
-                        resposta: valor,
-                        limitsAnswerId: this.limitsMap()[answerId] ?? null,
-                      }),
+                      this.machineAnswerResultService
+                        .create({
+                          machineId,
+                          answerId,
+                          controlId: control.id,
+                          resposta: valor,
+                          limitsAnswerId: this.limitsMap()[answerId] ?? null,
+                        })
+                        .pipe(
+                          catchError((err) => {
+                            console.error(
+                              `Falha ao salvar resposta da máquina ${machineId} para o parâmetro ${answerId}:`,
+                              err,
+                            );
+                            return of(null); // Continua mesmo se falhar
+                          }),
+                        ),
                     );
                   }
                 } else {
@@ -900,12 +910,19 @@ export class PainelComponent implements OnInit {
                     if (!this.dentroDoLimite(a.id, valor)) algumForaDoLimite = true;
 
                     resultOps.push(
-                      this.answerResultService.create({
-                        AnswerId: a.id,
-                        controlId: control.id,
-                        resposta: valor,
-                        limitsAnswerId: this.limitsMap()[a.id] ?? null,
-                      }),
+                      this.answerResultService
+                        .create({
+                          AnswerId: a.id,
+                          controlId: control.id,
+                          resposta: valor,
+                          limitsAnswerId: this.limitsMap()[a.id] ?? null,
+                        })
+                        .pipe(
+                          catchError((err) => {
+                            console.error(`Falha ao salvar resposta do parâmetro ${a.id}:`, err);
+                            return of(null); // Continua mesmo se falhar
+                          }),
+                        ),
                     );
                   }
                 }

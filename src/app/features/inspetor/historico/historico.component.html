@@ -172,6 +172,24 @@
             <!-- cabeçalho — clicável -->
             <div class="tl-card__head" style="cursor: pointer" (click)="toggleDetails(r)">
               <h3 class="tl-card__title">{{ r.formNome }}</h3>
+              @if ((controlStatuses()[r.id] ?? []).length > 0) {
+                @for (s of controlStatuses()[r.id]; track s) {
+                  <span
+                    class="tl-chip"
+                    [class.tl-chip--ok]="s.toLowerCase().includes('dentro')"
+                    [class.tl-chip--err]="s.toLowerCase().includes('fora')"
+                  >
+                    <i
+                      class="bi"
+                      [class.bi-check-circle-fill]="s.toLowerCase().includes('dentro')"
+                      [class.bi-exclamation-triangle-fill]="s.toLowerCase().includes('fora')"
+                    >
+                    </i>
+                    {{ s }}
+                  </span>
+                }
+              }
+
               <div style="display: flex; align-items: center; gap: 0.5rem">
                 <span class="tl-date">
                   <i class="bi bi-calendar-event"></i> {{ data(r.dataEmissao) }}

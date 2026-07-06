@@ -12,6 +12,8 @@ import { Section } from '../../../core/models/section.model';
 import { Location } from '../../../core/models/location.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 import { MachineAnswerResult } from '../../../core/models/machine-answer-result.model';
+import { Status } from '../../../core/models/status.model';
+import { ControlStatus } from '../../../core/models/controlStatus.model';
 
 import { ControlService } from '../../../core/services/control.service';
 import { FormService } from '../../../core/services/form.service';
@@ -23,6 +25,8 @@ import { LocationService } from '../../../core/services/location.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
 import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { StatusService } from '../../../core/services/status.service';
+import { ControlStatusService } from '../../../core/services/control-status.service';
 
 type FileLike = Record<string, unknown>;
 
@@ -39,6 +43,7 @@ interface HistoryRow {
   observacao: string | null;
   dataEmissao: Date | string;
   dataCriacao: Date | string;
+  statusNomes: string;
 }
 
 interface Filters {
@@ -49,6 +54,7 @@ interface Filters {
   sectionId: string;
   de: string;
   ate: string;
+  /* statusNomes: string; ------ pro futuro */
 }
 
 @Component({
@@ -69,6 +75,8 @@ export class HistoricoComponent implements OnInit {
   private readonly answerResultService = inject(AnswerResultService);
   private readonly machineAnswerResultService = inject(MachineAnswerResultService);
   private readonly auth = inject(AuthService);
+  private readonly controlStatusService = inject(ControlStatusService);
+  private readonly status = inject(StatusService);
 
   readonly controls = signal<Control[]>([]);
   readonly forms = signal<Form[]>([]);
@@ -81,6 +89,7 @@ export class HistoricoComponent implements OnInit {
   readonly expandedData = signal<Record<string, { nome: string; resposta: string }[]>>({});
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly controlStatuses = signal<Record<string, string[]>>({});
 
   // ───────── permissões de local (credentialLocation) ─────────
   /** Nomes dos locais liberados para a credencial logada. */
@@ -271,6 +280,8 @@ export class HistoricoComponent implements OnInit {
   // ───────── Para Layout do HTML ─────────
 
   toggleDetails(row: HistoryRow): void {
+    console.log('CONTROL ID:', row.id, 'FORM ID:', row.formId);
+
     if (this.expandedId() === row.id) {
       this.expandedId.set(null);
       return;
@@ -302,13 +313,11 @@ export class HistoricoComponent implements OnInit {
         // busca machine_answer_result e answer_result em paralelo
         forkJoin({
           machineResults: this.machineAnswerResultService
-            .getAll(1000, 1)
+            .getControlIdAll(row.id, 1000, 1)
             .pipe(catchError(() => of(null))),
-          answerResults: forkJoin(
-            answers.map((a) =>
-              this.answerResultService.getByAnswerId(a.id).pipe(catchError(() => of([]))),
-            ),
-          ),
+          answerResults: this.answerResultService
+            .getControlIdAll(row.id, 1000, 1)
+            .pipe(catchError(() => of(null))),
         }).subscribe({
           next: ({ machineResults, answerResults }) => {
             const allMachine = this.unwrap<MachineAnswerResult>(machineResults).filter((r) =>
@@ -332,20 +341,20 @@ export class HistoricoComponent implements OnInit {
               }));
             } else {
               // modo normal — lista parâmetro + resposta
-              const linhas = answers.map((a, i) => {
-                const resultados = (answerResults[i] ?? []) as AnswerResult[];
-                const ultimo = resultados.sort(
-                  (x, y) => new Date(y.dataCriacao).getTime() - new Date(x.dataCriacao).getTime(),
-                )[0];
-                return { nome: a.nome, resposta: ultimo?.resposta ?? '—' };
-              });
-              this.expandedData.update((d) => ({ ...d, [row.id]: linhas }));
-            }
+              const resultMap = new Map(
+        this.unwrap<AnswerResult>(answerResults).map(r => [r.AnswerId, r])
+      );
+      const linhas = answers.map(a => ({
+        nome:     a.nome,
+        resposta: resultMap.get(a.id)?.resposta ?? '—',
+      }));
+      this.expandedData.update(d => ({ ...d, [row.id]: linhas }));
+    }
 
-            this.expandedLoading.set(null);
-          },
-          error: () => this.expandedLoading.set(null),
-        });
+    this.expandedLoading.set(null);
+  },
+  error: () => this.expandedLoading.set(null),
+});
       },
       error: () => this.expandedLoading.set(null),
     });
@@ -480,6 +489,17 @@ export class HistoricoComponent implements OnInit {
         this.sections.set(this.unwrap<Section>(sections));
         this.locations.set(this.unwrap<Location>(locations));
         this.loading.set(false);
+        // busca status de cada control APÓS ter os controls
+        const ctrls = this.unwrap<Control>(controls);
+        forkJoin(
+          ctrls.map((c) =>
+            this.controlStatusService.getStatusNamesByControl(c.id).pipe(catchError(() => of([]))),
+          ),
+        ).subscribe((results) => {
+          const map: Record<string, string[]> = {};
+          ctrls.forEach((c, i) => (map[c.id] = results[i] as string[]));
+          this.controlStatuses.set(map);
+        });
       },
       error: () => {
         this.loading.set(false);

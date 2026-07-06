@@ -30,6 +30,7 @@ import { MachineAnswerResultService } from '../../../core/services/machine-answe
 
 // ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
 import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
+import { ControlStatusService } from '../../../core/services/control-status.service';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -783,6 +784,72 @@ export class PainelComponent implements OnInit {
 
   private readonly signatureFileService = inject(SignatureFileService);
   private readonly controlService = inject(ControlService);
+  private readonly controlStatusService = inject(ControlStatusService);
+
+  private verificaControlAnteriorByFormId(formId: string): void {
+    this.controlService.getByFormId(formId).subscribe({
+      next: (controls) => {
+        const existingControl = controls.at(0); // Pega o controle mais atual existente para este formulário, se houver
+        if (existingControl) {
+          this.controlStatusService.getByControl(existingControl.id).subscribe({
+            next: (status) => {
+              switch (status.statusId) {
+                case '1':
+                  // Lógica para status 'normalizado'
+                  break;
+                case '2':
+                  // Lógica para status 'correção'
+                  this.controlStatusService.update(existingControl.id, '3').subscribe({
+                    next: (controlStatus) => {
+                      console.log(
+                        `Status do controlId ${existingControl.id} atualizado para "${controlStatus.statusId} - pendente" com sucesso.`,
+                      );
+                    },
+                    error: (err) => {
+                      console.error('Erro ao atualizar status do controle:', err);
+                    },
+                  });
+                  break;
+                case '3':
+                  // Lógica para status 'pendente'
+                  break;
+              }
+            },
+            error: (err) => {
+              console.error('Erro ao buscar status do controle:', err);
+            },
+          });
+        }
+      },
+    });
+  }
+
+  private verificalimites(
+    limitsAnswerId: string | null | undefined,
+    valor: string,
+  ): boolean | void {
+    if (!limitsAnswerId?.trim() || !valor?.trim()) return;
+
+    this.limitsService.getById(limitsAnswerId).subscribe({
+      next: (limit) => {
+        if (!limit) return;
+
+        const valorConvertido = parseFloat(valor);
+        if (Number.isNaN(valorConvertido)) {
+          return;
+        }
+
+        const min = parseFloat(limit.limitMin ?? '0');
+        const max = parseFloat(limit.limitMax ?? '0');
+        const valido = valorConvertido >= min && valorConvertido <= max;
+
+        return valido;
+      },
+      error: (err) => {
+        console.error('Erro ao buscar limite:', err);
+      },
+    });
+  }
 
   private salvarEnvio(dados: {
     userId: string | null;
@@ -807,6 +874,8 @@ export class PainelComponent implements OnInit {
       })
       .subscribe({
         next: (file) => {
+          this.verificaControlAnteriorByFormId(this.selectedForm()!.id);
+
           this.controlService
             .create({
               formId: this.selectedForm()!.id,
@@ -824,25 +893,44 @@ export class PainelComponent implements OnInit {
                     .filter(([, valor]) => valor?.trim())
                     .map(([chave, valor]) => {
                       const [machineId, answerId] = chave.split('_');
-                      return this.machineAnswerResultService.create({
+
+                      const limiteValido = this.verificalimites(this.limitsMap()[answerId], valor);
+
+                      const machineAnswerResult = this.machineAnswerResultService.create({
                         machineId,
                         answerId: answerId,
                         controlId: control.id,
                         resposta: valor,
                         limitsAnswerId: this.limitsMap()[answerId] ?? null,
                       });
+
+                      this.controlStatusService.create({
+                        controlId: control.id,
+                        statusId: limiteValido ? '1' : '2', // 1 = normalizado, 2 = correção
+                      });
+
+                      return machineAnswerResult;
                     });
                 } else {
                   ops = this.answers()
                     .filter((a) => dados.respostas[a.id]?.trim())
-                    .map((a) =>
-                      this.answerResultService.create({
+                    .map((a) => {
+                      const limiteValido = this.verificalimites(a.id, dados.respostas[a.id]);
+
+                      const answerResult = this.answerResultService.create({
                         AnswerId: a.id,
                         controlId: control.id,
                         resposta: dados.respostas[a.id],
                         limitsAnswerId: this.limitsMap()[a.id] ?? null,
-                      }),
-                    );
+                      });
+
+                      this.controlStatusService.create({
+                        controlId: control.id,
+                        statusId: limiteValido ? '1' : '2', // 1 = normalizado, 2 = correção
+                      });
+
+                      return answerResult;
+                    });
                 }
 
                 if (!ops.length) {

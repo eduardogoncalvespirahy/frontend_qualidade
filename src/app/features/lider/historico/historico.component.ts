@@ -283,40 +283,56 @@ export class HistoricoComponent implements OnInit {
   this.expandedLoading.set(row.id);
 
   forkJoin({
-    answers:        this.answerService.getAll(1000, 1).pipe(catchError((err) => of([...err]))),
-    answerResults:  this.answerResultService.getControlIdAll(row.id).pipe(catchError((err) => of([...err]))),
-    machineResults: this.machineAnswerResultService.getControlIdAll(row.id).pipe(catchError((err) => of([...err]))),
+    answers: this.answerService.getAll(1000, 1).pipe(
+      catchError((err) => {
+        console.error('Falha ao buscar:', err);
+        return of([]); // Retorna uma lista vazia segura para a interface
+      }),
+    ),
+    answerResults: this.answerResultService.getControlIdAll(row.id).pipe(
+      catchError((err) => {
+        console.error('Falha ao buscar:', err);
+        return of([]); // Retorna uma lista vazia segura para a interface
+      }),
+    ),
+    machineResults: this.machineAnswerResultService.getControlIdAll(row.id).pipe(
+      catchError((err) => {
+        console.error('Falha ao buscar:', err);
+        return of([]); // Retorna uma lista vazia segura para a interface
+      }),
+    ),
   }).subscribe({
     next: ({ answers, answerResults, machineResults }) => {
-      const allAnswers = this.unwrap<Answer>(answers).filter(a => a.formId === row.formId);
-      const allMachine = this.unwrap<MachineAnswerResult>(machineResults)
-        .filter(r => allAnswers.some(a => a.id === r.answerId));
+      const allAnswers = this.unwrap<Answer>(answers).filter((a) => a.formId === row.formId);
+      const allMachine = this.unwrap<MachineAnswerResult>(machineResults).filter((r) =>
+        allAnswers.some((a) => a.id === r.answerId),
+      );
 
       if (allMachine.length > 0) {
-        const machineIds = [...new Set(allMachine.map(r => r.machineId))];
-        const maquinas = machineIds.map(id => ({ id, nome: id }));
+        const machineIds = [...new Set(allMachine.map((r) => r.machineId))];
+        const maquinas = machineIds.map((id) => ({ id, nome: id }));
         const cells: Record<string, string> = {};
-        allMachine.forEach(r => {
+        allMachine.forEach((r) => {
           cells[`${r.machineId}_${r.answerId}`] = r.resposta;
         });
-        this.expandedMachineData.update(d => ({
+        this.expandedMachineData.update((d) => ({
           ...d,
           [row.id]: {
             maquinas,
-            answers: allAnswers.map(a => ({ id: a.id, nome: a.nome })),
+            answers: allAnswers.map((a) => ({ id: a.id, nome: a.nome })),
             cells,
           },
         }));
       } else {
         const resultMap = new Map(
-          this.unwrap<AnswerResult>(answerResults).map(r => [r.AnswerId, r])
+          this.unwrap<AnswerResult>(answerResults).map((r) => [r.AnswerId, r]),
         );
 
-        const linhas = allAnswers.map(a => ({
-          nome:     a.nome,
+        const linhas = allAnswers.map((a) => ({
+          nome: a.nome,
           resposta: resultMap.get(a.id)?.resposta ?? '—',
         }));
-        this.expandedData.update(d => ({ ...d, [row.id]: linhas }));
+        this.expandedData.update((d) => ({ ...d, [row.id]: linhas }));
       }
 
       this.expandedLoading.set(null);

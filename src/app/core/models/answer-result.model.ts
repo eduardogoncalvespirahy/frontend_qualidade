@@ -1,6 +1,7 @@
 export interface AnswerResult {
   id: string,
   AnswerId: string;
+  controlId: string;
   resposta: string;
   limitsAnswerId: string | null;
   dataCriacao: Date;
@@ -9,6 +10,7 @@ export interface AnswerResult {
 
 export interface AnswerResultCreate {
   AnswerId: string;
+  controlId: string;  
   resposta: string;
   limitsAnswerId?: string | null;
   dataCriacao?: Date;
@@ -18,6 +20,7 @@ export interface AnswerResultCreate {
 export interface AnswerResultUpdate {
   id: string;
   AnswerId: string;
+  controlId: string;
   resposta: string;
   limitsAnswerId?: string | null;
   dataCriacao?: Date;

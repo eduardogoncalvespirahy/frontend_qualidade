@@ -41,6 +41,14 @@ export class AnswerResultService {
     return this.http.get<PaginatedResult<AnswerResult>>(this.apiUrl, { params });
   }
 
+  // Busca todas as respostas de um controle de envio específico  
+  getControlIdAll(controlId: string, limit?: number, page?: number): Observable<PaginatedResult<AnswerResult>> {
+    let params = new HttpParams();
+    if (limit != null) params = params.set('limit', limit.toString());
+    if (page  != null) params = params.set('page',  page.toString());
+    return this.http.get<PaginatedResult<AnswerResult>>(`${this.apiUrl}/control/${controlId}`, { params });
+  }
+
   delete(id: string): Observable<AnswerResult> {
     return this.http.delete<AnswerResult>(`${this.apiUrl}/${id}`);
   }

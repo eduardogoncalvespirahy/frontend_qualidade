@@ -3,6 +3,7 @@ export interface MachineAnswerResult {
   id: string;
   machineId: string;
   answerId: string;
+  controlId: string;  
   resposta: string;
   limitsAnswerId: string | null;
   dataCriacao: Date;
@@ -13,6 +14,7 @@ export interface MachineAnswerResult {
 export interface MachineAnswerResultCreate {
   machineId: string;
   answerId: string;
+  controlId: string;  
   resposta: string;
   limitsAnswerId?: string | null;
   dataCriacao?: Date;
@@ -23,6 +25,7 @@ export interface MachineAnswerResultCreate {
 export interface MachineAnswerResultUpdate {
   machineId: string;
   answerId: string;
+  controlId: string;  
   resposta: string;
   limitsAnswerId?: string | null;
   dataCriacao?: Date;

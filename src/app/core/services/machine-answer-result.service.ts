@@ -8,6 +8,7 @@ import {
   MachineAnswerResultCreate,
   MachineAnswerResultUpdate,
 } from '../models/machine-answer-result.model';
+import { AnswerResult } from '../models/answer-result.model';
 
 // Serviço responsável pelas respostas de parâmetros de máquina (machine_answer_result)
 @Injectable({
@@ -42,6 +43,14 @@ export class MachineAnswerResultService {
     if (limit != null) params = params.set('limit', limit.toString());
     if (page  != null) params = params.set('page',  page.toString());
     return this.http.get<PaginatedResult<MachineAnswerResult>>(this.apiUrl, { params });
+  }
+
+  // Busca todas as respostas de maquina de um controle de envio específico  
+  getControlIdAll(controlId: string, limit?: number, page?: number): Observable<PaginatedResult<MachineAnswerResult>> {
+    let params = new HttpParams();
+    if (limit != null) params = params.set('limit', limit.toString());
+    if (page  != null) params = params.set('page',  page.toString());
+    return this.http.get<PaginatedResult<MachineAnswerResult>>(`${this.apiUrl}/control/${controlId}`, { params });
   }
 
   update(id: string, data: MachineAnswerResultUpdate): Observable<MachineAnswerResult> {

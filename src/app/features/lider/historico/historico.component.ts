@@ -8,6 +8,7 @@ import { Control } from '../../../core/models/control.model';
 import { Form } from '../../../core/models/form.model';
 import { User } from '../../../core/models/user.model';
 import { Answer } from '../../../core/models/answer.model';
+import { Machine } from '../../../core/models/machine.model';
 import { Section } from '../../../core/models/section.model';
 import { Location } from '../../../core/models/location.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
@@ -18,11 +19,14 @@ import { FormService } from '../../../core/services/form.service';
 import { UserService } from '../../../core/services/user.service';
 import { FileService } from '../../../core/services/file.service';
 import { AnswerService } from '../../../core/services/answer.service';
+import { MachineService } from '../../../core/services/machine.service';
 import { SectionService } from '../../../core/services/section.service';
 import { LocationService } from '../../../core/services/location.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
 import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { StatusService } from '../../../core/services/status.service';
+import { ControlStatusService } from '../../../core/services/control-status.service';
 
 type FileLike = Record<string, unknown>;
 
@@ -39,6 +43,7 @@ interface HistoryRow {
   observacao: string | null;
   dataEmissao: Date | string;
   dataCriacao: Date | string;
+  statusNomes: string;
 }
 
 interface Filters {
@@ -47,6 +52,7 @@ interface Filters {
   formId: string;
   locationId: string;
   sectionId: string;
+  statusNome: string;
   de: string;
   ate: string;
 }
@@ -64,16 +70,21 @@ export class HistoricoComponent implements OnInit {
   private readonly userService = inject(UserService);
   private readonly fileService = inject(FileService);
   private readonly answerService = inject(AnswerService);
+  private readonly machineService = inject(MachineService);
   private readonly sectionService = inject(SectionService);
   private readonly locationService = inject(LocationService);
   private readonly answerResultService = inject(AnswerResultService);
   private readonly machineAnswerResultService = inject(MachineAnswerResultService);
   private readonly auth = inject(AuthService);
+  private readonly controlStatusService = inject(ControlStatusService);
+  private readonly status = inject(StatusService);
 
   readonly controls = signal<Control[]>([]);
   readonly forms = signal<Form[]>([]);
   readonly users = signal<User[]>([]);
   readonly files = signal<FileLike[]>([]);
+  readonly answers = signal<Answer[]>([]); // todos os parâmetros (carregados 1x)
+  readonly machines = signal<Machine[]>([]); // todas as máquinas (para resolver nomes)
   readonly sections = signal<Section[]>([]);
   readonly locations = signal<Location[]>([]);
   readonly expandedId = signal<string | null>(null);
@@ -81,6 +92,7 @@ export class HistoricoComponent implements OnInit {
   readonly expandedData = signal<Record<string, { nome: string; resposta: string }[]>>({});
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly controlStatuses = signal<Record<string, string[]>>({});
 
   // ───────── permissões de local (credentialLocation) ─────────
   /** Nomes dos locais liberados para a credencial logada. */
@@ -149,6 +161,22 @@ export class HistoricoComponent implements OnInit {
     () => new Map(this.locations().map((l) => [l.id, l.employerId])),
   );
 
+  /** formId → lista de parâmetros (para reuso ao expandir os detalhes). */
+  private readonly answersByForm = computed(() => {
+    const m = new Map<string, Answer[]>();
+    for (const a of this.answers()) {
+      const list = m.get(a.formId);
+      if (list) list.push(a);
+      else m.set(a.formId, [a]);
+    }
+    return m;
+  });
+
+  /** machineId → nome. */
+  private readonly machineNameById = computed(
+    () => new Map(this.machines().map((m) => [m.id, m.nome])),
+  );
+
   /** employerIds dos locais permitidos (null = sem restrição). */
   private readonly permittedEmployerIds = computed<Set<string> | null>(() => {
     const allowed = this.allowedLocations();
@@ -185,7 +213,7 @@ export class HistoricoComponent implements OnInit {
    * - senão, se há local escolhido → só os do local;
    * - senão → todos os permitidos.
    */
-  readonly formOptionsCascata = computed(() => {
+  readonly formOptions = computed(() => {
     const f = this.filters();
     const p = this.permittedFormIds();
     const formSec = this.formSectionById();
@@ -202,6 +230,24 @@ export class HistoricoComponent implements OnInit {
       .map((fm) => ({ value: fm.id, label: fm.nome || fm.id }));
   });
 
+  /** Alias compatível: mesmo conteúdo de formOptions (cascata). */
+  readonly formOptionsCascata = this.formOptions;
+
+  readonly userOptions = computed(() =>
+    [...this.users()]
+      .sort((a, b) => (a.username ?? '').localeCompare(b.username ?? ''))
+      .map((u) => ({ value: u.id, label: u.username || u.id })),
+  );
+
+  /** Opções de status — nomes distintos que aparecem nos controles carregados. */
+  readonly statusOptions = computed(() => {
+    const set = new Set<string>();
+    for (const nomes of Object.values(this.controlStatuses())) {
+      for (const nome of nomes) if (nome) set.add(nome);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b)).map((s) => ({ value: s, label: s }));
+  });
+
   // ───────── filtros ─────────
   readonly filtersOpen = signal(false);
   private readonly emptyFilters: Filters = {
@@ -210,6 +256,7 @@ export class HistoricoComponent implements OnInit {
     formId: '',
     locationId: '',
     sectionId: '',
+    statusNome: '',
     de: '',
     ate: '',
   };
@@ -234,6 +281,7 @@ export class HistoricoComponent implements OnInit {
     for (const v of Object.values(f)) if (v !== '') n++;
     return n;
   });
+
   // modo com máquina: { maquinas: string[], answers: string[], cells: Record<string,string> }
   readonly expandedMachineData = signal<
     Record<
@@ -268,85 +316,90 @@ export class HistoricoComponent implements OnInit {
       (file['url'] as string) ?? (file['path'] as string) ?? (file['caminho'] as string) ?? null
     );
   }
+
   // ───────── Para Layout do HTML ─────────
 
   toggleDetails(row: HistoryRow): void {
-  if (this.expandedId() === row.id) {
-    this.expandedId.set(null);
-    return;
-  }
+    // fecha se já estava aberta
+    if (this.expandedId() === row.id) {
+      this.expandedId.set(null);
+      return;
+    }
 
-  this.expandedId.set(row.id);
+    // Blindagem: não expande detalhes de um local fora do escopo.
+    if (!this.isFormAllowed(row.formId)) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
 
-  if (this.expandedData()[row.id] || this.expandedMachineData()[row.id]) return;
+    this.expandedId.set(row.id);
 
-  this.expandedLoading.set(row.id);
+    // já carregou antes — usa cache
+    if (this.expandedData()[row.id] || this.expandedMachineData()[row.id]) return;
 
-  forkJoin({
-    answers: this.answerService.getAll(1000, 1).pipe(
-      catchError((err) => {
-        console.error('Falha ao buscar:', err);
-        return of([]); // Retorna uma lista vazia segura para a interface
-      }),
-    ),
-    answerResults: this.answerResultService.getControlIdAll(row.id).pipe(
-      catchError((err) => {
-        console.error('Falha ao buscar:', err);
-        return of([]); // Retorna uma lista vazia segura para a interface
-      }),
-    ),
-    machineResults: this.machineAnswerResultService.getControlIdAll(row.id).pipe(
-      catchError((err) => {
-        console.error('Falha ao buscar:', err);
-        return of([]); // Retorna uma lista vazia segura para a interface
-      }),
-    ),
-  }).subscribe({
-    next: ({ answers, answerResults, machineResults }) => {
-      const allAnswers = this.unwrap<Answer>(answers).filter((a) => a.formId === row.formId);
-      const allMachine = this.unwrap<MachineAnswerResult>(machineResults).filter((r) =>
-        allAnswers.some((a) => a.id === r.answerId),
-      );
+    // parâmetros deste formulário (já carregados no reload — sem nova requisição)
+    const answers = this.answersByForm().get(row.formId) ?? [];
+    if (!answers.length) {
+      this.expandedData.update((d) => ({ ...d, [row.id]: [] }));
+      return;
+    }
 
-      if (allMachine.length > 0) {
-        const machineIds = [...new Set(allMachine.map((r) => r.machineId))];
-        const maquinas = machineIds.map((id) => ({ id, nome: id }));
-        const cells: Record<string, string> = {};
-        allMachine.forEach((r) => {
-          cells[`${r.machineId}_${r.answerId}`] = r.resposta;
-        });
-        this.expandedMachineData.update((d) => ({
-          ...d,
-          [row.id]: {
-            maquinas,
-            answers: allAnswers.map((a) => ({ id: a.id, nome: a.nome })),
-            cells,
-          },
-        }));
-      } else {
-        const resultMap = new Map(
-          this.unwrap<AnswerResult>(answerResults).map((r) => [r.AnswerId, r]),
+    this.expandedLoading.set(row.id);
+
+    // resultados são por controle → precisam ser buscados na expansão
+    forkJoin({
+      machineResults: this.machineAnswerResultService
+        .getControlIdAll(row.id, 1000, 1)
+        .pipe(catchError(() => of(null))),
+      answerResults: this.answerResultService
+        .getControlIdAll(row.id, 1000, 1)
+        .pipe(catchError(() => of(null))),
+    }).subscribe({
+      next: ({ machineResults, answerResults }) => {
+        const answerIdSet = new Set(answers.map((a) => a.id));
+        const allMachine = this.unwrap<MachineAnswerResult>(machineResults).filter((r) =>
+          answerIdSet.has(r.answerId),
         );
 
-        const linhas = allAnswers.map((a) => ({
-          nome: a.nome,
-          resposta: resultMap.get(a.id)?.resposta ?? '—',
-        }));
-        this.expandedData.update((d) => ({ ...d, [row.id]: linhas }));
-      }
+        if (allMachine.length > 0) {
+          const machineIds = [...new Set(allMachine.map((r) => r.machineId))];
+          const nameById = this.machineNameById();
+          const maquinas = machineIds.map((id) => ({ id, nome: nameById.get(id) ?? id }));
+          const cells: Record<string, string> = {};
+          for (const r of allMachine) cells[`${r.machineId}_${r.answerId}`] = r.resposta;
 
-      this.expandedLoading.set(null);
-    },
-    error: () => this.expandedLoading.set(null),
-  });
-}
+          this.expandedMachineData.update((d) => ({
+            ...d,
+            [row.id]: {
+              maquinas,
+              answers: answers.map((a) => ({ id: a.id, nome: a.nome })),
+              cells,
+            },
+          }));
+        } else {
+          // modo normal — lista parâmetro + resposta
+          const resultMap = new Map(
+            this.unwrap<AnswerResult>(answerResults).map((r) => [r.AnswerId, r]),
+          );
+          const linhas = answers.map((a) => ({
+            nome: a.nome,
+            resposta: resultMap.get(a.id)?.resposta ?? '—',
+          }));
+          this.expandedData.update((d) => ({ ...d, [row.id]: linhas }));
+        }
 
+        this.expandedLoading.set(null);
+      },
+      error: () => this.expandedLoading.set(null),
+    });
+  }
 
   // ───────── linhas do histórico (mais recentes primeiro) ─────────
   readonly rows = computed<HistoryRow[]>(() => {
     const formById = new Map(this.forms().map((f) => [f.id, f]));
     const userById = new Map(this.users().map((u) => [u.id, u]));
     const fileById = new Map(this.files().map((f) => [String(f['id']), f]));
+    const statusMap = this.controlStatuses();
 
     return (
       this.controls()
@@ -369,6 +422,7 @@ export class HistoricoComponent implements OnInit {
             observacao: c.observacao,
             dataEmissao: c.dataEmissao,
             dataCriacao: c.dataCriacao,
+            statusNomes: (statusMap[c.id] ?? []).join(', '),
           } as HistoryRow;
         })
         .sort((a, b) => new Date(b.dataEmissao).getTime() - new Date(a.dataEmissao).getTime())
@@ -392,6 +446,7 @@ export class HistoricoComponent implements OnInit {
     const f = this.filters();
     const formEmp = this.formEmployerById();
     const formSec = this.formSectionById();
+    const statuses = this.controlStatuses();
     const locEmp = f.locationId ? this.locationEmployerById().get(f.locationId) : null;
     return this.rows().filter(
       (r) =>
@@ -399,6 +454,7 @@ export class HistoricoComponent implements OnInit {
         (!f.formId || r.formId === f.formId) &&
         (!f.sectionId || formSec.get(r.formId) === f.sectionId) &&
         (locEmp == null || formEmp.get(r.formId) === locEmp) &&
+        (!f.statusNome || (statuses[r.id] ?? []).includes(f.statusNome)) &&
         this.dateInRange(r.dataEmissao, f.de, f.ate) &&
         (this.textMatch(r.formNome, f.texto) ||
           this.textMatch(r.userNome, f.texto) ||
@@ -406,19 +462,6 @@ export class HistoricoComponent implements OnInit {
           this.textMatch(r.observacao, f.texto) ||
           this.textMatch(r.fileNome, f.texto)),
     );
-  });
-
-  readonly userOptions = computed(() =>
-    [...this.users()]
-      .sort((a, b) => (a.username ?? '').localeCompare(b.username ?? ''))
-      .map((u) => ({ value: u.id, label: u.username || u.id })),
-  );
-  readonly formOptions = computed(() => {
-    const p = this.permittedFormIds();
-    return [...this.forms()]
-      .filter((f) => !p || p.has(f.id))
-      .sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? ''))
-      .map((f) => ({ value: f.id, label: f.nome || f.id }));
   });
 
   // ───────── formatação de datas ─────────
@@ -452,15 +495,24 @@ export class HistoricoComponent implements OnInit {
   reload(): void {
     this.loading.set(true);
     this.error.set(null);
+
+    const failLog = (label: string) =>
+      catchError((err: unknown) => {
+        console.error(`Falha ao carregar ${label}:`, err);
+        return of(null);
+      });
+
     forkJoin({
-      controls: this.controlService.getAll(1000, 1).pipe(catchError(() => of(null))),
-      forms: this.formService.getAll(1000, 1).pipe(catchError(() => of(null))),
-      users: this.userService.getAll(1000, 1).pipe(catchError(() => of(null))),
-      files: this.fileService.getAll(1000, 1).pipe(catchError(() => of(null))),
-      sections: this.sectionService.getAll(1000, 1).pipe(catchError(() => of(null))),
-      locations: this.locationService.getAll(1000, 1).pipe(catchError(() => of(null))),
+      controls: this.controlService.getAll(1000, 1).pipe(failLog('controles')),
+      forms: this.formService.getAll(1000, 1).pipe(failLog('formulários')),
+      users: this.userService.getAll(1000, 1).pipe(failLog('usuários')),
+      files: this.fileService.getAll(1000, 1).pipe(failLog('arquivos')),
+      answers: this.answerService.getAll(1000, 1).pipe(failLog('parâmetros')),
+      machines: this.machineService.getAll(1000, 1).pipe(failLog('máquinas')),
+      sections: this.sectionService.getAll(1000, 1).pipe(failLog('seções')),
+      locations: this.locationService.getAll(1000, 1).pipe(failLog('locais')),
     }).subscribe({
-      next: ({ controls, forms, users, files, sections, locations }) => {
+      next: ({ controls, forms, users, files, answers, machines, sections, locations }) => {
         if (controls == null) {
           this.error.set('Não foi possível carregar o histórico.');
         }
@@ -468,9 +520,29 @@ export class HistoricoComponent implements OnInit {
         this.forms.set(this.unwrap<Form>(forms));
         this.users.set(this.unwrap<User>(users));
         this.files.set(this.unwrap<FileLike>(files));
+        this.answers.set(this.unwrap<Answer>(answers));
+        this.machines.set(this.unwrap<Machine>(machines));
         this.sections.set(this.unwrap<Section>(sections));
         this.locations.set(this.unwrap<Location>(locations));
         this.loading.set(false);
+
+        // busca status apenas dos controles VISÍVEIS (dentro do escopo permitido)
+        const visiveis = this.unwrap<Control>(controls).filter((c) => this.isFormAllowed(c.formId));
+        if (!visiveis.length) {
+          this.controlStatuses.set({});
+          return;
+        }
+        forkJoin(
+          visiveis.map((c) =>
+            this.controlStatusService
+              .getStatusNamesByControl(c.id)
+              .pipe(catchError(() => of([] as string[]))),
+          ),
+        ).subscribe((results) => {
+          const map: Record<string, string[]> = {};
+          visiveis.forEach((c, i) => (map[c.id] = results[i] as string[]));
+          this.controlStatuses.set(map);
+        });
       },
       error: () => {
         this.loading.set(false);

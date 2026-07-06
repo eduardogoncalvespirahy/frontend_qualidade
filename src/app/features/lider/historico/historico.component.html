@@ -118,6 +118,20 @@
             </select>
           </label>
           <label class="ff">
+            <span class="ff__label">Status</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().statusNome"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('statusNome', $event)"
+            >
+              <option value="">Todos</option>
+              @for (opt of statusOptions(); track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          <label class="ff">
             <span class="ff__label">Emitido de</span>
             <input
               type="date"
@@ -165,13 +179,38 @@
     </div>
   } @else {
     <ol class="timeline">
-      @for (r of filtered(); track trackById($index, r)) {
+      @for (r of filtered(); track r.id) {
         <li class="tl-item">
           <div class="tl-marker"><i class="bi bi-clipboard-check"></i></div>
           <div class="tl-card">
             <!-- cabeçalho — clicável -->
             <div class="tl-card__head" style="cursor: pointer" (click)="toggleDetails(r)">
               <h3 class="tl-card__title">{{ r.formNome }}</h3>
+
+              @if (controlStatuses()[r.id]; as statuses) {
+                @for (s of statuses; track $index) {
+                  @let low = s.toLowerCase();
+                  @let isOk = low.includes('normaliz');
+                  @let isErr = low.includes('correç') || low.includes('correc');
+                  @let isPend = low.includes('pend');
+                  <span
+                    class="tl-chip"
+                    [class.tl-chip--ok]="isOk"
+                    [class.tl-chip--err]="isErr"
+                    [class.tl-chip--pending]="isPend"
+                  >
+                    <i
+                      class="bi"
+                      [class.bi-check-circle-fill]="isOk"
+                      [class.bi-clock-fill]="isErr"
+                      [class.bi-exclamation-triangle-fill]="isPend"
+                    >
+                    </i>
+                    {{ s }}
+                  </span>
+                }
+              }
+
               <div style="display: flex; align-items: center; gap: 0.5rem">
                 <span class="tl-date">
                   <i class="bi bi-calendar-event"></i> {{ data(r.dataEmissao) }}
@@ -211,26 +250,26 @@
                   <p class="tl-detail__loading">
                     <i class="bi bi-hourglass-split"></i> Carregando parâmetros…
                   </p>
-                } @else if (expandedMachineData()[r.id]) {
+                } @else if (expandedMachineData()[r.id]; as md) {
                   <!-- modo máquina: tabela pivô -->
                   <div class="overflow-auto">
                     <table class="table table-sm table-bordered mb-0">
                       <thead class="table-light">
                         <tr>
                           <th class="text-muted small">Máquina</th>
-                          @for (a of expandedMachineData()[r.id].answers; track a.id) {
+                          @for (a of md.answers; track a.id) {
                             <th class="text-muted small">{{ a.nome }}</th>
                           }
                         </tr>
                       </thead>
                       <tbody>
-                        @for (m of expandedMachineData()[r.id].maquinas; track m.id) {
+                        @for (m of md.maquinas; track m.id) {
                           <tr>
                             <td class="fw-semibold small">{{ m.nome }}</td>
-                            @for (a of expandedMachineData()[r.id].answers; track a.id) {
+                            @for (a of md.answers; track a.id) {
                               <td class="text-center">
                                 <span class="badge text-bg-light border fw-semibold text-dark">
-                                  {{ expandedMachineData()[r.id].cells[m.id + '_' + a.id] || '—' }}
+                                  {{ md.cells[m.id + '_' + a.id] || '—' }}
                                 </span>
                               </td>
                             }
@@ -239,27 +278,31 @@
                       </tbody>
                     </table>
                   </div>
-                } @else if ((expandedData()[r.id] ?? []).length === 0) {
-                  <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
-                } @else {
-                  <!-- modo normal: cards -->
-                  <div class="d-flex flex-wrap gap-2 mt-2">
-                    @for (p of expandedData()[r.id]; track p.nome) {
-                      <div class="border rounded p-2" style="min-width: 110px">
-                        <div
-                          class="text-muted"
-                          style="
-                            font-size: 0.72rem;
-                            text-transform: uppercase;
-                            letter-spacing: 0.04em;
-                          "
-                        >
-                          {{ p.nome }}
+                } @else if (expandedData()[r.id]; as params) {
+                  @if (params.length === 0) {
+                    <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
+                  } @else {
+                    <!-- modo normal: cards -->
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                      @for (p of params; track $index) {
+                        <div class="border rounded p-2" style="min-width: 110px">
+                          <div
+                            class="text-muted"
+                            style="
+                              font-size: 0.72rem;
+                              text-transform: uppercase;
+                              letter-spacing: 0.04em;
+                            "
+                          >
+                            {{ p.nome }}
+                          </div>
+                          <div class="fw-bold fs-5">{{ p.resposta }}</div>
                         </div>
-                        <div class="fw-bold fs-5">{{ p.resposta }}</div>
-                      </div>
-                    }
-                  </div>
+                      }
+                    </div>
+                  }
+                } @else {
+                  <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
                 }
 
                 @if (r.observacao && expandedLoading() !== r.id) {

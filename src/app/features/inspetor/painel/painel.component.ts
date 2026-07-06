@@ -100,6 +100,11 @@ export class PainelComponent implements OnInit {
     return allowed.includes(loc.nome) || allowed.includes(loc.id);
   }
 
+  /** Locais permitidos — base estável para lista e opções de filtro. */
+  private readonly permittedLocations = computed(() =>
+    this.locations().filter((l) => this.isLocationAllowed(l)),
+  );
+
   // ───────── filtros de busca (por campo das interfaces) ─────────
   readonly filtersOpen = signal(false);
 
@@ -154,11 +159,9 @@ export class PainelComponent implements OnInit {
 
   readonly filteredLocations = computed(() => {
     const f = this.filters();
-
-    return this.locations().filter(
+    // Restringe às locations permitidas pela credencial (credentialLocation).
+    return this.permittedLocations().filter(
       (l) =>
-        // Restringe às locations permitidas pela credencial (credentialLocation).
-        this.isLocationAllowed(l) &&
         this.textMatch(l.nome, f.nome) &&
         this.textMatch(l.descricao, f.descricao) &&
         this.textMatch(l.employerId, f.employerId) &&
@@ -197,10 +200,14 @@ export class PainelComponent implements OnInit {
     return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
   }
 
-  /** IDs de employer disponíveis no nível atual. */
+  /**
+   * IDs de employer disponíveis no nível atual.
+   * No passo 'location' usamos os locais permitidos (não os já filtrados),
+   * para que o próprio filtro de empregador não encolha as opções.
+   */
   readonly employerIdOptions = computed<string[]>(() => {
     if (this.step() === 'location') {
-      return this.distinct(this.filteredLocations().map((l) => l.employerId));
+      return this.distinct(this.permittedLocations().map((l) => l.employerId));
     }
     if (this.step() === 'section') {
       return this.distinct(this.sections().map((s) => s.employerId));
@@ -319,6 +326,7 @@ export class PainelComponent implements OnInit {
 
   /** Busca, para cada answer, suas linhas em answer_result. */
   private fetchResults(params: Answer[]): Observable<{ id: string; list: AnswerResult[] }[]> {
+    if (params.length === 0) return of([]);
     return forkJoin(
       params.map((a) =>
         this.answerResultService.getByAnswerId(a.id).pipe(
@@ -375,10 +383,11 @@ export class PainelComponent implements OnInit {
 
   selectForm(form: Form): void {
     this.clearFeedback();
+    this.resetFilters();
     this.selectedForm.set(form);
     this.step.set('parameters');
     this.loadAnswers();
-    this.loadMachines(); // ← adiciona aqui
+    this.loadMachines();
   }
 
   // ============================================================
@@ -409,6 +418,7 @@ export class PainelComponent implements OnInit {
     this.sections.set([]);
     this.forms.set([]);
     this.answers.set([]);
+    this.machines.set([]);
     this.step.set('location');
   }
 
@@ -420,6 +430,7 @@ export class PainelComponent implements OnInit {
     this.selectedForm.set(null);
     this.forms.set([]);
     this.answers.set([]);
+    this.machines.set([]);
     this.step.set('section');
   }
 
@@ -429,6 +440,7 @@ export class PainelComponent implements OnInit {
     this.resetFilters();
     this.selectedForm.set(null);
     this.answers.set([]);
+    this.machines.set([]);
     this.step.set('form');
   }
 
@@ -476,44 +488,6 @@ export class PainelComponent implements OnInit {
       return v && v !== prev ? n + 1 : n;
     }, 0);
   });
-
-  // save(): void {
-  //   this.clearFeedback();
-
-  //   const values = this.paramValues();
-  //   const existing = this.existingResults();
-  //   const ops: Observable<AnswerResult>[] = [];
-
-  //   for (const a of this.answers()) {
-  //     const value = (values[a.id] ?? '').trim();
-  //     if (!value) continue;
-
-  //     const prev = existing[a.id];
-  //     if (prev && prev.resposta === value) continue; // sem alteração → ignora
-
-  //     // Sem constraint de answerId único: cada alteração gera uma nova linha
-  //     // (o valor anterior fica preservado como histórico).
-  //     ops.push(this.answerResultService.create({ AnswerId: a.id, resposta: value }));
-  //   }
-
-  //   if (ops.length === 0) {
-  //     this.error.set('Nenhuma alteração para salvar.');
-  //     return;
-  //   }
-
-  //   this.saving.set(true);
-  //   forkJoin(ops).subscribe({
-  //     next: () => {
-  //       this.saving.set(false);
-  //       this.success.set(`${ops.length} resposta(s) salva(s) com sucesso.`);
-  //       this.refreshResults(); // recarrega os "valores atuais"
-  //     },
-  //     error: () => {
-  //       this.saving.set(false);
-  //       this.error.set('Erro ao salvar as respostas. Tente novamente.');
-  //     },
-  //   });
-  // }
 
   /** Recarrega os valores gravados após salvar. */
   private refreshResults(): void {
@@ -570,6 +544,8 @@ export class PainelComponent implements OnInit {
         return this.filteredForms().length > 0;
       case 'parameters':
         return this.answers().length > 0;
+      default:
+        return false;
     }
   });
 
@@ -730,27 +706,36 @@ export class PainelComponent implements OnInit {
   private readonly limitsService = inject(LimitAnswerService);
   private readonly machineAnswerResultService = inject(MachineAnswerResultService);
 
-  readonly limitsMap = signal<Record<string, string>>({}); // answerId → limitsAnswerId
+  /** answerId → id do limite ativo (usado em limitsAnswerId ao gravar). */
+  readonly limitsMap = signal<Record<string, string>>({});
+  /** answerId → limite ativo completo (usado para validar min/max localmente). */
+  private readonly limitsByAnswer = signal<Record<string, LimitAnswer>>({});
 
   // Agrupa todos os parâmetros em um único bloco para exibição no modal de envio.
-  protected readonly agrupados = computed(() => [
-    { categoria: null as any, answers: this.answers() },
+  protected readonly agrupados = computed<{ categoria: unknown; answers: Answer[] }[]>(() => [
+    { categoria: null, answers: this.answers() },
   ]);
 
   private loadLimits(): void {
-    const formId = this.selectedForm()?.id;
     this.limitsService.getAll(1000, 1).subscribe({
       next: (res) => {
         const all = this.unwrap<LimitAnswer>(res);
-        // filtra só os ativos dos parâmetros deste formulário
         const answerIds = new Set(this.answers().map((a) => a.id));
-        const map: Record<string, string> = {};
-        all
-          .filter((l) => l.status === 1 && answerIds.has(l.answerId))
-          .forEach((l) => (map[l.answerId] = l.id));
-        this.limitsMap.set(map);
+        const idMap: Record<string, string> = {};
+        const fullMap: Record<string, LimitAnswer> = {};
+        for (const l of all) {
+          if (l.status === 1 && answerIds.has(l.answerId)) {
+            idMap[l.answerId] = l.id;
+            fullMap[l.answerId] = l;
+          }
+        }
+        this.limitsMap.set(idMap);
+        this.limitsByAnswer.set(fullMap);
       },
-      error: () => {},
+      error: () => {
+        this.limitsMap.set({});
+        this.limitsByAnswer.set({});
+      },
     });
   }
 
@@ -777,8 +762,6 @@ export class PainelComponent implements OnInit {
     if (!confirmed) return;
 
     const dados = ref.instance.value();
-    console.log('DADOS MODAL:', dados);
-
     this.salvarEnvio(dados);
   }
 
@@ -789,66 +772,68 @@ export class PainelComponent implements OnInit {
   private verificaControlAnteriorByFormId(formId: string): void {
     this.controlService.getByFormId(formId).subscribe({
       next: (controls) => {
-        const existingControl = controls.at(0); // Pega o controle mais atual existente para este formulário, se houver
-        if (existingControl) {
-          this.controlStatusService.getByControl(existingControl.id).subscribe({
-            next: (status) => {
-              switch (status.statusId) {
-                case '1':
-                  // Lógica para status 'normalizado'
-                  break;
-                case '2':
-                  // Lógica para status 'correção'
-                  this.controlStatusService.update(existingControl.id, '3').subscribe({
-                    next: (controlStatus) => {
-                      console.log(
-                        `Status do controlId ${existingControl.id} atualizado para "${controlStatus.statusId} - pendente" com sucesso.`,
-                      );
-                    },
-                    error: (err) => {
-                      console.error('Erro ao atualizar status do controle:', err);
-                    },
-                  });
-                  break;
-                case '3':
-                  // Lógica para status 'pendente'
-                  break;
-              }
-            },
-            error: (err) => {
-              console.error('Erro ao buscar status do controle:', err);
-            },
-          });
-        }
+        if (!controls?.length) return;
+
+        // Pega o controle MAIS RECENTE sem confiar na ordem do backend:
+        // ordena por dataEmissao (ou dataCriacao) de forma decrescente.
+        const anterior = this.maisRecente(controls, (c: any) => c.dataEmissao ?? c.dataCriacao);
+        if (!anterior) return;
+
+        this.controlStatusService.getByControl(anterior.id).subscribe({
+          next: (res) => {
+            // getByControl pode devolver um único objeto OU uma lista — normaliza.
+            const status = Array.isArray(res)
+              ? this.maisRecente(res as any[], (s: any) => s.dataAlteracao ?? s.dataCriacao)
+              : res;
+
+            // statusId pode vir como número (2) ou string ('2') — compara normalizado.
+            const atual = String((status as any)?.statusId ?? '').trim();
+
+            // Só age quando o controle anterior estava em 'correção' (2) → 'pendente' (3).
+            if (atual === '2') {
+              this.controlStatusService.update(anterior.id, '3').subscribe({
+                next: () =>
+                  console.log(`Status do controle ${anterior.id} atualizado 2 → 3 (pendente).`),
+                error: (err) => console.error('Erro ao atualizar status do controle:', err),
+              });
+            }
+          },
+          error: (err) => console.error('Erro ao buscar status do controle:', err),
+        });
       },
+      error: (err) => console.error('Erro ao buscar controles anteriores:', err),
     });
   }
 
-  private verificalimites(
-    limitsAnswerId: string | null | undefined,
-    valor: string,
-  ): boolean | void {
-    if (!limitsAnswerId?.trim() || !valor?.trim()) return;
+  /** Item mais recente de uma lista, pela data extraída em `getDate` (desc). */
+  private maisRecente<T>(list: T[], getDate: (item: T) => Date | string | null | undefined): T | undefined {
+    return [...list].sort(
+      (a, b) => new Date(getDate(b) ?? 0).getTime() - new Date(getDate(a) ?? 0).getTime(),
+    )[0];
+  }
 
-    this.limitsService.getById(limitsAnswerId).subscribe({
-      next: (limit) => {
-        if (!limit) return;
+  /**
+   * Valida um valor contra o limite ativo do parâmetro (SÍNCRONO).
+   * Regras: sem limite ou valor não numérico → não é violação (retorna true).
+   * limitMin/limitMax ausentes são tratados como -∞/+∞ (não como 0).
+   */
+  private dentroDoLimite(answerId: string, valor: string): boolean {
+    const limit = this.limitsByAnswer()[answerId];
+    if (!limit) return true;
 
-        const valorConvertido = parseFloat(valor);
-        if (Number.isNaN(valorConvertido)) {
-          return;
-        }
+    const v = parseFloat((valor ?? '').replace(',', '.'));
+    if (Number.isNaN(v)) return true;
 
-        const min = parseFloat(limit.limitMin ?? '0');
-        const max = parseFloat(limit.limitMax ?? '0');
-        const valido = valorConvertido >= min && valorConvertido <= max;
+    const min =
+      limit.limitMin != null && `${limit.limitMin}`.trim() !== ''
+        ? parseFloat(`${limit.limitMin}`.replace(',', '.'))
+        : Number.NEGATIVE_INFINITY;
+    const max =
+      limit.limitMax != null && `${limit.limitMax}`.trim() !== ''
+        ? parseFloat(`${limit.limitMax}`.replace(',', '.'))
+        : Number.POSITIVE_INFINITY;
 
-        return valido;
-      },
-      error: (err) => {
-        console.error('Erro ao buscar limite:', err);
-      },
-    });
+    return v >= min && v <= max;
   }
 
   private salvarEnvio(dados: {
@@ -859,10 +844,6 @@ export class PainelComponent implements OnInit {
     machineRespostas: Record<string, string>;
     temMaquina: boolean;
   }): void {
-    // pra não salvar
-    this.paramValues.set({});
-    this.machineParamValues.set({});
-
     this.saving.set(true);
 
     this.signatureFileService
@@ -886,62 +867,56 @@ export class PainelComponent implements OnInit {
             })
             .subscribe({
               next: (control) => {
-                let ops: Observable<unknown>[] = [];
+                // Monta as gravações de resposta e avalia os limites de forma síncrona.
+                const resultOps: Observable<unknown>[] = [];
+                let algumForaDoLimite = false;
 
                 if (dados.temMaquina) {
-                  ops = Object.entries(dados.machineRespostas)
-                    .filter(([, valor]) => valor?.trim())
-                    .map(([chave, valor]) => {
-                      const [machineId, answerId] = chave.split('_');
+                  for (const [chave, valor] of Object.entries(dados.machineRespostas)) {
+                    if (!valor?.trim()) continue;
+                    // chave = `${machineId}_${answerId}` — corta no primeiro '_'
+                    const sep = chave.indexOf('_');
+                    if (sep < 0) continue;
+                    const machineId = chave.slice(0, sep);
+                    const answerId = chave.slice(sep + 1);
 
-                      const limiteValido = this.verificalimites(this.limitsMap()[answerId], valor);
+                    if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
 
-                      const machineAnswerResult = this.machineAnswerResultService.create({
+                    resultOps.push(
+                      this.machineAnswerResultService.create({
                         machineId,
-                        answerId: answerId,
+                        answerId,
                         controlId: control.id,
                         resposta: valor,
                         limitsAnswerId: this.limitsMap()[answerId] ?? null,
-                      });
-
-                      this.controlStatusService.create({
-                        controlId: control.id,
-                        statusId: limiteValido ? '1' : '2', // 1 = normalizado, 2 = correção
-                      });
-
-                      return machineAnswerResult;
-                    });
+                      }),
+                    );
+                  }
                 } else {
-                  ops = this.answers()
-                    .filter((a) => dados.respostas[a.id]?.trim())
-                    .map((a) => {
-                      const limiteValido = this.verificalimites(a.id, dados.respostas[a.id]);
+                  for (const a of this.answers()) {
+                    const valor = dados.respostas[a.id];
+                    if (!valor?.trim()) continue;
 
-                      const answerResult = this.answerResultService.create({
+                    if (!this.dentroDoLimite(a.id, valor)) algumForaDoLimite = true;
+
+                    resultOps.push(
+                      this.answerResultService.create({
                         AnswerId: a.id,
                         controlId: control.id,
-                        resposta: dados.respostas[a.id],
+                        resposta: valor,
                         limitsAnswerId: this.limitsMap()[a.id] ?? null,
-                      });
-
-                      this.controlStatusService.create({
-                        controlId: control.id,
-                        statusId: limiteValido ? '1' : '2', // 1 = normalizado, 2 = correção
-                      });
-
-                      return answerResult;
-                    });
+                      }),
+                    );
+                  }
                 }
 
-                if (!ops.length) {
-                  this.paramValues.set({});
-                  this.machineParamValues.set({});
-                  this.saving.set(false);
-                  this.success.set('Inspeção enviada com sucesso!');
-                  return;
-                }
+                // UM único status para o controle: 1 = normalizado, 2 = correção.
+                const statusOp = this.controlStatusService.create({
+                  controlId: control.id,
+                  statusId: algumForaDoLimite ? '2' : '1',
+                });
 
-                forkJoin(ops).subscribe({
+                forkJoin([statusOp, ...resultOps]).subscribe({
                   next: () => {
                     this.paramValues.set({});
                     this.machineParamValues.set({});
@@ -950,7 +925,9 @@ export class PainelComponent implements OnInit {
                   },
                   error: () => {
                     this.saving.set(false);
-                    this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
+                    this.error.set(
+                      'Inspeção registrada, mas falhou ao salvar algumas respostas.',
+                    );
                   },
                 });
               },

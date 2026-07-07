@@ -1,0 +1,49 @@
+<div class="d-flex flex-column gap-3">
+  <p class="text-muted mb-0 small">
+    Configure os tempos de execução deste formulário (em minutos).
+  </p>
+
+  <div>
+    <label for="tempoExecucao" class="form-label">
+      Tempo de execução <span class="text-danger">*</span>
+    </label>
+    <div class="input-group">
+      <input
+        id="tempoExecucao"
+        name="tempoExecucao"
+        type="time"
+        class="form-control"
+        [(ngModel)]="tempoExecucao"
+      />
+    </div>
+    <div class="form-text">Tempo esperado até o próximo formulário.</div>
+  </div>
+
+  <div>
+    <label for="tempoTolerancia" class="form-label">Tolerância</label>
+    <div class="input-group">
+      <input
+        id="tempoTolerancia"
+        name="tempoTolerancia"
+        type="time"
+        class="form-control"
+        [(ngModel)]="tempoTolerancia"
+      />
+    </div>
+    <div class="form-text">Margem de atraso aceitável.</div>
+  </div>
+
+  <div>
+    <label for="tempoAntecependem" class="form-label">Antecedência</label>
+    <div class="input-group">
+      <input
+        id="tempoAntecependem"
+        name="tempoAntecependem"
+        type="time"
+        class="form-control"
+        [(ngModel)]="tempoAntecependem"
+      />
+    </div>
+    <div class="form-text">Tempo de antecedência para dispara o alarme.</div>
+  </div>
+</div>

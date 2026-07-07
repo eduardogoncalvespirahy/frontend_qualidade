@@ -5,12 +5,15 @@ import { FormsModule } from '@angular/forms';
 import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
 import { Form } from '../../../../../core/models/form.model';
+import { FormTime } from '../../../../../core/models/form-time.model';
 import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { FormService } from '../../../../../core/services/form.service';
+import { FormTimeService } from '../../../../../core/services/form-time.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { AuthService } from '../../../../../core/services/auth.service';
 import { FormularioFormComponent } from './modals/form/form.component';
+import { FormTimeComponent } from './modals/form-time/form-time.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 import { BreakFormComponent } from './modals/break-form/break-form.component';
 
@@ -38,6 +41,7 @@ export class FormComponent implements OnInit {
   private readonly locationService = inject(LocationService);
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
+  private readonly formTimeService = inject(FormTimeService);
   private readonly modalService = inject(ModalService);
   private readonly auth = inject(AuthService);
 
@@ -51,6 +55,8 @@ export class FormComponent implements OnInit {
   readonly selectedLocation = signal<Location | null>(null);
   readonly selectedSection = signal<Section | null>(null);
   readonly selectedForm = signal<Form | null>(null); // formulário cujas paradas serão geridas
+  /** formId → FormTime existente (carregado junto com os formulários). */
+  readonly formTimeByFormId = signal<Record<string, FormTime>>({});
 
   // ───────── permissões de local (credentialLocation) ─────────
   /** Nomes dos locais liberados para a credencial logada. */
@@ -179,9 +185,7 @@ export class FormComponent implements OnInit {
   readonly pageTitle = computed(() => this.titles[this.step()]);
   readonly pageDescription = computed(() => this.descriptions[this.step()]);
 
-  ngOnInit(): void {
-    this.loadLocations();
-  }
+
 
   // ============================================================
   //  CARREGAMENTO
@@ -234,6 +238,17 @@ export class FormComponent implements OnInit {
         const all = this.unwrap<Form>(res);
         this.forms.set(all.filter((f) => f.sectionId === sectionId));
         this.loading.set(false);
+        // carrega formtimes para montar o mapa formId → FormTime
+        this.formTimeService.getAll(1000, 1).subscribe({
+          next: (ftRes) => {
+            const map: Record<string, FormTime> = {};
+            for (const ft of this.unwrap<FormTime>(ftRes)) {
+              if (ft.formId) map[ft.formId] = ft;
+            }
+            this.formTimeByFormId.set(map);
+          },
+          error: () => {},
+        });
       },
       error: () => this.fail('Não foi possível carregar os formulários.'),
     });
@@ -273,6 +288,45 @@ export class FormComponent implements OnInit {
     this.clearFeedback();
     this.selectedForm.set(form);
     this.step.set('break');
+  }
+
+  ngOnInit(): void {
+    this.loadLocations();
+  }
+
+  /** Abre o modal de configuração de tempo do formulário. */
+  async openTime(form: Form): Promise<void> {
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
+    this.clearFeedback();
+    const existing = this.formTimeByFormId()[form.id] ?? null;
+    const ref = this.modalService.openComponent(FormTimeComponent, {
+      title: `Tempo: ${form.nome}`,
+      size: 'md',
+      backdrop: 'static',
+      inputs: { existing },
+      buttons: this.crudButtons('Salvar'),
+    });
+    if (!(await ref.result)) return;
+    const v = ref.instance.value();
+    const payload = {
+      formId: form.id,
+      tempoExecucao: v.tempoExecucao,
+      tempoTolerancia: v.tempoTolerancia ?? undefined,
+      tempoAntecependem: v.tempoAntecependem ?? undefined,
+    };
+    const op$ = existing
+      ? this.formTimeService.update(form.id, payload)
+      : this.formTimeService.create(payload);
+    op$.subscribe({
+      next: (ft) => {
+        this.formTimeByFormId.update((m) => ({ ...m, [form.id]: ft }));
+        this.success.set('Tempo configurado.');
+      },
+      error: () => this.error.set('Erro ao salvar o tempo.'),
+    });
   }
 
   back(): void {
@@ -353,7 +407,7 @@ export class FormComponent implements OnInit {
       title: `Editar: ${item.nome}`,
       size: 'lg',
       backdrop: 'static',
-      inputs: { mode: 'edit', item, sections: sec ? [sec] : [], lockedSectionId: item.sectionId },
+      inputs: { mode: 'edit', item, sections: sec ? [sec] : [] },
       buttons: this.crudButtons('Salvar'),
     });
     if (!(await ref.result)) return;

@@ -317,6 +317,15 @@
                   <button
                     type="button"
                     class="card__del"
+                    [title]="formTimeByFormId()[fm.id] ? 'Tempo configurado' : 'Configurar tempo'"
+                    [style.color]="formTimeByFormId()[fm.id] ? 'var(--bs-success)' : ''"
+                    (click)="$event.stopPropagation(); openTime(fm)"
+                  >
+                    <i class="bi bi-clock"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="card__del"
                     title="Excluir"
                     (click)="$event.stopPropagation(); excluirForm(fm)"
                   >

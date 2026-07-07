@@ -172,7 +172,7 @@
         }}
       </p>
       @if (hasFilter()) {
-        <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+        <button type="button" class="btn-ghost-custom" (click)="resetFilters()">
           Limpar filtros
         </button>
       }
@@ -300,14 +300,19 @@
                     <!-- modo normal: cards -->
                     <div class="d-flex flex-wrap gap-2 mt-2">
                       @for (p of params; track p.answerId) {
-                        <div class="border rounded p-2" style="min-width: 110px">
+                        @let ok = p.resposta !== '—' && p.limitsAnswerId != null && dentroDoLimite(p.answerId, p.resposta);
+                        @let err = p.resposta !== '—' && p.limitsAnswerId != null && !dentroDoLimite(p.answerId, p.resposta);
+                        <div
+                          class="border rounded p-2"
+                          style="min-width: 110px"
+                          [class.border-success]="ok"
+                          [class.bg-success-subtle]="ok"
+                          [class.border-danger]="err"
+                          [class.bg-danger-subtle]="err"
+                        >
                           <div
                             class="text-muted"
-                            style="
-                              font-size: 0.72rem;
-                              text-transform: uppercase;
-                              letter-spacing: 0.04em;
-                            "
+                            style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em"
                           >
                             {{ p.nome }}
                           </div>
@@ -320,7 +325,11 @@
                               (ngModelChange)="updateEditValue(p.answerId, $event)"
                             />
                           } @else {
-                            <div class="fw-bold fs-5">{{ p.resposta }}</div>
+                            <div
+                              class="fw-bold fs-5"
+                              [class.text-success]="ok"
+                              [class.text-danger]="err"
+                            >{{ p.resposta }}</div>
                           }
                         </div>
                       }
@@ -328,6 +337,44 @@
                   }
                 } @else {
                   <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
+                }
+
+                <!-- Histórico de versões (modo normal) -->
+                @if (!expandedMachineData()[r.id] && expandedHistory()[r.id]?.length > 1) {
+                  <details class="mt-3">
+                    <summary class="text-muted small" style="cursor:pointer">
+                      <i class="bi bi-clock-history"></i>
+                      Histórico de correções ({{ expandedHistory()[r.id].length - 1 }})
+                    </summary>
+                    <div class="mt-2 d-flex flex-column gap-2">
+                      @for (v of expandedHistory()[r.id].slice(0, -1); track $index) {
+                        <div class="border rounded p-2 bg-light">
+                          <div class="text-muted" style="font-size:0.72rem">
+                            <i class="bi bi-calendar2-event"></i> {{ dataHora(v.dataCriacao) }}
+                          </div>
+                          <div class="d-flex flex-wrap gap-2 mt-1">
+                            @for (p of expandedData()[r.id]; track p.answerId) {
+                              @if (v.valores[p.answerId]; as val) {
+                                @let hOk = p.limitsAnswerId != null && dentroDoLimite(p.answerId, val);
+                                @let hErr = p.limitsAnswerId != null && !dentroDoLimite(p.answerId, val);
+                                <span
+                                  class="border rounded px-2 py-1"
+                                  style="font-size:0.8rem"
+                                  [class.border-success]="hOk"
+                                  [class.bg-success-subtle]="hOk"
+                                  [class.border-danger]="hErr"
+                                  [class.bg-danger-subtle]="hErr"
+                                >
+                                  <span class="text-muted">{{ p.nome }}:</span>
+                                  <strong [class.text-success]="hOk" [class.text-danger]="hErr">{{ val }}</strong>
+                                </span>
+                              }
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </details>
                 }
 
                 <!-- Observação -->
@@ -381,7 +428,7 @@
                         (click)="iniciarEdicao(r)"
                       >
                         <i class="bi bi-pencil"></i>
-                        {{ canCampos ? 'Editar' : 'Editar observação' }}
+                        {{ canCampos ? 'Corrigir' : 'Editar observação' }}
                       </button>
                     }
                   </div>

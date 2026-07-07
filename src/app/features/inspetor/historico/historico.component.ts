@@ -95,13 +95,14 @@ export class HistoricoComponent implements OnInit {
   readonly expandedData = signal<
     Record<string, { answerId: string; nome: string; resposta: string; limitsAnswerId: string | null }[]>
   >({});
+  readonly expandedHistory = signal<
+    Record<string, { dataCriacao: string; valores: Record<string, string> }[]>
+  >({});
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly controlStatuses = signal<Record<string, string[]>>({});
 
   // ───────── edição por status ─────────
-  /** controlId → statusId atual (string). */
-  readonly controlStatusId = signal<Record<string, string>>({});
   /** controlId em edição (ou null). */
   readonly editId = signal<string | null>(null);
   /** valores editados: answerId (modo normal) OU machineId_answerId (modo máquina). */
@@ -338,6 +339,50 @@ export class HistoricoComponent implements OnInit {
 
   // ───────── Para Layout do HTML ─────────
 
+  /**
+   * Agrupa registros de answer_result em "versões" de envio.
+   * Registros com dataCriacao dentro de 10 segundos entre si = mesmo lote.
+   */
+  private getDataCriacao(r: Record<string, unknown>): number {
+    const raw =
+      r['dataCriacao'] ?? r['data_criacao'] ?? r['createdAt'] ?? r['created_at'] ?? null;
+    if (!raw) return 0;
+    return new Date(raw as string).getTime();
+  }
+
+  private agruparVersoes(
+    records: (AnswerResult & Record<string, unknown>)[],
+  ): { dataCriacao: string; valores: Record<string, string> }[] {
+    if (!records.length) return [];
+    console.log('[histórico] agruparVersoes records:', records.length, records[0]);
+    const versoes: { dataCriacao: string; valores: Record<string, string> }[] = [];
+    let lote: typeof records = [];
+    let refMs = this.getDataCriacao(records[0]);
+
+    for (const r of records) {
+      const ms = this.getDataCriacao(r);
+      if (lote.length && ms - refMs > 10_000) {
+        versoes.push(this.loteParaVersao(lote));
+        lote = [];
+        refMs = ms;
+      }
+      lote.push(r);
+    }
+    if (lote.length) versoes.push(this.loteParaVersao(lote));
+    console.log('[histórico] versões agrupadas:', versoes.length);
+    return versoes;
+  }
+
+  private loteParaVersao(
+    lote: (AnswerResult & Record<string, unknown>)[],
+  ): { dataCriacao: string; valores: Record<string, string> } {
+    const valores: Record<string, string> = {};
+    for (const r of lote) valores[r.AnswerId] = r.resposta;
+    const raw =
+      lote[0]['dataCriacao'] ?? lote[0]['data_criacao'] ?? lote[0]['createdAt'] ?? '';
+    return { dataCriacao: String(raw), valores };
+  }
+
   toggleDetails(row: HistoryRow): void {
     // fecha se já estava aberta
     if (this.expandedId() === row.id) {
@@ -354,9 +399,6 @@ export class HistoricoComponent implements OnInit {
 
     this.expandedId.set(row.id);
     this.cancelarEdicao();
-
-    // garante o statusId atual do controle (para liberar/limitar a edição)
-    this.fetchStatusId(row.id);
 
     // já carregou antes — usa cache
     if (this.expandedData()[row.id] || this.expandedMachineData()[row.id]) return;
@@ -408,13 +450,23 @@ export class HistoricoComponent implements OnInit {
           }));
         } else {
           // modo normal — lista parâmetro + resposta (guarda answerId/limitsAnswerId p/ edição)
-          const resultMap = new Map(
-            this.unwrap<AnswerResult>(answerResults).map((r) => [r.AnswerId, r]),
+          const allResults = this.unwrap<AnswerResult>(answerResults) as (AnswerResult & {
+            limitsAnswerId?: string | null;
+            dataCriacao?: string;
+          })[];
+
+          // ordena por data asc para histórico correto
+          allResults.sort(
+            (a, b) =>
+              new Date(a.dataCriacao ?? 0).getTime() - new Date(b.dataCriacao ?? 0).getTime(),
           );
+
+          // última resposta por answerId = valor atual
+          const latestMap = new Map<string, typeof allResults[0]>();
+          for (const r of allResults) latestMap.set(r.AnswerId, r);
+
           const linhas = answers.map((a) => {
-            const res = resultMap.get(a.id) as
-              | (AnswerResult & { limitsAnswerId?: string | null })
-              | undefined;
+            const res = latestMap.get(a.id);
             return {
               answerId: a.id,
               nome: a.nome,
@@ -423,6 +475,10 @@ export class HistoricoComponent implements OnInit {
             };
           });
           this.expandedData.update((d) => ({ ...d, [row.id]: linhas }));
+
+          // agrupa versões por lote (registros dentro de 10s = mesmo envio)
+          const versoes = this.agruparVersoes(allResults as unknown as (AnswerResult & Record<string, unknown>)[]);
+          this.expandedHistory.update((d) => ({ ...d, [row.id]: versoes }));
         }
 
         this.expandedLoading.set(null);
@@ -435,54 +491,29 @@ export class HistoricoComponent implements OnInit {
   //  EDIÇÃO POR STATUS (1/2 = campos + obs, 3 = só obs)
   // ============================================================
 
-  /** Busca (e memoiza) o statusId atual do controle. */
-  private fetchStatusId(controlId: string): void {
-    if (this.controlStatusId()[controlId] != null) return;
-    this.controlStatusService
-      .getByControl(controlId)
-      .pipe(catchError(() => of(null)))
-      .subscribe((res) => {
-        this.controlStatusId.update((m) => ({ ...m, [controlId]: this.extractStatusId(res) }));
-      });
-  }
-
-  /** Extrai o statusId do retorno de getByControl (objeto único ou lista → mais recente). */
-  private extractStatusId(res: unknown): string {
-    if (res == null) return '';
-    const pick = Array.isArray(res)
-      ? this.maisRecente(res as any[], (s: any) => s.dataAlteracao ?? s.dataCriacao)
-      : res;
-    return String((pick as any)?.statusId ?? '').trim();
-  }
-
-  /** Item mais recente de uma lista, pela data extraída em getDate (desc). */
-  private maisRecente<T>(
-    list: T[],
-    getDate: (item: T) => Date | string | null | undefined,
-  ): T | undefined {
-    return [...list].sort(
-      (a, b) => new Date(getDate(b) ?? 0).getTime() - new Date(getDate(a) ?? 0).getTime(),
-    )[0];
-  }
-
-  /** Tipo do status atual do controle (1, 2, 3…) ou null. */
+  /**
+   * Tipo do status atual do controle derivado dos nomes já carregados.
+   * 1 = normalizado, 2 = correção, 3 = pendente.
+   */
   statusTipo(controlId: string): number | null {
-    const raw = this.controlStatusId()[controlId];
-    if (raw == null || raw === '') return null;
-    const n = Number(raw);
-    return Number.isNaN(n) ? null : n;
+    const nomes = this.controlStatuses()[controlId];
+    if (!nomes?.length) return null;
+    // usa o último nome da lista (mais recente)
+    const last = (nomes[nomes.length - 1] ?? '').toLowerCase();
+    if (last.includes('normaliz')) return 1;
+    if (last.includes('corre')) return 2;
+    if (last.includes('pend')) return 3;
+    return null;
   }
 
-  /** Pode editar os campos (respostas)? Só normalizado (1) ou correção (2). */
+  /** Pode editar os campos (respostas)? Apenas correção (2). */
   podeEditarCampos(controlId: string): boolean {
-    const t = this.statusTipo(controlId);
-    return t === 1 || t === 2;
+    return this.statusTipo(controlId) === 2;
   }
 
-  /** Pode editar a observação? Normalizado (1), correção (2) ou pendente (3). */
+  /** Pode editar a observação? Apenas correção (2). */
   podeEditarObs(controlId: string): boolean {
-    const t = this.statusTipo(controlId);
-    return t === 1 || t === 2 || t === 3;
+    return this.statusTipo(controlId) === 2;
   }
 
   iniciarEdicao(row: HistoryRow): void {
@@ -521,7 +552,7 @@ export class HistoricoComponent implements OnInit {
    * Sem limite ou valor não numérico → não é violação (true).
    * limitMin/limitMax ausentes = -∞/+∞.
    */
-  private dentroDoLimite(answerId: string, valor: string): boolean {
+  dentroDoLimite(answerId: string, valor: string): boolean {
     const limit = this.limitsByAnswer()[answerId];
     if (!limit) return true;
     const v = parseFloat((valor ?? '').replace(',', '.'));
@@ -643,8 +674,7 @@ export class HistoricoComponent implements OnInit {
   }
 
   /** Atualiza o status no estado local e recarrega o nome do status (chip). */
-  private atualizarStatusLocal(controlId: string, statusId: string): void {
-    this.controlStatusId.update((m) => ({ ...m, [controlId]: statusId }));
+  private atualizarStatusLocal(controlId: string, _statusId: string): void {
     this.controlStatusService
       .getStatusNamesByControl(controlId)
       .pipe(catchError(() => of([] as string[])))
@@ -847,4 +877,5 @@ export class HistoricoComponent implements OnInit {
   trackById(_: number, r: HistoryRow): string {
     return r.id;
   }
+
 }

@@ -183,8 +183,16 @@
         <li class="tl-item">
           <div class="tl-marker"><i class="bi bi-clipboard-check"></i></div>
           <div class="tl-card">
-            <!-- cabeçalho — clicável -->
-            <div class="tl-card__head" style="cursor: pointer" (click)="toggleDetails(r)">
+            <!-- cabeçalho — clicável (acessível por teclado) -->
+            <div
+              class="tl-card__head tl-card__head--toggle"
+              role="button"
+              tabindex="0"
+              [attr.aria-expanded]="expandedId() === r.id"
+              (click)="toggleDetails(r)"
+              (keydown.enter)="toggleDetails(r)"
+              (keydown.space)="$event.preventDefault(); toggleDetails(r)"
+            >
               <h3 class="tl-card__title">{{ r.formNome }}</h3>
 
               @if (controlStatuses()[r.id]; as statuses) {
@@ -211,7 +219,7 @@
                 }
               }
 
-              <div style="display: flex; align-items: center; gap: 0.5rem">
+              <div class="tl-card__head-right">
                 <span class="tl-date">
                   <i class="bi bi-calendar-event"></i> {{ data(r.dataEmissao) }}
                 </span>
@@ -226,21 +234,6 @@
 
             <div class="tl-meta">
               <span class="tl-chip"><i class="bi bi-person"></i> {{ r.userNome }}</span>
-              <!-- @if (r.userEmail) {
-                <span class="tl-chip tl-chip--muted">
-                  <i class="bi bi-envelope"></i> {{ r.userEmail }}
-                </span>
-              }
-              @if (r.fileUrl) {
-                <a class="tl-chip tl-chip--file" [href]="r.fileUrl" target="_blank" rel="noopener">
-                  <i class="bi bi-paperclip"></i> {{ r.fileNome }}
-                  <i class="bi bi-box-arrow-up-right"></i>
-                </a>
-              } @else {
-                <span class="tl-chip tl-chip--file">
-                  <i class="bi bi-paperclip"></i> {{ r.fileNome }}
-                </span>
-              } -->
             </div>
 
             <!-- área expandida -->
@@ -271,19 +264,20 @@
                           <tr>
                             <td class="fw-semibold small">{{ m.nome }}</td>
                             @for (a of md.answers; track a.id) {
+                              @let cellKey = m.id + '_' + a.id;
                               <td class="text-center">
                                 @if (editing && canCampos) {
                                   <input
                                     type="text"
                                     class="form-control form-control-sm"
                                     style="min-width: 84px"
-                                    [ngModel]="editValues()[m.id + '_' + a.id] ?? ''"
+                                    [ngModel]="editValues()[cellKey] ?? ''"
                                     [ngModelOptions]="{ standalone: true }"
-                                    (ngModelChange)="updateEditValue(m.id + '_' + a.id, $event)"
+                                    (ngModelChange)="updateEditValue(cellKey, $event)"
                                   />
                                 } @else {
                                   <span class="badge text-bg-light border fw-semibold text-dark">
-                                    {{ md.cells[m.id + '_' + a.id] || '—' }}
+                                    {{ md.cells[cellKey] || '—' }}
                                   </span>
                                 }
                               </td>
@@ -300,8 +294,9 @@
                     <!-- modo normal: cards -->
                     <div class="d-flex flex-wrap gap-2 mt-2">
                       @for (p of params; track p.answerId) {
-                        @let ok = p.resposta !== '—' && p.limitsAnswerId != null && dentroDoLimite(p.answerId, p.resposta);
-                        @let err = p.resposta !== '—' && p.limitsAnswerId != null && !dentroDoLimite(p.answerId, p.resposta);
+                        @let temLimite = p.resposta !== '—' && p.limitsAnswerId != null;
+                        @let ok = temLimite && dentroDoLimite(p.answerId, p.resposta);
+                        @let err = temLimite && !dentroDoLimite(p.answerId, p.resposta);
                         <div
                           class="border rounded p-2"
                           style="min-width: 110px"
@@ -312,7 +307,11 @@
                         >
                           <div
                             class="text-muted"
-                            style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em"
+                            style="
+                              font-size: 0.72rem;
+                              text-transform: uppercase;
+                              letter-spacing: 0.04em;
+                            "
                           >
                             {{ p.nome }}
                           </div>
@@ -329,7 +328,9 @@
                               class="fw-bold fs-5"
                               [class.text-success]="ok"
                               [class.text-danger]="err"
-                            >{{ p.resposta }}</div>
+                            >
+                              {{ p.resposta }}
+                            </div>
                           }
                         </div>
                       }
@@ -340,50 +341,58 @@
                 }
 
                 <!-- Histórico de versões (modo normal) -->
-                @if (!expandedMachineData()[r.id] && expandedHistory()[r.id]?.length > 1) {
-                  <details class="mt-3">
-                    <summary class="text-muted small" style="cursor:pointer">
-                      <i class="bi bi-clock-history"></i>
-                      Histórico de correções ({{ expandedHistory()[r.id].length - 1 }})
-                    </summary>
-                    <div class="mt-2 d-flex flex-column gap-2">
-                      @for (v of expandedHistory()[r.id].slice(0, -1); track $index) {
-                        <div class="border rounded p-2 bg-light">
-                          <div class="text-muted" style="font-size:0.72rem">
-                            <i class="bi bi-calendar2-event"></i> {{ dataHora(v.dataCriacao) }}
-                          </div>
-                          <div class="d-flex flex-wrap gap-2 mt-1">
-                            @for (p of expandedData()[r.id]; track p.answerId) {
-                              @if (v.valores[p.answerId]; as val) {
-                                @let hOk = p.limitsAnswerId != null && dentroDoLimite(p.answerId, val);
-                                @let hErr = p.limitsAnswerId != null && !dentroDoLimite(p.answerId, val);
-                                <span
-                                  class="border rounded px-2 py-1"
-                                  style="font-size:0.8rem"
-                                  [class.border-success]="hOk"
-                                  [class.bg-success-subtle]="hOk"
-                                  [class.border-danger]="hErr"
-                                  [class.bg-danger-subtle]="hErr"
-                                >
-                                  <span class="text-muted">{{ p.nome }}:</span>
-                                  <strong [class.text-success]="hOk" [class.text-danger]="hErr">{{ val }}</strong>
-                                </span>
+                @if (!expandedMachineData()[r.id]) {
+                  @let versoes = expandedHistory()[r.id] ?? [];
+                  @if (versoes.length > 1) {
+                    <details class="mt-3">
+                      <summary class="text-muted small" style="cursor: pointer">
+                        <i class="bi bi-clock-history"></i>
+                        Histórico de correções ({{ versoes.length - 1 }})
+                      </summary>
+                      <div class="mt-2 d-flex flex-column gap-2">
+                        @for (v of versoes.slice(0, -1); track $index) {
+                          <div class="border rounded p-2 bg-light">
+                            <div class="text-muted" style="font-size: 0.72rem">
+                              <i class="bi bi-calendar2-event"></i> {{ dataHora(v.dataCriacao) }}
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-1">
+                              @for (p of expandedData()[r.id] ?? []; track p.answerId) {
+                                @if (v.valores[p.answerId]; as val) {
+                                  @let hOk =
+                                    p.limitsAnswerId != null && dentroDoLimite(p.answerId, val);
+                                  @let hErr =
+                                    p.limitsAnswerId != null && !dentroDoLimite(p.answerId, val);
+                                  <span
+                                    class="border rounded px-2 py-1"
+                                    style="font-size: 0.8rem"
+                                    [class.border-success]="hOk"
+                                    [class.bg-success-subtle]="hOk"
+                                    [class.border-danger]="hErr"
+                                    [class.bg-danger-subtle]="hErr"
+                                  >
+                                    <span class="text-muted">{{ p.nome }}:</span>
+                                    <strong [class.text-success]="hOk" [class.text-danger]="hErr">{{
+                                      val
+                                    }}</strong>
+                                  </span>
+                                }
                               }
-                            }
+                            </div>
                           </div>
-                        </div>
-                      }
-                    </div>
-                  </details>
+                        }
+                      </div>
+                    </details>
+                  }
                 }
 
                 <!-- Observação -->
                 @if (editing && canObs) {
                   <div class="mt-3">
-                    <label class="text-muted small d-block mb-1">
+                    <label class="text-muted small d-block mb-1" [attr.for]="'obs-' + r.id">
                       <i class="bi bi-chat-left-text"></i> Observação
                     </label>
                     <textarea
+                      [id]="'obs-' + r.id"
                       class="form-control form-control-sm"
                       rows="2"
                       placeholder="Observação do controle…"
@@ -411,7 +420,7 @@
                         [disabled]="savingEdit()"
                         (click)="salvarEdicao(r)"
                       >
-                        <i class="bi bi-check-lg"></i> Salvar
+                        <i class="bi bi-check-lg"></i> {{ savingEdit() ? 'Salvando…' : 'Salvar' }}
                       </button>
                       <button
                         type="button"

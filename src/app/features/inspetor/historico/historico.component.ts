@@ -27,10 +27,12 @@ import { AnswerResultService } from '../../../core/services/answer-result.servic
 import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { StatusService } from '../../../core/services/status.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
 
 type FileLike = Record<string, unknown>;
+
+/** Nível de edição permitido conforme o status do controle. */
+type EditLevel = 'campos' | 'obs' | null;
 
 interface HistoryRow {
   id: string;
@@ -59,6 +61,25 @@ interface Filters {
   ate: string;
 }
 
+interface ParamRow {
+  answerId: string;
+  nome: string;
+  resposta: string;
+  limitsAnswerId: string | null;
+}
+
+interface MachineData {
+  maquinas: { id: string; nome: string }[];
+  answers: { id: string; nome: string }[];
+  cells: Record<string, string>; // chave: machineId_answerId
+  cellLimits: Record<string, string | null>; // chave: machineId_answerId → limitsAnswerId
+}
+
+interface VersaoResposta {
+  dataCriacao: string;
+  valores: Record<string, string>;
+}
+
 @Component({
   selector: 'app-historico',
   standalone: true,
@@ -80,7 +101,6 @@ export class HistoricoComponent implements OnInit {
   private readonly limitService = inject(LimitAnswerService);
   private readonly auth = inject(AuthService);
   private readonly controlStatusService = inject(ControlStatusService);
-  private readonly status = inject(StatusService);
 
   readonly controls = signal<Control[]>([]);
   readonly forms = signal<Form[]>([]);
@@ -90,14 +110,13 @@ export class HistoricoComponent implements OnInit {
   readonly machines = signal<Machine[]>([]); // todas as máquinas (para resolver nomes)
   readonly sections = signal<Section[]>([]);
   readonly locations = signal<Location[]>([]);
+
   readonly expandedId = signal<string | null>(null);
   readonly expandedLoading = signal<string | null>(null);
-  readonly expandedData = signal<
-    Record<string, { answerId: string; nome: string; resposta: string; limitsAnswerId: string | null }[]>
-  >({});
-  readonly expandedHistory = signal<
-    Record<string, { dataCriacao: string; valores: Record<string, string> }[]>
-  >({});
+  readonly expandedData = signal<Record<string, ParamRow[]>>({});
+  readonly expandedHistory = signal<Record<string, VersaoResposta[]>>({});
+  readonly expandedMachineData = signal<Record<string, MachineData>>({});
+
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly controlStatuses = signal<Record<string, string[]>>({});
@@ -294,6 +313,7 @@ export class HistoricoComponent implements OnInit {
       return next;
     });
   }
+
   readonly activeFilterCount = computed(() => {
     const f = this.filters();
     let n = 0;
@@ -301,19 +321,8 @@ export class HistoricoComponent implements OnInit {
     return n;
   });
 
-  // modo com máquina: { maquinas: string[], answers: string[], cells: Record<string,string> }
-  readonly expandedMachineData = signal<
-    Record<
-      string,
-      {
-        maquinas: { id: string; nome: string }[];
-        answers: { id: string; nome: string }[];
-        cells: Record<string, string>; // chave: machineId_answerId
-        cellLimits: Record<string, string | null>; // chave: machineId_answerId → limitsAnswerId
-      }
-    >
-  >({});
   readonly hasFilter = computed(() => this.activeFilterCount() > 0);
+
   resetFilters(): void {
     this.filters.set({ ...this.emptyFilters });
   }
@@ -337,25 +346,24 @@ export class HistoricoComponent implements OnInit {
     );
   }
 
-  // ───────── Para Layout do HTML ─────────
+  // ───────── agrupamento de versões (histórico de correções) ─────────
+
+  /** Instante (ms) de um registro, tolerando diferentes nomes de campo. */
+  private getDataCriacao(r: Record<string, unknown>): number {
+    const raw = r['dataCriacao'] ?? r['data_criacao'] ?? r['createdAt'] ?? r['created_at'] ?? null;
+    if (!raw) return 0;
+    const ms = new Date(raw as string).getTime();
+    return Number.isNaN(ms) ? 0 : ms;
+  }
 
   /**
    * Agrupa registros de answer_result em "versões" de envio.
    * Registros com dataCriacao dentro de 10 segundos entre si = mesmo lote.
+   * Espera receber os registros já ordenados por data asc.
    */
-  private getDataCriacao(r: Record<string, unknown>): number {
-    const raw =
-      r['dataCriacao'] ?? r['data_criacao'] ?? r['createdAt'] ?? r['created_at'] ?? null;
-    if (!raw) return 0;
-    return new Date(raw as string).getTime();
-  }
-
-  private agruparVersoes(
-    records: (AnswerResult & Record<string, unknown>)[],
-  ): { dataCriacao: string; valores: Record<string, string> }[] {
+  private agruparVersoes(records: (AnswerResult & Record<string, unknown>)[]): VersaoResposta[] {
     if (!records.length) return [];
-    console.log('[histórico] agruparVersoes records:', records.length, records[0]);
-    const versoes: { dataCriacao: string; valores: Record<string, string> }[] = [];
+    const versoes: VersaoResposta[] = [];
     let lote: typeof records = [];
     let refMs = this.getDataCriacao(records[0]);
 
@@ -369,20 +377,17 @@ export class HistoricoComponent implements OnInit {
       lote.push(r);
     }
     if (lote.length) versoes.push(this.loteParaVersao(lote));
-    console.log('[histórico] versões agrupadas:', versoes.length);
     return versoes;
   }
 
-  private loteParaVersao(
-    lote: (AnswerResult & Record<string, unknown>)[],
-  ): { dataCriacao: string; valores: Record<string, string> } {
+  private loteParaVersao(lote: (AnswerResult & Record<string, unknown>)[]): VersaoResposta {
     const valores: Record<string, string> = {};
     for (const r of lote) valores[r.AnswerId] = r.resposta;
-    const raw =
-      lote[0]['dataCriacao'] ?? lote[0]['data_criacao'] ?? lote[0]['createdAt'] ?? '';
+    const raw = lote[0]['dataCriacao'] ?? lote[0]['data_criacao'] ?? lote[0]['createdAt'] ?? '';
     return { dataCriacao: String(raw), valores };
   }
 
+  // ───────── expandir detalhes ─────────
   toggleDetails(row: HistoryRow): void {
     // fecha se já estava aberta
     if (this.expandedId() === row.id) {
@@ -428,57 +433,9 @@ export class HistoricoComponent implements OnInit {
         );
 
         if (allMachine.length > 0) {
-          const machineIds = [...new Set(allMachine.map((r) => r.machineId))];
-          const nameById = this.machineNameById();
-          const maquinas = machineIds.map((id) => ({ id, nome: nameById.get(id) ?? id }));
-          const cells: Record<string, string> = {};
-          const cellLimits: Record<string, string | null> = {};
-          for (const r of allMachine) {
-            const key = `${r.machineId}_${r.answerId}`;
-            cells[key] = r.resposta;
-            cellLimits[key] = (r as { limitsAnswerId?: string | null }).limitsAnswerId ?? null;
-          }
-
-          this.expandedMachineData.update((d) => ({
-            ...d,
-            [row.id]: {
-              maquinas,
-              answers: answers.map((a) => ({ id: a.id, nome: a.nome })),
-              cells,
-              cellLimits,
-            },
-          }));
+          this.montarModoMaquina(row.id, answers, allMachine);
         } else {
-          // modo normal — lista parâmetro + resposta (guarda answerId/limitsAnswerId p/ edição)
-          const allResults = this.unwrap<AnswerResult>(answerResults) as (AnswerResult & {
-            limitsAnswerId?: string | null;
-            dataCriacao?: string;
-          })[];
-
-          // ordena por data asc para histórico correto
-          allResults.sort(
-            (a, b) =>
-              new Date(a.dataCriacao ?? 0).getTime() - new Date(b.dataCriacao ?? 0).getTime(),
-          );
-
-          // última resposta por answerId = valor atual
-          const latestMap = new Map<string, typeof allResults[0]>();
-          for (const r of allResults) latestMap.set(r.AnswerId, r);
-
-          const linhas = answers.map((a) => {
-            const res = latestMap.get(a.id);
-            return {
-              answerId: a.id,
-              nome: a.nome,
-              resposta: res?.resposta ?? '—',
-              limitsAnswerId: res?.limitsAnswerId ?? null,
-            };
-          });
-          this.expandedData.update((d) => ({ ...d, [row.id]: linhas }));
-
-          // agrupa versões por lote (registros dentro de 10s = mesmo envio)
-          const versoes = this.agruparVersoes(allResults as unknown as (AnswerResult & Record<string, unknown>)[]);
-          this.expandedHistory.update((d) => ({ ...d, [row.id]: versoes }));
+          this.montarModoNormal(row.id, answers, this.unwrap<AnswerResult>(answerResults));
         }
 
         this.expandedLoading.set(null);
@@ -487,18 +444,81 @@ export class HistoricoComponent implements OnInit {
     });
   }
 
+  private montarModoMaquina(
+    controlId: string,
+    answers: Answer[],
+    allMachine: MachineAnswerResult[],
+  ): void {
+    const machineIds = [...new Set(allMachine.map((r) => r.machineId))];
+    const nameById = this.machineNameById();
+    const maquinas = machineIds.map((id) => ({ id, nome: nameById.get(id) ?? id }));
+    const cells: Record<string, string> = {};
+    const cellLimits: Record<string, string | null> = {};
+    for (const r of allMachine) {
+      const key = `${r.machineId}_${r.answerId}`;
+      cells[key] = r.resposta;
+      cellLimits[key] = (r as { limitsAnswerId?: string | null }).limitsAnswerId ?? null;
+    }
+
+    this.expandedMachineData.update((d) => ({
+      ...d,
+      [controlId]: {
+        maquinas,
+        answers: answers.map((a) => ({ id: a.id, nome: a.nome })),
+        cells,
+        cellLimits,
+      },
+    }));
+  }
+
+  private montarModoNormal(controlId: string, answers: Answer[], results: AnswerResult[]): void {
+    const allResults = results as (AnswerResult & {
+      limitsAnswerId?: string | null;
+      dataCriacao?: string;
+    })[];
+
+    // ordena por data asc para histórico correto
+    allResults.sort(
+      (a, b) => new Date(a.dataCriacao ?? 0).getTime() - new Date(b.dataCriacao ?? 0).getTime(),
+    );
+
+    // última resposta por answerId = valor atual
+    const latestMap = new Map<string, (typeof allResults)[number]>();
+    for (const r of allResults) latestMap.set(r.AnswerId, r);
+
+    const linhas: ParamRow[] = answers.map((a) => {
+      const res = latestMap.get(a.id);
+      return {
+        answerId: a.id,
+        nome: a.nome,
+        resposta: res?.resposta ?? '—',
+        limitsAnswerId: res?.limitsAnswerId ?? null,
+      };
+    });
+    this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
+
+    // agrupa versões por lote (registros dentro de 10s = mesmo envio)
+    const versoes = this.agruparVersoes(
+      allResults as unknown as (AnswerResult & Record<string, unknown>)[],
+    );
+    this.expandedHistory.update((d) => ({ ...d, [controlId]: versoes }));
+  }
+
   // ============================================================
-  //  EDIÇÃO POR STATUS (1/2 = campos + obs, 3 = só obs)
+  //  EDIÇÃO POR STATUS
+  //  1 = normalizado, 2 = correção → editam CAMPOS (+ observação)
+  //  3 = pendente                  → edita apenas a OBSERVAÇÃO
+  //  (fonte única da regra: nivelEdicao)
   // ============================================================
 
   /**
    * Tipo do status atual do controle derivado dos nomes já carregados.
    * 1 = normalizado, 2 = correção, 3 = pendente.
+   * Assume que o último nome da lista é o mais recente.
    */
   statusTipo(controlId: string): number | null {
     const nomes = this.controlStatuses()[controlId];
     if (!nomes?.length) return null;
-    // usa o último nome da lista (mais recente)
     const last = (nomes[nomes.length - 1] ?? '').toLowerCase();
     if (last.includes('normaliz')) return 1;
     if (last.includes('corre')) return 2;
@@ -506,14 +526,27 @@ export class HistoricoComponent implements OnInit {
     return null;
   }
 
-  /** Pode editar os campos (respostas)? Apenas correção (2). */
-  podeEditarCampos(controlId: string): boolean {
-    return this.statusTipo(controlId) === 2;
+  /** Regra central de edição por status. */
+  private nivelEdicao(controlId: string): EditLevel {
+    switch (this.statusTipo(controlId)) {
+      case 1:
+      case 2:
+        return 'campos';
+      case 3:
+        return 'obs';
+      default:
+        return null;
+    }
   }
 
-  /** Pode editar a observação? Apenas correção (2). */
+  /** Pode editar os campos (respostas)? Normalizado (1) e correção (2). */
+  podeEditarCampos(controlId: string): boolean {
+    return this.nivelEdicao(controlId) === 'campos';
+  }
+
+  /** Pode editar a observação? Qualquer status editável (1, 2 ou 3). */
   podeEditarObs(controlId: string): boolean {
-    return this.statusTipo(controlId) === 2;
+    return this.nivelEdicao(controlId) !== null;
   }
 
   iniciarEdicao(row: HistoryRow): void {
@@ -569,15 +602,14 @@ export class HistoricoComponent implements OnInit {
   }
 
   salvarEdicao(row: HistoryRow): void {
-    const tipo = this.statusTipo(row.id);
-    if (tipo == null) return;
+    if (this.nivelEdicao(row.id) == null) return;
 
     this.error.set(null);
     const ops: Observable<unknown>[] = [];
     const vals = this.editValues();
     let novoStatusId: string | null = null;
 
-    // Campos só quando normalizado (1) ou correção (2).
+    // Campos: apenas normalizado (1) ou correção (2).
     if (this.podeEditarCampos(row.id)) {
       let camposMudaram = false;
       let tudoDentroDoLimite = true;
@@ -638,18 +670,16 @@ export class HistoricoComponent implements OnInit {
       }
     }
 
-    // Observação (sempre que puder editar — 1/2/3).
+    // Observação (qualquer status editável — 1/2/3).
     const novaObs = this.editObs().trim();
     const obsAtual = (row.observacao ?? '').trim();
     const obsMudou = this.podeEditarObs(row.id) && novaObs !== obsAtual;
     if (obsMudou) {
-
       const payload: ControlUpdate = {
         userId: row.userId,
         fileId: row.fileId,
         observacao: novaObs || null,
       };
-
       ops.push(this.controlService.update(row.id, payload));
     }
 
@@ -662,7 +692,7 @@ export class HistoricoComponent implements OnInit {
     forkJoin(ops).subscribe({
       next: () => {
         this.aplicarEdicaoLocal(row.id, obsMudou ? novaObs || null : row.observacao);
-        if (novoStatusId) this.atualizarStatusLocal(row.id, novoStatusId);
+        if (novoStatusId) this.atualizarStatusLocal(row.id);
         this.savingEdit.set(false);
         this.cancelarEdicao();
       },
@@ -673,8 +703,8 @@ export class HistoricoComponent implements OnInit {
     });
   }
 
-  /** Atualiza o status no estado local e recarrega o nome do status (chip). */
-  private atualizarStatusLocal(controlId: string, _statusId: string): void {
+  /** Atualiza o status no estado local recarregando o nome do status (chip). */
+  private atualizarStatusLocal(controlId: string): void {
     this.controlStatusService
       .getStatusNamesByControl(controlId)
       .pipe(catchError(() => of([] as string[])))
@@ -809,6 +839,12 @@ export class HistoricoComponent implements OnInit {
   reload(): void {
     this.loading.set(true);
     this.error.set(null);
+    // limpa caches de expansão para não misturar com dados antigos
+    this.expandedId.set(null);
+    this.expandedData.set({});
+    this.expandedHistory.set({});
+    this.expandedMachineData.set({});
+    this.cancelarEdicao();
 
     const failLog = (label: string) =>
       catchError((err: unknown) => {
@@ -850,7 +886,7 @@ export class HistoricoComponent implements OnInit {
         this.loading.set(false);
 
         // busca status apenas dos controles VISÍVEIS (dentro do escopo permitido)
-        const visiveis = this.unwrap<Control>(controls).filter((c) => this.isFormAllowed(c.formId));
+        const visiveis = this.controls().filter((c) => this.isFormAllowed(c.formId));
         if (!visiveis.length) {
           this.controlStatuses.set({});
           return;
@@ -873,9 +909,4 @@ export class HistoricoComponent implements OnInit {
       },
     });
   }
-
-  trackById(_: number, r: HistoryRow): string {
-    return r.id;
-  }
-
 }

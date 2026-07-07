@@ -1,22 +1,33 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
+  DestroyRef,
   inject,
   input,
   signal,
-  ViewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  of,
+  shareReplay,
+  Subject,
+  switchMap,
+} from 'rxjs';
 
 import { Answer } from '../../../../core/models/answer.model';
-import { catchError, debounceTime, distinctUntilChanged, of, Subject, switchMap } from 'rxjs';
-import { UserService } from '../../../../core/services/user.service';
-
-import { SignatureComponent } from '../../../../core/modals/signature/signature.component';
 import { Machine } from '../../../../core/models/machine.model';
+import { UserService } from '../../../../core/services/user.service';
+import { SignatureComponent } from '../../../../core/modals/signature/signature.component';
+
+interface CategoriaGrupo {
+  categoria: unknown;
+  answers: Answer[];
+}
 
 @Component({
   selector: 'app-painel-modal-envio',
@@ -26,172 +37,105 @@ import { Machine } from '../../../../core/models/machine.model';
   styleUrl: './modal-envio.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ModalEnvioComponent implements AfterViewInit {
+export class ModalEnvioComponent {
   private readonly userService = inject(UserService);
+  private readonly destroyRef = inject(DestroyRef);
+
   // Hierarquia do formulário — exibida no resumo antes de enviar
   readonly locationNome = input('');
   readonly sectionNome = input('');
   readonly formNome = input('');
 
   // Parâmetros agrupados por categoria e respostas preenchidas pelo inspetor
-  readonly agrupados = input<{ categoria: any; answers: Answer[] }[]>([]);
+  readonly agrupados = input<CategoriaGrupo[]>([]);
   readonly respostas = input<Record<string, string>>({});
+
+  // Máquinas (modo pivô) e suas respostas — chave: `${machineId}_${answerId}`
+  readonly machines = input<Machine[]>([]);
+  readonly machineRespostas = input<Record<string, string>>({});
 
   // Campos preenchidos dentro do modal
   protected readonly observacao = signal('');
   protected readonly matricula = signal('');
-
-  // maquinas
-  readonly machines = input<Machine[]>([]);
-  readonly machineResposta = input<Record<string, string>>({});
-
-  // Canvas de assinatura
-  @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
-  private ctx!: CanvasRenderingContext2D;
-  private isDrawing = false;
-  protected hasSignature = false;
-
-  //assinatura modal
   protected readonly assinatura = signal('');
 
-  // pegar iduser da matricula
+  // id real do usuário resolvido a partir da matrícula
   protected readonly userId = signal<string | null>(null);
 
-  @ViewChild('signature')
-  private signature!: SignatureComponent;
-  //assinatura modal
-
-  ngAfterViewInit(): void {
-    this.iniciarBuscaReativa(); // ← sempre chama, independente do canvas
-
-    if (!this.canvasRef?.nativeElement) return;
-    const canvas = this.canvasRef.nativeElement;
-    this.ctx = canvas.getContext('2d')!;
-    this.ctx.strokeStyle = '#000';
-    this.ctx.lineWidth = 2;
-    this.ctx.lineCap = 'round';
-    console.log('MACHINE RESPOSTAS:', this.machineRespostas());
-  }
-
-  readonly machineRespostas = input<Record<string, string>>({});
-
-  // Subject é como um "canal de eventos" — cada vez que o usuário digita,
-  // jogamos o valor novo aqui dentro com .next()
-  private readonly matriculaInput$ = new Subject<string>();
-
-  // Signal que guarda o nome encontrado (null = ainda não buscou)
+  // Feedback da busca do inspetor (null = nada buscado ainda; '—' = não encontrado)
   protected readonly nomeInspetor = signal<string | null>(null);
-
-  // Signal que controla o spinner de carregamento no HTML
   protected readonly buscandoInspetor = signal(false);
 
-  private iniciarBuscaReativa(): void {
+  // Canal de eventos da digitação da matrícula
+  private readonly matriculaInput$ = new Subject<string>();
+
+  // Perfis buscados UMA vez e reutilizados (evita refetch a cada tecla)
+  private readonly profiles$ = this.userService.getAllUserProfile(1000, 1).pipe(
+    catchError(() => of(null)),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
+
+  constructor() {
     this.matriculaInput$
       .pipe(
-        // Espera 400ms depois que o usuário PAROU de digitar para disparar a busca.
-        // Sem isso, chamaria a API a cada tecla pressionada.
+        // espera parar de digitar antes de buscar
         debounceTime(400),
-
-        // Se o valor não mudou (ex: usuário apagou e redigitou o mesmo), ignora.
+        // ignora se o valor não mudou
         distinctUntilChanged(),
-
-        // switchMap cancela a chamada anterior se uma nova chegar antes de terminar.
-        // Ex: digitou "12", chamou a API → digitou "123" antes de receber resposta
-        // → cancela a busca por "12" e começa por "123".
         switchMap((matricula) => {
-          // Se o campo está vazio, limpa o nome e não chama a API.
           if (!matricula) {
-            this.nomeInspetor.set(null);
-            return of(null); // of(null) = observable que emite null e termina
+            this.limparInspetor();
+            return of(null);
           }
-
-          // Ativa o loading e dispara a busca de todos os profiles.
           this.buscandoInspetor.set(true);
-          return this.userService.getAllUserProfile(1000, 1).pipe(
-            // Se der erro na chamada (ex: rede caiu), retorna null
-            // em vez de quebrar o observable inteiro.
-            catchError(() => of(null)),
-          );
+          return this.profiles$;
         }),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((profiles) => {
-        console.log(
-          'PROFILES:',
-          profiles?.data?.map((p) => ({
-            matricula: p.employeeMatricula,
-            userId: p.userId,
-            nome: p.employeeNome,
-          })),
-        );
-        console.log('BUSCANDO POR:', this.matricula());
-        // Aqui chegam os dados (ou null em caso de erro/vazio)
+        const alvo = this.matricula().trim();
 
+        // campo esvaziado enquanto a busca acontecia
+        if (!alvo) {
+          this.limparInspetor();
+          return;
+        }
+
+        // erro/sem dados → não afirma "não encontrado", apenas limpa o vínculo
         if (!profiles) {
           this.nomeInspetor.set(null);
+          this.userId.set(null);
           this.buscandoInspetor.set(false);
           return;
         }
 
-        // Busca dentro da lista o profile cuja matrícula bate com o que foi digitado.
-        // employeeMatricula é o campo de matrícula dentro do UserProfile.
-        const found = profiles.data.find(
-          (p) => String(p.employeeMatricula) === String(this.matricula()),
-        );
+        const found = profiles.data.find((p) => String(p.employeeMatricula) === alvo);
 
-        // Se achou, pega o nome. Se não achou, mostra '—'.
         this.nomeInspetor.set(found?.employeeNome ?? '—');
-        this.userId.set(found?.userId ?? null); // ← guarda o id real
-
+        this.userId.set(found?.userId ?? null);
         this.buscandoInspetor.set(false);
       });
   }
 
-  // Chamado pelo (input) do campo de matrícula no HTML.
-  // Atualiza o signal E empurra o valor novo no Subject para disparar a busca.
+  /** Chamado pelo (input) da matrícula: sanitiza (só dígitos, máx. 4) e dispara a busca. */
   protected onMatriculaChange(valor: string): void {
-    this.matricula.set(valor);
-    this.matriculaInput$.next(valor); // <-- isso acorda o pipe lá em cima
+    const limpo = (valor ?? '').replace(/\D/g, '').slice(0, 4);
+    this.matricula.set(limpo);
+    this.matriculaInput$.next(limpo);
   }
 
-  private getPos(event: MouseEvent | TouchEvent): { x: number; y: number } {
-    const canvas = this.canvasRef.nativeElement;
-    const rect = canvas.getBoundingClientRect();
-    const source = event instanceof MouseEvent ? event : event.touches[0];
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-      x: (source.clientX - rect.left) * scaleX,
-      y: (source.clientY - rect.top) * scaleY,
-    };
+  private limparInspetor(): void {
+    this.nomeInspetor.set(null);
+    this.userId.set(null);
+    this.buscandoInspetor.set(false);
   }
 
-  protected iniciarDesenho(event: MouseEvent | TouchEvent): void {
-    this.isDrawing = true;
-    const pos = this.getPos(event);
-    this.ctx.beginPath();
-    this.ctx.moveTo(pos.x, pos.y);
+  /** Pronto para enviar? (inspetor resolvido + assinatura feita). */
+  isValid(): boolean {
+    return !!this.userId() && !!this.assinatura();
   }
 
-  protected desenhar(event: MouseEvent | TouchEvent): void {
-    if (!this.isDrawing) return;
-    event.preventDefault();
-    const pos = this.getPos(event);
-    this.ctx.lineTo(pos.x, pos.y);
-    this.ctx.stroke();
-    this.hasSignature = true;
-  }
-
-  protected pararDesenho(): void {
-    this.isDrawing = false;
-  }
-
-  protected limpar(): void {
-    const canvas = this.canvasRef.nativeElement;
-    this.ctx.clearRect(0, 0, canvas.width, canvas.height);
-    this.hasSignature = false;
-  }
-
-  // Retorna todos os dados prontos para o pai enviar ao backend
+  /** Retorna todos os dados prontos para o pai enviar ao backend. */
   value() {
     return {
       observacao: this.observacao(),

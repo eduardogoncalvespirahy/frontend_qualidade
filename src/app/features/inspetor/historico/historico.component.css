@@ -302,6 +302,23 @@
   flex-wrap: wrap;
 }
 
+/* cabeçalho clicável (acessível) */
+.tl-card__head--toggle {
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.tl-card__head--toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.tl-card__head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .tl-card__title {
   margin: 0;
   font-size: 16px;
@@ -358,7 +375,6 @@
   color: #475569;
   border-color: #cbd5e1;
 }
-
 
 .tl-card__foot {
   margin-top: 12px;

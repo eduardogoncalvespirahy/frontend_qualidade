@@ -1,6 +1,6 @@
-<div class="d-flex flex-column gap-4">
+<div class="me-modal d-flex flex-column gap-4">
   <!-- Cabeçalho: hierarquia do formulário -->
-  <div class="p-3 rounded-3 bg-light border d-flex align-items-center gap-2 flex-wrap">
+  <div class="me-breadcrumb p-3 rounded-3 border d-flex align-items-center gap-2 flex-wrap">
     <span class="d-flex align-items-center gap-1 text-muted small">
       <i class="bi bi-geo-alt-fill text-primary"></i>
       {{ locationNome() }}
@@ -23,17 +23,14 @@
     <div class="col-12 col-lg-7 d-flex flex-column gap-3">
       <!-- Tabela de respostas -->
       <div>
-        <h6
-          class="text-uppercase fw-bold text-muted mb-2"
-          style="font-size: 0.7rem; letter-spacing: 0.08em"
-        >
+        <h6 class="me-eyebrow text-uppercase fw-bold mb-2">
           <i class="bi bi-list-check me-1"></i>Respostas
         </h6>
 
         @if (machines().length > 0) {
           <!-- Tabela pivô: máquinas × parâmetros -->
-          <div class="border rounded-3 overflow-auto">
-            <table class="table table-sm table-bordered mb-0">
+          <div class="me-table-wrap border rounded-3 overflow-auto">
+            <table class="me-table table table-sm table-bordered mb-0">
               <thead class="table-light">
                 <tr>
                   <th class="text-muted small">Máquina</th>
@@ -64,7 +61,7 @@
           </div>
         } @else {
           <!-- Lista sem máquinas -->
-          <div class="border rounded-3 overflow-hidden">
+          <div class="me-list border rounded-3 overflow-hidden">
             @for (grupo of agrupados(); track $index) {
               @for (answer of grupo.answers; track answer.id) {
                 <div
@@ -89,7 +86,7 @@
         <label class="form-label small fw-semibold" for="matricula-inspetor">
           <i class="bi bi-person-badge me-1 text-primary"></i>Matrícula
         </label>
-        <div class="d-flex align-items-center gap-2">
+        <div class="me-matricula d-flex align-items-center gap-2">
           <input
             id="matricula-inspetor"
             type="text"
@@ -141,11 +138,8 @@
     </div>
 
     <!-- Coluna direita: assinatura -->
-    <div class="col-12 col-lg-5 d-flex flex-column gap-2">
-      <h6
-        class="text-uppercase fw-bold text-muted mb-0"
-        style="font-size: 0.7rem; letter-spacing: 0.08em"
-      >
+    <div class="me-signature col-12 col-lg-5 d-flex flex-column gap-2">
+      <h6 class="me-eyebrow text-uppercase fw-bold mb-0">
         <i class="bi bi-pen me-1"></i>Assinatura do inspetor
       </h6>
 
@@ -155,5 +149,19 @@
         Assine dentro da área acima com o mouse ou dedo
       </p>
     </div>
+  </div>
+
+  <!-- Ações -->
+  <div class="me-actions d-flex justify-content-end gap-2 pt-3">
+    <button type="button" class="btn btn-secondary" (click)="cancelar.emit()">Cancelar</button>
+    <button
+      type="button"
+      class="btn btn-primary"
+      [disabled]="!podeEnviar()"
+      [title]="motivoBloqueio()"
+      (click)="confirmar.emit()"
+    >
+      <i class="bi bi-send me-1"></i>Confirmar Envio
+    </button>
   </div>
 </div>

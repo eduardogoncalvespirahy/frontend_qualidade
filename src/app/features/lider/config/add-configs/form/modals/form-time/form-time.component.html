@@ -1,49 +1,108 @@
-<div class="d-flex flex-column gap-3">
-  <p class="text-muted mb-0 small">
-    Configure os tempos de execução deste formulário (em minutos).
-  </p>
+<section class="ft">
+  <header class="ft__head">
+    <div>
+      <span class="ft__eyebrow"> Tempo </span>
 
-  <div>
-    <label for="tempoExecucao" class="form-label">
-      Tempo de execução <span class="text-danger">*</span>
-    </label>
-    <div class="input-group">
-      <input
-        id="tempoExecucao"
-        name="tempoExecucao"
-        type="time"
-        class="form-control"
-        [(ngModel)]="tempoExecucao"
-      />
+      <h2 class="ft__title">Configuração de tempo</h2>
     </div>
-    <div class="form-text">Tempo esperado até o próximo formulário.</div>
-  </div>
 
-  <div>
-    <label for="tempoTolerancia" class="form-label">Tolerância</label>
-    <div class="input-group">
-      <input
-        id="tempoTolerancia"
-        name="tempoTolerancia"
-        type="time"
-        class="form-control"
-        [(ngModel)]="tempoTolerancia"
-      />
-    </div>
-    <div class="form-text">Margem de atraso aceitável.</div>
-  </div>
+    <div class="ft__actions">
+      @if (formTime()) {
+        <button type="button" class="btn btn--ghost" [disabled]="saving()" (click)="cancelar()">
+          <i class="bi bi-arrow-counterclockwise"></i>
 
-  <div>
-    <label for="tempoAntecependem" class="form-label">Antecedência</label>
-    <div class="input-group">
-      <input
-        id="tempoAntecependem"
-        name="tempoAntecependem"
-        type="time"
-        class="form-control"
-        [(ngModel)]="tempoAntecependem"
-      />
+          Restaurar
+        </button>
+      }
+
+      <button type="button" class="btn btn--primary" [disabled]="!podeSalvar()" (click)="salvar()">
+        <i class="bi bi-check-lg"></i>
+
+        {{ saving() ? 'Salvando...' : possuiConfiguracao() ? 'Salvar alterações' : 'Configurar' }}
+      </button>
     </div>
-    <div class="form-text">Tempo de antecedência para dispara o alarme.</div>
-  </div>
-</div>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error">
+      <i class="bi bi-exclamation-triangle"></i>
+
+      {{ error() }}
+    </div>
+  }
+
+  @if (success()) {
+    <div class="alert alert--success">
+      <i class="bi bi-check-circle"></i>
+
+      {{ success() }}
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="ft__form ft__form--skeleton">
+      @for (item of [1, 2, 3]; track item) {
+        <div class="ft-skeleton"></div>
+      }
+    </div>
+
+  } @else {
+    <div class="ft__form">
+      <div class="ff">
+        <label class="ff__label" for="tempoExecucao">
+          Tempo de execução
+          <span class="ff__required">*</span>
+        </label>
+
+        <input
+          id="tempoExecucao"
+          type="time"
+          class="ff__control"
+          [ngModel]="tempoExecucao()"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="tempoExecucao.set($event)"
+        />
+
+        <span class="ff__hint"> Tempo previsto entre uma execução e outra. </span>
+      </div>
+
+      <div class="ff">
+        <label class="ff__label" for="tempoTolerancia"> Tempo de tolerância </label>
+
+        <input
+          id="tempoTolerancia"
+          type="time"
+          class="ff__control"
+          [ngModel]="tempoTolerancia()"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="tempoTolerancia.set($event)"
+        />
+
+        <span class="ff__hint"> Tempo adicional aceito antes da geração do alerta. </span>
+      </div>
+
+      <div class="ff">
+        <label class="ff__label" for="tempoAntecedencia"> Antecedência do alerta </label>
+
+        <input
+          id="tempoAntecedencia"
+          type="time"
+          class="ff__control"
+          [ngModel]="tempoAntecedencia()"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="tempoAntecedencia.set($event)"
+        />
+
+        <span class="ff__hint"> Quanto tempo antes o sistema deverá avisar. </span>
+      </div>
+
+      <div class="ft__footer">
+        <div class="ft__info">
+          <i class="bi bi-info-circle"></i>
+
+          <span> Os horários devem ser informados no formato HH:MM. </span>
+        </div>
+      </div>
+    </div>
+  }
+</section>

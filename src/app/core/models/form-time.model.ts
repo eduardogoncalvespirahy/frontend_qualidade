@@ -1,20 +1,21 @@
 export interface FormTime {
-  formId?: string;
+  formId: string;
   tempoExecucao: string;
-  tempoTolerancia?: string;
-  tempoAntecependem?: string;
+  tempoTolerancia: string;
+  tempoAntecedencia: string;
+  dataCriacao: Date;
+  dataAlteracao: Date;
 }
 
 export interface CreateFormTime {
-  formId?: string;
-  tempoExecucao: string | null;
-  tempoTolerancia?: string | null;
-  tempoAntecependem?: string | null;
+  formId: string;
+  tempoExecucao: string;
+  tempoTolerancia: string;
+  tempoAntecedencia?: string;
 }
 
 export interface UpdateFormTime {
-  formId?: string;
-  tempoExecucao?: string | null;
-  tempoTolerancia?: string | null;
-  tempoAntecependem?: string | null;
+  tempoExecucao?: string;
+  tempoTolerancia?: string;
+  tempoAntecedencia?: string;
 }

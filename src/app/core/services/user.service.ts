@@ -58,6 +58,10 @@ export class UserService {
     return this.http.get<PaginatedResult<UserProfile>>(this.apiUrl + '/profiles', { params });
   }
 
+  getInspetorByRegisterNumber(registerNumber: string): Observable<UserProfile> {
+    return this.http.get<UserProfile>(`${this.apiUrl}/inspetor/registerNumber/${registerNumber}`);
+  }
+
   update(id: string, user: UserUpdate): Observable<User> {
     return this.http.put<User>(`${this.apiUrl}/${id}`, user, this.httpOptions);
   }

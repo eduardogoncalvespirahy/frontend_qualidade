@@ -17,7 +17,7 @@ import { FormTimeComponent } from './modals/form-time/form-time.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 import { BreakFormComponent } from './modals/break-form/break-form.component';
 
-type Step = 'location' | 'section' | 'form' | 'break';
+type Step = 'location' | 'section' | 'form' | 'break' | 'time';
 
 interface Filters {
   nome: string;
@@ -33,7 +33,7 @@ interface Filters {
 @Component({
   selector: 'app-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollTopComponent, BreakFormComponent],
+  imports: [CommonModule, FormsModule, ScrollTopComponent, BreakFormComponent, FormTimeComponent],
   templateUrl: './form.component.html',
   styleUrl: './form.component.css',
 })
@@ -54,8 +54,10 @@ export class FormComponent implements OnInit {
   readonly forms = signal<Form[]>([]);
   readonly selectedLocation = signal<Location | null>(null);
   readonly selectedSection = signal<Section | null>(null);
-  readonly selectedForm = signal<Form | null>(null); // formulário cujas paradas serão geridas
-  /** formId → FormTime existente (carregado junto com os formulários). */
+  /** formulário cujas paradas OU tempo serão geridos. */
+  readonly selectedForm = signal<Form | null>(null);
+
+  /** formId → FormTime existente (só para o indicador de "tempo configurado" no card). */
   readonly formTimeByFormId = signal<Record<string, FormTime>>({});
 
   // ───────── permissões de local (credentialLocation) ─────────
@@ -175,17 +177,17 @@ export class FormComponent implements OnInit {
     section: 'Seções',
     form: 'Formulários',
     break: 'Paradas',
+    time: 'Tempo',
   };
   private readonly descriptions: Record<Step, string> = {
     location: 'Selecione um local para gerenciar seus formularios.',
     section: 'Selecione uma seção para gerenciar seus formularios.',
     form: 'Gerencie os formulários desta seção.',
     break: 'Gerencie as paradas deste formulário.',
+    time: 'Configure o tempo deste formulário.',
   };
   readonly pageTitle = computed(() => this.titles[this.step()]);
   readonly pageDescription = computed(() => this.descriptions[this.step()]);
-
-
 
   // ============================================================
   //  CARREGAMENTO
@@ -238,19 +240,25 @@ export class FormComponent implements OnInit {
         const all = this.unwrap<Form>(res);
         this.forms.set(all.filter((f) => f.sectionId === sectionId));
         this.loading.set(false);
-        // carrega formtimes para montar o mapa formId → FormTime
-        this.formTimeService.getAll(1000, 1).subscribe({
-          next: (ftRes) => {
-            const map: Record<string, FormTime> = {};
-            for (const ft of this.unwrap<FormTime>(ftRes)) {
-              if (ft.formId) map[ft.formId] = ft;
-            }
-            this.formTimeByFormId.set(map);
-          },
-          error: () => {},
-        });
+        this.loadFormTimes();
       },
       error: () => this.fail('Não foi possível carregar os formulários.'),
+    });
+  }
+
+  /** Atualiza o mapa formId → FormTime (indicador de "tempo configurado"). */
+  private loadFormTimes(): void {
+    this.formTimeService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const map: Record<string, FormTime> = {};
+        for (const ft of this.unwrap<FormTime>(res)) {
+          if (ft.formId) map[ft.formId] = ft;
+        }
+        this.formTimeByFormId.set(map);
+      },
+      error: () => {
+        /* indicador é opcional — silencioso */
+      },
     });
   }
 
@@ -290,48 +298,24 @@ export class FormComponent implements OnInit {
     this.step.set('break');
   }
 
-  ngOnInit(): void {
-    this.loadLocations();
-  }
-
-  /** Abre o modal de configuração de tempo do formulário. */
-  async openTime(form: Form): Promise<void> {
+  /** Abre a configuração de tempo do formulário (etapa inline, como as paradas). */
+  openTime(form: Form): void {
     if (!this.isLocationAllowed(this.selectedLocation())) {
       this.error.set('Você não tem acesso a este local.');
       return;
     }
     this.clearFeedback();
-    const existing = this.formTimeByFormId()[form.id] ?? null;
-    const ref = this.modalService.openComponent(FormTimeComponent, {
-      title: `Tempo: ${form.nome}`,
-      size: 'md',
-      backdrop: 'static',
-      inputs: { existing },
-      buttons: this.crudButtons('Salvar'),
-    });
-    if (!(await ref.result)) return;
-    const v = ref.instance.value();
-    const payload = {
-      formId: form.id,
-      tempoExecucao: v.tempoExecucao,
-      tempoTolerancia: v.tempoTolerancia ?? undefined,
-      tempoAntecependem: v.tempoAntecependem ?? undefined,
-    };
-    const op$ = existing
-      ? this.formTimeService.update(form.id, payload)
-      : this.formTimeService.create(payload);
-    op$.subscribe({
-      next: (ft) => {
-        this.formTimeByFormId.update((m) => ({ ...m, [form.id]: ft }));
-        this.success.set('Tempo configurado.');
-      },
-      error: () => this.error.set('Erro ao salvar o tempo.'),
-    });
+    this.selectedForm.set(form);
+    this.step.set('time');
+  }
+
+  ngOnInit(): void {
+    this.loadLocations();
   }
 
   back(): void {
     this.clearFeedback();
-    if (this.step() === 'break') this.goToForms();
+    if (this.step() === 'break' || this.step() === 'time') this.goToForms();
     else if (this.step() === 'form') this.goToSections();
     else if (this.step() === 'section') this.goToLocations();
   }
@@ -363,6 +347,8 @@ export class FormComponent implements OnInit {
     this.resetFilters();
     this.selectedForm.set(null);
     this.step.set('form');
+    // ao voltar de "tempo"/"paradas", reflete alterações no indicador do card
+    this.loadFormTimes();
   }
 
   // ============================================================

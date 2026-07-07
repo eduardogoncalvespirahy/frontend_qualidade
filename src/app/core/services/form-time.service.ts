@@ -11,7 +11,7 @@ import { PaginatedResult } from '../models/paginated.model';
 export class FormTimeService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl = `${environment.apiUrl}/form-times`;
+  private readonly apiUrl = `${environment.apiUrl}/form-time`;
 
   private readonly httpOptions = {
     headers: new HttpHeaders({
@@ -22,14 +22,6 @@ export class FormTimeService {
   create(FormTime: CreateFormTime): Observable<FormTime> {
     return this.http.post<FormTime>(this.apiUrl, FormTime);
   }
-
-  getById(id: string): Observable<FormTime> {
-    return this.http.get<FormTime>(`${this.apiUrl}/${id}`);
-  }
-
-//   getbyFormId(formId: string): Observable<FormTime[]> {
-//     return this.http.get<FormTime[]>(`${this.apiUrl}/form/${formId}`);
-//   }
 
   getAll(limit?: number, page?: number): Observable<PaginatedResult<FormTime>> {
     let params = new HttpParams();
@@ -42,11 +34,15 @@ export class FormTimeService {
     return this.http.get<PaginatedResult<FormTime>>(this.apiUrl, { params });
   }
 
-  update(id: string, FormTime: UpdateFormTime): Observable<FormTime> {
-    return this.http.put<FormTime>(`${this.apiUrl}/${id}`, FormTime, this.httpOptions);
+  getByFormId(formId: string): Observable<FormTime> {
+    return this.http.get<FormTime>(`${this.apiUrl}/${formId}`);
   }
 
-  delete(id: string): Observable<FormTime> {
-    return this.http.delete<FormTime>(`${this.apiUrl}/${id}`);
+  update(formId: string, FormTime: UpdateFormTime): Observable<FormTime> {
+    return this.http.put<FormTime>(`${this.apiUrl}/${formId}`, FormTime, this.httpOptions);
+  }
+
+  delete(formId: string): Observable<FormTime> {
+    return this.http.delete<FormTime>(`${this.apiUrl}/${formId}`);
   }
 }

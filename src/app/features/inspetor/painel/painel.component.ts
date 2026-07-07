@@ -18,7 +18,7 @@ import { SectionService } from '../../../core/services/section.service';
 import { FormService } from '../../../core/services/form.service';
 import { AnswerService } from '../../../core/services/answer.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
-import { ModalService } from '../../../core/services/modal.service';
+import { ComponentModalRef, ModalService } from '../../../core/services/modal.service';
 import { SignatureFileService } from '../../../core/services/signature-file.service';
 import { ControlService } from '../../../core/services/control.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -740,7 +740,9 @@ export class PainelComponent implements OnInit {
   }
 
   protected async enviar(): Promise<void> {
-    const ref = this.modalService.openComponent(ModalEnvioComponent, {
+    let ref: ComponentModalRef<ModalEnvioComponent, boolean> | undefined;
+
+    ref = this.modalService.openComponent(ModalEnvioComponent, {
       title: 'Confirmar Envio',
       size: 'xl',
       inputs: {
@@ -752,10 +754,13 @@ export class PainelComponent implements OnInit {
         machines: this.machines(),
         machineRespostas: this.machineParamValues(),
       },
-      buttons: [
-        { text: 'Cancelar', variant: 'secondary', value: false },
-        { text: 'Confirmar Envio', variant: 'primary', value: true },
-      ],
+      // Sem botões no rodapé: as ações ficam no próprio componente,
+      // onde o "Confirmar" só habilita com inspetor + assinatura + 1 resultado.
+      buttons: [],
+      outputs: {
+        confirmar: () => ref?.close(true),
+        cancelar: () => ref?.close(false),
+      },
     });
 
     const confirmed = await ref.result;
@@ -806,7 +811,10 @@ export class PainelComponent implements OnInit {
   }
 
   /** Item mais recente de uma lista, pela data extraída em `getDate` (desc). */
-  private maisRecente<T>(list: T[], getDate: (item: T) => Date | string | null | undefined): T | undefined {
+  private maisRecente<T>(
+    list: T[],
+    getDate: (item: T) => Date | string | null | undefined,
+  ): T | undefined {
     return [...list].sort(
       (a, b) => new Date(getDate(b) ?? 0).getTime() - new Date(getDate(a) ?? 0).getTime(),
     )[0];
@@ -942,9 +950,7 @@ export class PainelComponent implements OnInit {
                   },
                   error: () => {
                     this.saving.set(false);
-                    this.error.set(
-                      'Inspeção registrada, mas falhou ao salvar algumas respostas.',
-                    );
+                    this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
                   },
                 });
               },

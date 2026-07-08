@@ -108,13 +108,13 @@ export class BreakMachineComponent implements OnInit {
     this.clearFeedback();
     const v = this.novo();
 
-    if (!v.horaInicio || !v.horaFim) {
-      this.error.set('Informe a hora de início e de fim.');
+    if (!v.horaInicio) {
+      this.error.set('Informe a hora de início.');
       return;
     }
 
     const ini = this.fromLocalInput(v.horaInicio);
-    const fim = this.fromLocalInput(v.horaFim);
+    const fim = v.horaFim ? this.fromLocalInput(v.horaFim) : null;
 
     const erro = validateBreakTimes(ini, fim, new Date());
     if (erro) {
@@ -126,10 +126,10 @@ export class BreakMachineComponent implements OnInit {
     this.service
       .create({
         machineId: this.machineId(),
-        horaInicio: ini,
-        horaFim: fim,
-        motivo: v.motivo.trim() || null,
-        status: 1, // nasce ativa/agendada dentro da janela
+        horaInicio: this.toServerDate(ini),
+        horaFim: fim ? this.toServerDate(fim) : undefined,
+        motivo: v.motivo.trim(),
+        status: 1,
       })
       .subscribe({
         next: () => {
@@ -157,26 +157,26 @@ export class BreakMachineComponent implements OnInit {
   }
 
   desativar(b: BreakMachine): void {
-    this.clearFeedback();
-    if (!canDeactivate(b, new Date())) {
-      this.error.set('Não é possível desativar esta parada.');
-      return;
-    }
-    this.persistStatus(b, 0, 'Parada desativada.');
-  }
+  this.clearFeedback();
+  this.persistStatus(b, 0, 'Parada desativada.', new Date());
+}
 
-  private persistStatus(b: BreakMachine, status: number, msg: string): void {
-    this.saving.set(true);
-    // UpdateBreakMachine exige horaInicio e horaFim — reenviamos os atuais.
-    this.service
-      .update(b.id, {
-        machineId: b.machineId,
-        horaInicio: new Date(b.horaInicio),
-        horaFim: new Date(b.horaFim),
-        motivo: b.motivo,
-        status,
-      })
-      .subscribe({
+
+  private persistStatus(b: BreakMachine, status: number, msg: string, horaFim?: Date): void {
+  this.saving.set(true);
+  this.service
+    .update(b.id, {
+      machineId: b.machineId,
+      horaInicio: this.toServerDate(this.parseServerDate(b.horaInicio)),
+      horaFim: horaFim
+        ? this.toServerDate(horaFim)
+        : b.horaFim
+          ? this.toServerDate(this.parseServerDate(b.horaFim))
+          : undefined,
+      motivo: b.motivo,
+      status,
+    })
+    .subscribe({
         next: () => {
           this.saving.set(false);
           this.success.set(msg);
@@ -198,6 +198,16 @@ export class BreakMachineComponent implements OnInit {
   private fromLocalInput(s: string): Date {
     return new Date(s);
   }
+  /**
+   * Converte Date para string local sem Z antes de enviar ao backend.
+   * A coluna hora_inicio/hora_fim é TIMESTAMP (sem fuso): pg armazena
+   * exatamente o valor recebido. Enviar sem Z garante que o valor local
+   * (ex.: "10:20") seja salvo como-está, sem conversão de fuso.
+   */
+  private toServerDate(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
 
   private readonly dtFmt = new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
@@ -205,9 +215,12 @@ export class BreakMachineComponent implements OnInit {
   });
   fmt(d: Date | string | null | undefined): string {
     if (!d) return '—';
-    const t = new Date(d);
+    const s = typeof d === 'string' && !d.endsWith('Z') ? d + 'Z' : d;
+    const t = new Date(s);
     return isNaN(t.getTime()) ? '—' : this.dtFmt.format(t);
   }
+
+
 
   toggleForm(): void {
     this.clearFeedback();
@@ -224,4 +237,11 @@ export class BreakMachineComponent implements OnInit {
     this.error.set(null);
     this.success.set(null);
   }
+
+  /** Converte string do servidor (sem Z) para Date UTC correto. */
+  private parseServerDate(d: Date | string): Date {
+    if (d instanceof Date) return d;
+    return new Date(d.endsWith('Z') ? d : d + 'Z');
+  }
+
 }

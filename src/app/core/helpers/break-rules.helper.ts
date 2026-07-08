@@ -16,7 +16,7 @@
 
 export interface BreakLike {
   horaInicio: Date | string;
-  horaFim: Date | string;
+  horaFim?: Date | string | null | undefined;
   status: number;
 }
 
@@ -29,34 +29,37 @@ const GRACE_MS = 60_000;
  */
 export function validateBreakTimes(
   horaInicio: Date,
-  horaFim: Date,
+  horaFim: Date | null,
   now: Date = new Date(),
 ): string | null {
-  const ini = horaInicio.getTime();
-  const fim = horaFim.getTime();
-
-  if (Number.isNaN(ini) || Number.isNaN(fim)) {
-    return 'Informe uma hora de início e de fim válidas.';
+  if (Number.isNaN(horaInicio.getTime())) {
+    return 'Informe uma hora de início válida.';
   }
-  if (ini < now.getTime() - GRACE_MS) {
+  if (horaInicio.getTime() < now.getTime() - GRACE_MS) {
     return 'A hora de início deve ser a atual ou posterior.';
   }
-  if (fim <= ini) {
-    return 'A hora de fim deve ser posterior à hora de início.';
+  if (horaFim !== null) {
+    if (Number.isNaN(horaFim.getTime())) return 'Informe uma hora de fim válida.';
+    if (horaFim.getTime() <= horaInicio.getTime()) return 'A hora de fim deve ser posterior à hora de início.';
   }
   return null;
 }
 
-/** A parada já expirou? (horaFim no passado ou agora). */
+
+/** Sem hora fim, nunca expira. */
 export function isExpired(b: BreakLike, now: Date = new Date()): boolean {
+  if (!b.horaFim) return false;
   return new Date(b.horaFim).getTime() <= now.getTime();
 }
+
 
 /** Está dentro do período (entre início e fim)? */
 export function isWithinWindow(b: BreakLike, now: Date = new Date()): boolean {
   const t = now.getTime();
+  if (!b.horaFim) return t >= new Date(b.horaInicio).getTime();
   return t >= new Date(b.horaInicio).getTime() && t < new Date(b.horaFim).getTime();
 }
+
 
 /** Ainda não começou (agendada para o futuro). */
 export function isScheduled(b: BreakLike, now: Date = new Date()): boolean {
@@ -90,3 +93,5 @@ export function statusLabel(
   if (b.status === 1) return isScheduled(b, now) ? 'Agendada' : 'Ativa';
   return 'Inativa';
 }
+
+

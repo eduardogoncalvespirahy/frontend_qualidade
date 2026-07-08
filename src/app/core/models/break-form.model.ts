@@ -20,7 +20,7 @@ export interface CreateBreakForm {
 export interface UpdateBreakForm {
   formId?: string;
   horaInicio: Date;
-  horaFim: Date;  
+  horaFim?: Date | null;
   motivo?: string | null;
   status?: number;
 }

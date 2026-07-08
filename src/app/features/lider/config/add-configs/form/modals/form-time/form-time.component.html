@@ -2,7 +2,6 @@
   <header class="ft__head">
     <div>
       <span class="ft__eyebrow"> Tempo </span>
-
       <h2 class="ft__title">Configuração de tempo</h2>
     </div>
 
@@ -10,14 +9,12 @@
       @if (formTime()) {
         <button type="button" class="btn btn--ghost" [disabled]="saving()" (click)="cancelar()">
           <i class="bi bi-arrow-counterclockwise"></i>
-
           Restaurar
         </button>
       }
 
       <button type="button" class="btn btn--primary" [disabled]="!podeSalvar()" (click)="salvar()">
         <i class="bi bi-check-lg"></i>
-
         {{ saving() ? 'Salvando...' : possuiConfiguracao() ? 'Salvar alterações' : 'Configurar' }}
       </button>
     </div>
@@ -26,7 +23,6 @@
   @if (error()) {
     <div class="alert alert--error">
       <i class="bi bi-exclamation-triangle"></i>
-
       {{ error() }}
     </div>
   }
@@ -34,7 +30,6 @@
   @if (success()) {
     <div class="alert alert--success">
       <i class="bi bi-check-circle"></i>
-
       {{ success() }}
     </div>
   }
@@ -45,7 +40,6 @@
         <div class="ft-skeleton"></div>
       }
     </div>
-
   } @else {
     <div class="ft__form">
       <div class="ff">
@@ -53,7 +47,6 @@
           Tempo de execução
           <span class="ff__required">*</span>
         </label>
-
         <input
           id="tempoExecucao"
           type="time"
@@ -62,13 +55,14 @@
           [ngModelOptions]="{ standalone: true }"
           (ngModelChange)="tempoExecucao.set($event)"
         />
-
         <span class="ff__hint"> Tempo previsto entre uma execução e outra. </span>
       </div>
 
       <div class="ff">
-        <label class="ff__label" for="tempoTolerancia"> Tempo de tolerância </label>
-
+        <label class="ff__label" for="tempoTolerancia">
+          Tempo de tolerância
+          <span class="ff__required">*</span>
+        </label>
         <input
           id="tempoTolerancia"
           type="time"
@@ -77,13 +71,11 @@
           [ngModelOptions]="{ standalone: true }"
           (ngModelChange)="tempoTolerancia.set($event)"
         />
-
         <span class="ff__hint"> Tempo adicional aceito antes da geração do alerta. </span>
       </div>
 
       <div class="ff">
         <label class="ff__label" for="tempoAntecedencia"> Antecedência do alerta </label>
-
         <input
           id="tempoAntecedencia"
           type="time"
@@ -92,14 +84,12 @@
           [ngModelOptions]="{ standalone: true }"
           (ngModelChange)="tempoAntecedencia.set($event)"
         />
-
         <span class="ff__hint"> Quanto tempo antes o sistema deverá avisar. </span>
       </div>
 
       <div class="ft__footer">
         <div class="ft__info">
           <i class="bi bi-info-circle"></i>
-
           <span> Os horários devem ser informados no formato HH:MM. </span>
         </div>
       </div>

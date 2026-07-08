@@ -55,7 +55,7 @@
             <input
               type="text"
               class="ff__control"
-              placeholder="Formulário, usuário, observação…"
+              placeholder="Formulário, usuário, local, seção…"
               [ngModel]="filters().texto"
               [ngModelOptions]="{ standalone: true }"
               (ngModelChange)="updateFilter('texto', $event)"
@@ -234,6 +234,12 @@
 
             <div class="tl-meta">
               <span class="tl-chip"><i class="bi bi-person"></i> {{ r.userNome }}</span>
+              @if (r.locationNome) {
+                <span class="tl-chip"><i class="bi bi-geo-alt"></i> {{ r.locationNome }}</span>
+              }
+              @if (r.sectionNome) {
+                <span class="tl-chip"><i class="bi bi-diagram-3"></i> {{ r.sectionNome }}</span>
+              }
             </div>
 
             <!-- área expandida -->

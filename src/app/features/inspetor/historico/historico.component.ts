@@ -45,6 +45,10 @@ interface HistoryRow {
   id: string;
   formId: string;
   formNome: string;
+  sectionId: string;
+  sectionNome: string;
+  locationId: string;
+  locationNome: string;
   userId: string;
   userNome: string;
   userEmail: string;
@@ -88,7 +92,7 @@ interface VersaoResposta {
 }
 
 @Component({
-  selector: 'app-historico',
+  selector: 'app-historico-inspetor',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './historico.component.html',
@@ -787,6 +791,9 @@ export class HistoricoComponent implements OnInit {
   // ───────── linhas do histórico (mais recentes primeiro) ─────────
   readonly rows = computed<HistoryRow[]>(() => {
     const formById = new Map(this.forms().map((f) => [f.id, f]));
+    const sectionById = new Map(this.sections().map((s) => [s.id, s]));
+    // employerId → location (deriva o local a partir do employer da seção)
+    const locationByEmployer = new Map(this.locations().map((l) => [l.employerId, l]));
     const userById = new Map(this.users().map((u) => [u.id, u]));
     const fileById = new Map(this.files().map((f) => [String(f['id']), f]));
     const statusMap = this.controlStatuses();
@@ -797,12 +804,18 @@ export class HistoricoComponent implements OnInit {
         .filter((c) => this.isFormAllowed(c.formId))
         .map((c) => {
           const form = formById.get(c.formId);
+          const section = form ? sectionById.get(form.sectionId) : undefined;
+          const location = section ? locationByEmployer.get(section.employerId) : undefined;
           const user = userById.get(c.userId);
           const file = fileById.get(c.fileId);
           return {
             id: c.id,
             formId: c.formId,
             formNome: form?.nome ?? c.formId,
+            sectionId: section?.id ?? form?.sectionId ?? '',
+            sectionNome: section?.nome ?? '',
+            locationId: location?.id ?? '',
+            locationNome: location?.nome ?? '',
             userId: c.userId,
             userNome: user?.username ?? c.userId,
             userEmail: user?.email ?? '',
@@ -850,7 +863,9 @@ export class HistoricoComponent implements OnInit {
           this.textMatch(r.userNome, f.texto) ||
           this.textMatch(r.userEmail, f.texto) ||
           this.textMatch(r.observacao, f.texto) ||
-          this.textMatch(r.fileNome, f.texto)),
+          this.textMatch(r.fileNome, f.texto) ||
+          this.textMatch(r.locationNome, f.texto) ||
+          this.textMatch(r.sectionNome, f.texto)),
     );
   });
 

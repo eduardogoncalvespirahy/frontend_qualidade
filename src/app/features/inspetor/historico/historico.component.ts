@@ -629,6 +629,10 @@ export class HistoricoComponent implements OnInit {
     const vals = this.editValues();
     let novoStatusId: string | null = null;
 
+    // Valores efetivamente alterados no modo normal → viram uma nova "versão"
+    // (lote de correção) inserida reativamente no histórico ao salvar.
+    const changedNormal: Record<string, string> = {};
+
     // Campos: apenas normalizado (1) ou correção (2).
     if (this.podeEditarCampos(row.id)) {
       let camposMudaram = false;
@@ -670,6 +674,7 @@ export class HistoricoComponent implements OnInit {
 
           if (novo && novo !== atual) {
             camposMudaram = true;
+            changedNormal[p.answerId] = novo;
             ops.push(
               this.answerResultService.create({
                 AnswerId: p.answerId,
@@ -712,6 +717,10 @@ export class HistoricoComponent implements OnInit {
     forkJoin(ops).subscribe({
       next: () => {
         this.aplicarEdicaoLocal(row.id, obsMudou ? novaObs || null : row.observacao);
+        // Insere a nova versão (lote de correção) no histórico — modo normal.
+        if (Object.keys(changedNormal).length && !this.expandedMachineData()[row.id]) {
+          this.anexarVersao(row.id, changedNormal);
+        }
         if (novoStatusId) this.atualizarStatusLocal(row.id);
         this.savingEdit.set(false);
         this.cancelarEdicao();
@@ -721,6 +730,23 @@ export class HistoricoComponent implements OnInit {
         this.error.set('Erro ao salvar as alterações.');
       },
     });
+  }
+
+  /**
+   * Insere reativamente uma nova versão no histórico de correções.
+   * `valores` contém apenas os campos alterados neste envio (como um lote real),
+   * ficando como a versão MAIS RECENTE (o template mostra as anteriores em
+   * "Histórico de correções" e os valores atuais nos cards).
+   */
+  private anexarVersao(controlId: string, valores: Record<string, string>): void {
+    const nova: VersaoResposta = {
+      dataCriacao: new Date().toISOString(),
+      valores: { ...valores },
+    };
+    this.expandedHistory.update((h) => ({
+      ...h,
+      [controlId]: [...(h[controlId] ?? []), nova],
+    }));
   }
 
   /** Atualiza o status no estado local recarregando o nome do status (chip). */

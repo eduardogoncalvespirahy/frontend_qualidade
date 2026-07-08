@@ -11,6 +11,7 @@ import { Section } from '../../../core/models/section.model';
 import { Form } from '../../../core/models/form.model';
 import { Answer } from '../../../core/models/answer.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
+import { BreakMachine } from '../../../core/models/break-machine.model';
 
 import { MachineService } from '../../../core/services/machine.service';
 import { LocationService } from '../../../core/services/location.service';
@@ -22,6 +23,7 @@ import { ComponentModalRef, ModalService } from '../../../core/services/modal.se
 import { SignatureFileService } from '../../../core/services/signature-file.service';
 import { ControlService } from '../../../core/services/control.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { BreakMachineService } from '../../../core/services/break-machine.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
@@ -1009,9 +1011,24 @@ export class PainelComponent implements OnInit {
   // ============================================================
 
   private readonly machineService = inject(MachineService);
+  private readonly breakMachineService = inject(BreakMachineService);
 
   readonly machines = signal<Machine[]>([]);
   readonly machineParamValues = signal<Record<string, string>>({});
+  readonly breaks = signal<BreakMachine[]>([]);
+
+  readonly pausedMachineIds = computed<Set<string>>(() => {
+    const now = new Date();
+    return new Set(
+      this.breaks()
+        .filter(
+          (b) =>
+            b.status === 1 &&
+            (!b.horaFim || new Date(b.horaFim).getTime() > now.getTime()),
+        )
+        .map((b) => b.machineId),
+    );
+  });
 
   private loadMachines(): void {
     const formId = this.selectedForm()?.id;
@@ -1022,6 +1039,16 @@ export class PainelComponent implements OnInit {
       },
       error: () => {},
     });
+
+    this.breakMachineService.getAll(1000,1).subscribe({
+      next: (res) => this.breaks.set(this.unwrap<BreakMachine>(res)),
+      error:() => this.breaks.set([]),
+    })
+
+  }
+
+  isPaused(machineId: string): boolean {
+    return this.pausedMachineIds().has(machineId);
   }
 
   updateMachineParam(machineId: string, answerId: string, value: string): void {

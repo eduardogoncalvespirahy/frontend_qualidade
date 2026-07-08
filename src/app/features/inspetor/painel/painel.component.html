@@ -381,8 +381,15 @@
               </thead>
               <tbody>
                 @for (m of machines(); track m.id) {
-                  <tr>
-                    <td class="fw-semibold text-dark">{{ m.nome }}</td>
+                  <tr [class.table-warning]="isPaused(m.id)">
+                    <td class="fw-semibold text-dark">
+                      {{ m.nome }}
+                      @if (isPaused(m.id)) {
+                        <span class="badge bg-warning text-dark ms-2">
+                          <i class="bi bi-pause-circle me-1"></i>Em pausa
+                        </span>
+                      }
+                    </td>
                     @for (a of answers(); track a.id) {
                       <td class="p-1">
                         <input
@@ -392,6 +399,8 @@
                           [ngModelOptions]="{ standalone: true }"
                           (ngModelChange)="updateMachineParam(m.id, a.id, $event)"
                           placeholder="—"
+                          [disabled]="isPaused(m.id)"
+                          [title]="isPaused(m.id) ? 'Máquina em pausa — inspeção bloqueada' : ''"
                         />
                       </td>
                     }

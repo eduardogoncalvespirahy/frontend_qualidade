@@ -1,38 +1,50 @@
 <section class="ft">
   <header class="ft__head">
-    <div>
-      <span class="ft__eyebrow"> Tempo </span>
+    <div class="ft__headings">
+      <span class="ft__eyebrow">Tempo</span>
       <h2 class="ft__title">Configuração de tempo</h2>
+      @if (possuiConfiguracao()) {
+        <span class="ft__status ft__status--on">
+          <i class="bi bi-check-circle-fill"></i> Configurado
+          @if (atualizadoEm()) {
+            <span class="ft__status-date">· atualizado em {{ atualizadoEm() }}</span>
+          }
+        </span>
+      } @else if (!loading()) {
+        <span class="ft__status ft__status--off">
+          <i class="bi bi-slash-circle"></i> Não configurado
+        </span>
+      }
     </div>
 
     <div class="ft__actions">
-      @if (formTime()) {
+      @if (dirty()) {
         <button type="button" class="btn btn--ghost" [disabled]="saving()" (click)="cancelar()">
           <i class="bi bi-arrow-counterclockwise"></i>
           Restaurar
         </button>
       }
-
       <button type="button" class="btn btn--primary" [disabled]="!podeSalvar()" (click)="salvar()">
-        <i class="bi bi-check-lg"></i>
+        <i class="bi" [class.bi-check-lg]="!saving()" [class.bi-hourglass-split]="saving()"></i>
         {{ saving() ? 'Salvando...' : possuiConfiguracao() ? 'Salvar alterações' : 'Configurar' }}
       </button>
     </div>
   </header>
 
-  @if (error()) {
-    <div class="alert alert--error">
-      <i class="bi bi-exclamation-triangle"></i>
-      {{ error() }}
-    </div>
-  }
-
-  @if (success()) {
-    <div class="alert alert--success">
-      <i class="bi bi-check-circle"></i>
-      {{ success() }}
-    </div>
-  }
+  <div class="ft__feedback" aria-live="polite">
+    @if (error()) {
+      <div class="alert alert--error" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        {{ error() }}
+      </div>
+    }
+    @if (success()) {
+      <div class="alert alert--success" role="status">
+        <i class="bi bi-check-circle"></i>
+        {{ success() }}
+      </div>
+    }
+  </div>
 
   @if (loading()) {
     <div class="ft__form ft__form--skeleton">
@@ -41,56 +53,102 @@
       }
     </div>
   } @else {
+    @if (!possuiConfiguracao()) {
+      <div class="ft__empty">
+        <i class="bi bi-clock-history"></i>
+        <span>
+          Este formulário ainda não tem tempo configurado. Preencha abaixo e clique em
+          <strong>Configurar</strong>.
+        </span>
+      </div>
+    }
+
     <div class="ft__form">
+      <!-- Execução -->
       <div class="ff">
         <label class="ff__label" for="tempoExecucao">
-          Tempo de execução
-          <span class="ff__required">*</span>
+          Tempo de execução <span class="ff__required">*</span>
         </label>
         <input
           id="tempoExecucao"
           type="time"
+          step="1"
           class="ff__control"
+          [class.is-invalid]="mostraErro('exec') && erroExecucao()"
+          [attr.aria-invalid]="mostraErro('exec') && !!erroExecucao()"
+          [attr.aria-describedby]="mostraErro('exec') && erroExecucao() ? 'err-exec' : null"
           [ngModel]="tempoExecucao()"
           [ngModelOptions]="{ standalone: true }"
-          (ngModelChange)="tempoExecucao.set($event)"
+          (ngModelChange)="setCampo('exec', $event)"
+          (blur)="marcarTocado('exec')"
         />
-        <span class="ff__hint"> Tempo previsto entre uma execução e outra. </span>
+        @if (mostraErro('exec') && erroExecucao()) {
+          <span id="err-exec" class="ff__error">
+            <i class="bi bi-exclamation-circle"></i> {{ erroExecucao() }}
+          </span>
+        } @else {
+          <span class="ff__hint">Tempo previsto entre uma execução e outra.</span>
+        }
       </div>
 
+      <!-- Tolerância -->
       <div class="ff">
         <label class="ff__label" for="tempoTolerancia">
-          Tempo de tolerância
-          <span class="ff__required">*</span>
+          Tempo de tolerância <span class="ff__required">*</span>
         </label>
         <input
           id="tempoTolerancia"
           type="time"
+          step="1"
           class="ff__control"
+          [class.is-invalid]="mostraErro('tol') && erroTolerancia()"
+          [attr.aria-invalid]="mostraErro('tol') && !!erroTolerancia()"
+          [attr.aria-describedby]="mostraErro('tol') && erroTolerancia() ? 'err-tol' : null"
           [ngModel]="tempoTolerancia()"
           [ngModelOptions]="{ standalone: true }"
-          (ngModelChange)="tempoTolerancia.set($event)"
+          (ngModelChange)="setCampo('tol', $event)"
+          (blur)="marcarTocado('tol')"
         />
-        <span class="ff__hint"> Tempo adicional aceito antes da geração do alerta. </span>
+        @if (mostraErro('tol') && erroTolerancia()) {
+          <span id="err-tol" class="ff__error">
+            <i class="bi bi-exclamation-circle"></i> {{ erroTolerancia() }}
+          </span>
+        } @else {
+          <span class="ff__hint">Tempo adicional aceito antes da geração do alerta.</span>
+        }
       </div>
 
+      <!-- Antecedência -->
       <div class="ff">
-        <label class="ff__label" for="tempoAntecedencia"> Antecedência do alerta </label>
+        <label class="ff__label" for="tempoAntecedencia">Antecedência do alerta</label>
         <input
           id="tempoAntecedencia"
           type="time"
+          step="1"
           class="ff__control"
+          [class.is-invalid]="mostraErro('ant') && erroAntecedencia()"
+          [attr.aria-invalid]="mostraErro('ant') && !!erroAntecedencia()"
+          [attr.aria-describedby]="mostraErro('ant') && erroAntecedencia() ? 'err-ant' : null"
           [ngModel]="tempoAntecedencia()"
           [ngModelOptions]="{ standalone: true }"
-          (ngModelChange)="tempoAntecedencia.set($event)"
+          (ngModelChange)="setCampo('ant', $event)"
+          (blur)="marcarTocado('ant')"
         />
-        <span class="ff__hint"> Quanto tempo antes o sistema deverá avisar. </span>
+        @if (mostraErro('ant') && erroAntecedencia()) {
+          <span id="err-ant" class="ff__error">
+            <i class="bi bi-exclamation-circle"></i> {{ erroAntecedencia() }}
+          </span>
+        } @else {
+          <span class="ff__hint"
+            >Quanto tempo antes o sistema deverá avisar (padrão 00:05:00).</span
+          >
+        }
       </div>
 
       <div class="ft__footer">
         <div class="ft__info">
           <i class="bi bi-info-circle"></i>
-          <span> Os horários devem ser informados no formato HH:MM. </span>
+          <span>Os horários devem ser informados no formato HH:MM:SS.</span>
         </div>
       </div>
     </div>

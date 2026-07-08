@@ -26,17 +26,23 @@
           id="brk-ini"
           type="datetime-local"
           class="ff__control"
+          min="2020-01-01T00:00"
+          max="2100-12-31T23:59"
           [ngModel]="novo().horaInicio"
           [ngModelOptions]="{ standalone: true }"
           (ngModelChange)="updateNovo('horaInicio', $event)"
         />
       </div>
       <div class="ff">
-        <label class="ff__label" for="brk-fim">Hora de fim</label>
+        <label class="ff__label" for="brk-fim">
+          Hora de fim <span class="ff__optional">(opcional)</span>
+        </label>
         <input
           id="brk-fim"
           type="datetime-local"
           class="ff__control"
+          min="2020-01-01T00:00"
+          max="2100-12-31T23:59"
           [ngModel]="novo().horaFim"
           [ngModelOptions]="{ standalone: true }"
           (ngModelChange)="updateNovo('horaFim', $event)"
@@ -61,7 +67,7 @@
       </div>
       <p class="brk__hint">
         <i class="bi bi-info-circle"></i>
-        O início deve ser agora ou depois; o fim, sempre após o início.
+        O início deve ser agora ou depois. A hora de fim é opcional — defina ao desativar.
       </p>
     </div>
   }
@@ -96,7 +102,9 @@
 
           <div class="brk-card__times">
             <span><i class="bi bi-play-fill"></i> {{ fmt(b.horaInicio) }}</span>
-            <span><i class="bi bi-stop-fill"></i> {{ fmt(b.horaFim) }}</span>
+            <span>
+              <i class="bi bi-stop-fill"></i> {{ b.horaFim ? fmt(b.horaFim) : 'Em aberto' }}
+            </span>
           </div>
 
           @if (b.motivo) {

@@ -12,6 +12,7 @@ import { Form } from '../../../core/models/form.model';
 import { Answer } from '../../../core/models/answer.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 import { BreakMachine } from '../../../core/models/break-machine.model';
+import { BreakForm } from '../../../core/models/break-form.model';
 
 import { MachineService } from '../../../core/services/machine.service';
 import { LocationService } from '../../../core/services/location.service';
@@ -24,6 +25,7 @@ import { SignatureFileService } from '../../../core/services/signature-file.serv
 import { ControlService } from '../../../core/services/control.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BreakMachineService } from '../../../core/services/break-machine.service';
+import { BreakFormService } from '../../../core/services/break-form.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
@@ -294,6 +296,11 @@ export class PainelComponent implements OnInit {
       },
       error: () => this.fail('Não foi possível carregar os formulários.'),
     });
+    // carrega breaks de todos os formulários para identificar pausados
+    this.breakFormService.getAll(1000, 1).subscribe({
+      next: (res) => this.allFormBreaks.set(this.unwrap<BreakForm>(res)),
+      error: () => this.allFormBreaks.set([]),
+    });
   }
 
   private loadAnswers(): void {
@@ -390,6 +397,12 @@ export class PainelComponent implements OnInit {
     this.step.set('parameters');
     this.loadAnswers();
     this.loadMachines();
+
+    // carrega breaks do formulário selecionado
+    this.breakFormService.getbyFormId(form.id).subscribe({
+      next: (res) => this.formBreaks.set(Array.isArray(res) ? res : []),
+      error: () => this.formBreaks.set([]),
+    });
   }
 
   // ============================================================
@@ -1022,9 +1035,7 @@ export class PainelComponent implements OnInit {
     return new Set(
       this.breaks()
         .filter(
-          (b) =>
-            b.status === 1 &&
-            (!b.horaFim || new Date(b.horaFim).getTime() > now.getTime()),
+          (b) => b.status === 1 && (!b.horaFim || new Date(b.horaFim).getTime() > now.getTime()),
         )
         .map((b) => b.machineId),
     );
@@ -1040,11 +1051,10 @@ export class PainelComponent implements OnInit {
       error: () => {},
     });
 
-    this.breakMachineService.getAll(1000,1).subscribe({
+    this.breakMachineService.getAll(1000, 1).subscribe({
       next: (res) => this.breaks.set(this.unwrap<BreakMachine>(res)),
-      error:() => this.breaks.set([]),
-    })
-
+      error: () => this.breaks.set([]),
+    });
   }
 
   isPaused(machineId: string): boolean {
@@ -1053,5 +1063,25 @@ export class PainelComponent implements OnInit {
 
   updateMachineParam(machineId: string, answerId: string, value: string): void {
     this.machineParamValues.update((m) => ({ ...m, [`${machineId}_${answerId}`]: value }));
+  }
+
+  // E PARA FORMS COM PAUSA EM ANDAMENTO
+
+  private readonly breakFormService = inject(BreakFormService);
+  readonly allFormBreaks = signal<BreakForm[]>([]);
+  readonly formBreaks = signal<BreakForm[]>([]);
+
+  readonly pausedFormIds = computed<Set<string>>(() => {
+    const now = new Date();
+    return new Set(
+      this.allFormBreaks()
+        .filter(
+          (b) => b.status === 1 && (!b.horaFim || new Date(b.horaFim).getTime() > now.getTime()),
+        )
+        .map((b) => b.formId),
+    );
+  });
+  isFormPausedById(formId: string): boolean {
+    return this.pausedFormIds().has(formId);
   }
 }

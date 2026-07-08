@@ -331,16 +331,36 @@
         @if (filteredForms().length) {
           <div class="grid">
             @for (form of filteredForms(); track trackById($index, form)) {
-              <button type="button" class="card" (click)="selectForm(form)">
+              <button
+                type="button"
+                class="card"
+                [class.is-paused]="isFormPausedById(form.id)"
+                [disabled]="isFormPausedById(form.id)"
+                (click)="selectForm(form)"
+              >
                 <div class="card__top">
                   <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
-                  <span class="badge" [class.badge--on]="isAtivo(form.status)">
-                    {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
-                  </span>
+                  <div class="d-flex gap-2">
+                    <span class="badge" [class.badge--on]="isAtivo(form.status)">
+                      {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
+                    </span>
+                    @if (isFormPausedById(form.id)) {
+                      <span class="badge badge--warn">
+                        <i class="bi bi-pause-circle me-1"></i>Pausado
+                      </span>
+                    }
+                  </div>
                 </div>
                 <h3 class="card__title">{{ form.nome }}</h3>
                 <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
-                <span class="card__go">Preencher <i class="bi bi-arrow-right"></i></span>
+                <span class="card__go">
+                  {{ isFormPausedById(form.id) ? 'Em pausa' : 'Preencher' }}
+                  <i
+                    class="bi"
+                    [class.bi-pause-fill]="isFormPausedById(form.id)"
+                    [class.bi-arrow-right]="!isFormPausedById(form.id)"
+                  ></i>
+                </span>
               </button>
             }
           </div>

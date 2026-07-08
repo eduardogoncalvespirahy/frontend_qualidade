@@ -335,6 +335,13 @@
   border-color: transparent;
   box-shadow: none;
 }
+
+.badge--warn {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+
 @keyframes shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }

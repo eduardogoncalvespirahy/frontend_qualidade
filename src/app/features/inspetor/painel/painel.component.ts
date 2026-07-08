@@ -398,11 +398,6 @@ export class PainelComponent implements OnInit {
     this.loadAnswers();
     this.loadMachines();
 
-    // carrega breaks do formulário selecionado
-    this.breakFormService.getbyFormId(form.id).subscribe({
-      next: (res) => this.formBreaks.set(Array.isArray(res) ? res : []),
-      error: () => this.formBreaks.set([]),
-    });
   }
 
   // ============================================================
@@ -1069,7 +1064,6 @@ export class PainelComponent implements OnInit {
 
   private readonly breakFormService = inject(BreakFormService);
   readonly allFormBreaks = signal<BreakForm[]>([]);
-  readonly formBreaks = signal<BreakForm[]>([]);
 
   readonly pausedFormIds = computed<Set<string>>(() => {
     const now = new Date();

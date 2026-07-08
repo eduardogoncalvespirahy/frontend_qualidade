@@ -2,7 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 
 import { SignatureFile } from '../../../core/models/signature-file.model';
 import { Machine } from '../../../core/models/machine.model';
@@ -774,41 +774,41 @@ export class PainelComponent implements OnInit {
   private readonly controlService = inject(ControlService);
   private readonly controlStatusService = inject(ControlStatusService);
 
-  private verificaControlAnteriorByFormId(formId: string): void {
-    this.controlService.getByFormId(formId).subscribe({
-      next: (controls) => {
-        if (!controls?.length) return;
+  // private verificaControlAnteriorByFormId(formId: string): void {
+  //   this.controlService.getByFormId(formId).subscribe({
+  //     next: (controls) => {
+  //       if (!controls?.length) return;
 
-        // Pega o controle MAIS RECENTE sem confiar na ordem do backend:
-        // ordena por dataEmissao (ou dataCriacao) de forma decrescente.
-        const anterior = this.maisRecente(controls, (c: any) => c.dataEmissao ?? c.dataCriacao);
-        if (!anterior) return;
+  //       // Pega o controle MAIS RECENTE sem confiar na ordem do backend:
+  //       // ordena por dataEmissao (ou dataCriacao) de forma decrescente.
+  //       const anterior = this.maisRecente(controls, (c: any) => c.dataEmissao ?? c.dataCriacao);
+  //       if (!anterior) return;
 
-        this.controlStatusService.getByControl(anterior.id).subscribe({
-          next: (res) => {
-            // getByControl pode devolver um único objeto OU uma lista — normaliza.
-            const status = Array.isArray(res)
-              ? this.maisRecente(res as any[], (s: any) => s.dataAlteracao ?? s.dataCriacao)
-              : res;
+  //       this.controlStatusService.getByControl(anterior.id).subscribe({
+  //         next: (res) => {
+  //           // getByControl pode devolver um único objeto OU uma lista — normaliza.
+  //           const status = Array.isArray(res)
+  //             ? this.maisRecente(res as any[], (s: any) => s.dataAlteracao ?? s.dataCriacao)
+  //             : res;
 
-            // statusId pode vir como número (2) ou string ('2') — compara normalizado.
-            const atual = String((status as any)?.statusId ?? '').trim();
+  //           // statusId pode vir como número (2) ou string ('2') — compara normalizado.
+  //           const atual = String((status as any)?.statusId ?? '').trim();
 
-            // Só age quando o controle anterior estava em 'correção' (2) → 'pendente' (3).
-            if (atual === '2') {
-              this.controlStatusService.update(anterior.id, '3').subscribe({
-                next: () =>
-                  console.log(`Status do controle ${anterior.id} atualizado 2 → 3 (pendente).`),
-                error: (err) => console.error('Erro ao atualizar status do controle:', err),
-              });
-            }
-          },
-          error: (err) => console.error('Erro ao buscar status do controle:', err),
-        });
-      },
-      error: (err) => console.error('Erro ao buscar controles anteriores:', err),
-    });
-  }
+  //           // Só age quando o controle anterior estava em 'correção' (2) → 'pendente' (3).
+  //           if (atual === '2') {
+  //             this.controlStatusService.update(anterior.id, '3').subscribe({
+  //               next: () =>
+  //                 console.log(`Status do controle ${anterior.id} atualizado 2 → 3 (pendente).`),
+  //               error: (err) => console.error('Erro ao atualizar status do controle:', err),
+  //             });
+  //           }
+  //         },
+  //         error: (err) => console.error('Erro ao buscar status do controle:', err),
+  //       });
+  //     },
+  //     error: (err) => console.error('Erro ao buscar controles anteriores:', err),
+  //   });
+  // }
 
   /** Item mais recente de uma lista, pela data extraída em `getDate` (desc). */
   private maisRecente<T>(
@@ -844,6 +844,27 @@ export class PainelComponent implements OnInit {
     return v >= min && v <= max;
   }
 
+  private controleAnteriorParaPendente(formId: string): Observable<string | null> {
+    return this.controlService.getByFormId(formId).pipe(
+      switchMap((controls) => {
+        if (!controls?.length) return of<string | null>(null);
+        const anterior = this.maisRecente(controls, (c: any) => c.dataEmissao ?? c.dataCriacao);
+        if (!anterior) return of<string | null>(null);
+        return this.controlStatusService.getByControl(anterior.id).pipe(
+          map((res) => {
+            const status = Array.isArray(res)
+              ? this.maisRecente(res as any[], (s: any) => s.dataAlteracao ?? s.dataCriacao)
+              : res;
+            const atual = String((status as any)?.statusId ?? '').trim();
+            return atual === '2' ? String(anterior.id) : null;
+          }),
+          catchError(() => of<string | null>(null)),
+        );
+      }),
+      catchError(() => of<string | null>(null)),
+    );
+  }
+
   private salvarEnvio(dados: {
     userId: string | null;
     observacao: string;
@@ -853,6 +874,7 @@ export class PainelComponent implements OnInit {
     temMaquina: boolean;
   }): void {
     this.saving.set(true);
+    const formId = this.selectedForm()!.id;
 
     this.signatureFileService
       .create({
@@ -861,108 +883,123 @@ export class PainelComponent implements OnInit {
         mimeType: 'image/png',
         extensao: 'png',
       })
+      .pipe(
+        // 1) resolve o "anterior" ANTES de criar o novo controle
+        switchMap((file) =>
+          this.controleAnteriorParaPendente(formId).pipe(
+            // 2) cria o novo controle
+            switchMap((anteriorPendenteId) =>
+              this.controlService
+                .create({
+                  formId,
+                  userId: dados.userId ?? '',
+                  fileId: file.id,
+                  observacao: dados.observacao || null,
+                  dataEmissao: new Date(),
+                })
+                .pipe(map((control) => ({ control, anteriorPendenteId }))),
+            ),
+          ),
+        ),
+      )
       .subscribe({
-        next: (file) => {
-          this.verificaControlAnteriorByFormId(this.selectedForm()!.id);
+        next: ({ control, anteriorPendenteId }) => {
+          const resultOps: Observable<unknown>[] = [];
+          let algumForaDoLimite = false;
 
-          this.controlService
-            .create({
-              formId: this.selectedForm()!.id,
-              userId: dados.userId ?? '',
-              fileId: file.id,
-              observacao: dados.observacao || null,
-              dataEmissao: new Date(),
-            })
-            .subscribe({
-              next: (control) => {
-                // Monta as gravações de resposta e avalia os limites de forma síncrona.
-                const resultOps: Observable<unknown>[] = [];
-                let algumForaDoLimite = false;
+          if (dados.temMaquina) {
+            for (const [chave, valor] of Object.entries(dados.machineRespostas)) {
+              if (!valor?.trim()) continue;
+              // chave = `${machineId}_${answerId}` — corta no primeiro '_'
+              const sep = chave.indexOf('_');
+              if (sep < 0) continue;
+              const machineId = chave.slice(0, sep);
+              const answerId = chave.slice(sep + 1);
 
-                if (dados.temMaquina) {
-                  for (const [chave, valor] of Object.entries(dados.machineRespostas)) {
-                    if (!valor?.trim()) continue;
-                    // chave = `${machineId}_${answerId}` — corta no primeiro '_'
-                    const sep = chave.indexOf('_');
-                    if (sep < 0) continue;
-                    const machineId = chave.slice(0, sep);
-                    const answerId = chave.slice(sep + 1);
+              if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
 
-                    if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
+              resultOps.push(
+                this.machineAnswerResultService
+                  .create({
+                    machineId,
+                    answerId,
+                    controlId: control.id,
+                    resposta: valor,
+                    limitsAnswerId: this.limitsMap()[answerId] ?? null,
+                  })
+                  .pipe(
+                    catchError((err) => {
+                      console.error(
+                        `Falha ao salvar resposta da máquina ${machineId} para o parâmetro ${answerId}:`,
+                        err,
+                      );
+                      return of(null);
+                    }),
+                  ),
+              );
+            }
+          } else {
+            for (const a of this.answers()) {
+              const valor = dados.respostas[a.id];
+              if (!valor?.trim()) continue;
 
-                    resultOps.push(
-                      this.machineAnswerResultService
-                        .create({
-                          machineId,
-                          answerId,
-                          controlId: control.id,
-                          resposta: valor,
-                          limitsAnswerId: this.limitsMap()[answerId] ?? null,
-                        })
-                        .pipe(
-                          catchError((err) => {
-                            console.error(
-                              `Falha ao salvar resposta da máquina ${machineId} para o parâmetro ${answerId}:`,
-                              err,
-                            );
-                            return of(null); // Continua mesmo se falhar
-                          }),
-                        ),
-                    );
-                  }
-                } else {
-                  for (const a of this.answers()) {
-                    const valor = dados.respostas[a.id];
-                    if (!valor?.trim()) continue;
+              if (!this.dentroDoLimite(a.id, valor)) algumForaDoLimite = true;
 
-                    if (!this.dentroDoLimite(a.id, valor)) algumForaDoLimite = true;
+              resultOps.push(
+                this.answerResultService
+                  .create({
+                    AnswerId: a.id,
+                    controlId: control.id,
+                    resposta: valor,
+                    limitsAnswerId: this.limitsMap()[a.id] ?? null,
+                  })
+                  .pipe(
+                    catchError((err) => {
+                      console.error(`Falha ao salvar resposta do parâmetro ${a.id}:`, err);
+                      return of(null);
+                    }),
+                  ),
+              );
+            }
+          }
 
-                    resultOps.push(
-                      this.answerResultService
-                        .create({
-                          AnswerId: a.id,
-                          controlId: control.id,
-                          resposta: valor,
-                          limitsAnswerId: this.limitsMap()[a.id] ?? null,
-                        })
-                        .pipe(
-                          catchError((err) => {
-                            console.error(`Falha ao salvar resposta do parâmetro ${a.id}:`, err);
-                            return of(null); // Continua mesmo se falhar
-                          }),
-                        ),
-                    );
-                  }
-                }
+          // UM único status para o NOVO controle: 1 = normalizado, 2 = correção.
+          const statusOp = this.controlStatusService.create({
+            controlId: control.id,
+            statusId: algumForaDoLimite ? '2' : '1',
+          });
 
-                // UM único status para o controle: 1 = normalizado, 2 = correção.
-                const statusOp = this.controlStatusService.create({
-                  controlId: control.id,
-                  statusId: algumForaDoLimite ? '2' : '1',
-                });
+          // Só AGORA (novo controle já criado) marcamos o ANTERIOR como pendente (2 → 3).
+          // A guarda `!== control.id` é segurança extra: o anterior foi resolvido antes
+          // de criar o novo, então nunca deveria ser o mesmo id.
+          const ops: Observable<unknown>[] = [statusOp, ...resultOps];
+          if (anteriorPendenteId && anteriorPendenteId !== String(control.id)) {
+            ops.push(
+              this.controlStatusService.update(anteriorPendenteId, '3').pipe(
+                catchError((err) => {
+                  console.error('Erro ao atualizar status do controle anterior:', err);
+                  return of(null);
+                }),
+              ),
+            );
+          }
 
-                forkJoin([statusOp, ...resultOps]).subscribe({
-                  next: () => {
-                    this.paramValues.set({});
-                    this.machineParamValues.set({});
-                    this.saving.set(false);
-                    this.success.set('Inspeção enviada com sucesso!');
-                  },
-                  error: () => {
-                    this.saving.set(false);
-                    this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
-                  },
-                });
-              },
-              error: () => {
-                this.saving.set(false);
-                this.error.set('Falhou ao registrar a inspeção.');
-              },
-            });
+          forkJoin(ops).subscribe({
+            next: () => {
+              this.paramValues.set({});
+              this.machineParamValues.set({});
+              this.saving.set(false);
+              this.success.set('Inspeção enviada com sucesso!');
+            },
+            error: () => {
+              this.saving.set(false);
+              this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
+            },
+          });
         },
         error: () => {
           this.saving.set(false);
-          this.error.set('Falhou ao salvar a assinatura.');
+          this.error.set('Falhou ao registrar a inspeção.');
         },
       });
   }

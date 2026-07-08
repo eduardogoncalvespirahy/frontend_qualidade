@@ -1,4 +1,11 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
@@ -86,6 +93,7 @@ interface VersaoResposta {
   imports: [CommonModule, FormsModule],
   templateUrl: './historico.component.html',
   styleUrl: './historico.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HistoricoComponent implements OnInit {
   private readonly controlService = inject(ControlService);
@@ -356,25 +364,31 @@ export class HistoricoComponent implements OnInit {
     return Number.isNaN(ms) ? 0 : ms;
   }
 
+  /** Ordena (cópia) por data de criação ascendente, tolerando o nome do campo. */
+  private sortByDataAsc<T extends Record<string, unknown>>(records: T[]): T[] {
+    return [...records].sort((a, b) => this.getDataCriacao(a) - this.getDataCriacao(b));
+  }
+
   /**
    * Agrupa registros de answer_result em "versões" de envio.
-   * Registros com dataCriacao dentro de 10 segundos entre si = mesmo lote.
+   * Registros consecutivos com menos de 10s de intervalo = mesmo lote.
    * Espera receber os registros já ordenados por data asc.
    */
   private agruparVersoes(records: (AnswerResult & Record<string, unknown>)[]): VersaoResposta[] {
     if (!records.length) return [];
     const versoes: VersaoResposta[] = [];
     let lote: typeof records = [];
-    let refMs = this.getDataCriacao(records[0]);
+    let prevMs = this.getDataCriacao(records[0]);
 
     for (const r of records) {
       const ms = this.getDataCriacao(r);
-      if (lote.length && ms - refMs > 10_000) {
+      // compara com o registro ANTERIOR (rajada), não com o início do lote
+      if (lote.length && ms - prevMs > 10_000) {
         versoes.push(this.loteParaVersao(lote));
         lote = [];
-        refMs = ms;
       }
       lote.push(r);
+      prevMs = ms;
     }
     if (lote.length) versoes.push(this.loteParaVersao(lote));
     return versoes;
@@ -402,6 +416,7 @@ export class HistoricoComponent implements OnInit {
       return;
     }
 
+    this.error.set(null);
     this.expandedId.set(row.id);
     this.cancelarEdicao();
 
@@ -449,12 +464,17 @@ export class HistoricoComponent implements OnInit {
     answers: Answer[],
     allMachine: MachineAnswerResult[],
   ): void {
-    const machineIds = [...new Set(allMachine.map((r) => r.machineId))];
+    // ordena asc por data → o último de cada célula é o valor mais recente
+    const ordenados = this.sortByDataAsc(
+      allMachine as unknown as (MachineAnswerResult & Record<string, unknown>)[],
+    ) as unknown as MachineAnswerResult[];
+
+    const machineIds = [...new Set(ordenados.map((r) => r.machineId))];
     const nameById = this.machineNameById();
     const maquinas = machineIds.map((id) => ({ id, nome: nameById.get(id) ?? id }));
     const cells: Record<string, string> = {};
     const cellLimits: Record<string, string | null> = {};
-    for (const r of allMachine) {
+    for (const r of ordenados) {
       const key = `${r.machineId}_${r.answerId}`;
       cells[key] = r.resposta;
       cellLimits[key] = (r as { limitsAnswerId?: string | null }).limitsAnswerId ?? null;
@@ -477,14 +497,14 @@ export class HistoricoComponent implements OnInit {
       dataCriacao?: string;
     })[];
 
-    // ordena por data asc para histórico correto
-    allResults.sort(
-      (a, b) => new Date(a.dataCriacao ?? 0).getTime() - new Date(b.dataCriacao ?? 0).getTime(),
-    );
+    // ordena por data asc (tolerante ao nome do campo) para histórico correto
+    const ordenados = this.sortByDataAsc(
+      allResults as unknown as Record<string, unknown>[],
+    ) as unknown as typeof allResults;
 
     // última resposta por answerId = valor atual
-    const latestMap = new Map<string, (typeof allResults)[number]>();
-    for (const r of allResults) latestMap.set(r.AnswerId, r);
+    const latestMap = new Map<string, (typeof ordenados)[number]>();
+    for (const r of ordenados) latestMap.set(r.AnswerId, r);
 
     const linhas: ParamRow[] = answers.map((a) => {
       const res = latestMap.get(a.id);
@@ -497,9 +517,9 @@ export class HistoricoComponent implements OnInit {
     });
     this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
 
-    // agrupa versões por lote (registros dentro de 10s = mesmo envio)
+    // agrupa versões por rajada (registros consecutivos em até 10s = mesmo envio)
     const versoes = this.agruparVersoes(
-      allResults as unknown as (AnswerResult & Record<string, unknown>)[],
+      ordenados as unknown as (AnswerResult & Record<string, unknown>)[],
     );
     this.expandedHistory.update((d) => ({ ...d, [controlId]: versoes }));
   }

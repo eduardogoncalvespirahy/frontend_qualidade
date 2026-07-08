@@ -95,7 +95,7 @@ interface VersaoResposta {
 }
 
 @Component({
-  selector: 'app-historico',
+  selector: 'app-historico-inspetor',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './historico.component.html',

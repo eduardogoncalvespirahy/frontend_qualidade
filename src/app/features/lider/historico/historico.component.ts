@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, Observable, of } from 'rxjs';
+import { forkJoin, firstValueFrom, Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
 import { Control, ControlUpdate } from '../../../core/models/control.model';
@@ -35,6 +35,9 @@ import { MachineAnswerResultService } from '../../../core/services/machine-answe
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
+import { SignatureFileService } from '../../../core/services/signature-file.service';
+import { ModalService } from '../../../core/services/modal.service';
+import { SignatureComponent } from '../../../core/modals/signature/signature.component';
 
 type FileLike = Record<string, unknown>;
 
@@ -113,6 +116,8 @@ export class HistoricoComponent implements OnInit {
   private readonly limitService = inject(LimitAnswerService);
   private readonly auth = inject(AuthService);
   private readonly controlStatusService = inject(ControlStatusService);
+  private readonly signatureFileService = inject(SignatureFileService);
+  private readonly modalService = inject(ModalService);
 
   readonly controls = signal<Control[]>([]);
   readonly forms = signal<Form[]>([]);
@@ -625,23 +630,25 @@ export class HistoricoComponent implements OnInit {
     return v >= min && v <= max;
   }
 
-  salvarEdicao(row: HistoryRow): void {
+  async salvarEdicao(row: HistoryRow): Promise<void> {
     if (this.nivelEdicao(row.id) == null) return;
 
     this.error.set(null);
-    const ops: Observable<unknown>[] = [];
     const vals = this.editValues();
+
+    // Quem está editando (usuário logado). Se for OUTRO usuário, a alteração
+    // passa a ser atribuída a ele (userId + nova assinatura/fileId).
+    const editorId = this.auth.userId();
+    const reatribuir = !!editorId && editorId !== row.userId;
+
+    // ── monta as operações de campos ──
+    const fieldOps: Observable<unknown>[] = [];
+    const changedNormal: Record<string, string> = {};
+    let camposMudaram = false;
     let novoStatusId: string | null = null;
 
-    // Valores efetivamente alterados no modo normal → viram uma nova "versão"
-    // (lote de correção) inserida reativamente no histórico ao salvar.
-    const changedNormal: Record<string, string> = {};
-
-    // Campos: apenas normalizado (1) ou correção (2).
     if (this.podeEditarCampos(row.id)) {
-      let camposMudaram = false;
       let tudoDentroDoLimite = true;
-
       const md = this.expandedMachineData()[row.id];
       if (md) {
         for (const key of Object.keys(md.cells)) {
@@ -651,13 +658,13 @@ export class HistoricoComponent implements OnInit {
           const answerId = key.slice(sep + 1);
           const novo = (vals[key] ?? '').trim();
           const atual = (md.cells[key] ?? '').trim();
-          const finalVal = novo || atual; // valor que vale após a edição
+          const finalVal = novo || atual;
 
           if (finalVal && !this.dentroDoLimite(answerId, finalVal)) tudoDentroDoLimite = false;
 
           if (novo && novo !== atual) {
             camposMudaram = true;
-            ops.push(
+            fieldOps.push(
               this.machineAnswerResultService.create({
                 machineId,
                 answerId,
@@ -679,7 +686,7 @@ export class HistoricoComponent implements OnInit {
           if (novo && novo !== atual) {
             camposMudaram = true;
             changedNormal[p.answerId] = novo;
-            ops.push(
+            fieldOps.push(
               this.answerResultService.create({
                 AnswerId: p.answerId,
                 controlId: row.id,
@@ -691,36 +698,89 @@ export class HistoricoComponent implements OnInit {
         }
       }
 
-      // Só reavalia/atualiza o status se algum campo mudou.
-      // Dentro dos limites → 1 (normalizado); algum fora → 2 (correção).
       if (camposMudaram) {
         novoStatusId = tudoDentroDoLimite ? '1' : '2';
-        ops.push(this.controlStatusService.update(row.id, novoStatusId));
       }
     }
 
-    // Observação (qualquer status editável — 1/2/3).
+    // ── observação ──
     const novaObs = this.editObs().trim();
     const obsAtual = (row.observacao ?? '').trim();
     const obsMudou = this.podeEditarObs(row.id) && novaObs !== obsAtual;
-    if (obsMudou) {
+
+    // Nada mudou → apenas sai da edição.
+    if (!camposMudaram && !obsMudou) {
+      this.cancelarEdicao();
+      return;
+    }
+
+    // Assinatura é exigida sempre que houver CORREÇÃO de campos (o fileId do
+    // controle aponta para o binário da assinatura, então cada correção precisa
+    // de uma nova assinatura do usuário atual). Também exigimos quando OUTRO
+    // usuário altera apenas a observação (para registrar a autoria).
+    const precisaAssinar = camposMudaram || (reatribuir && obsMudou);
+
+    let novoUserId: string | null = null;
+    let novoFileId: string | null = null;
+
+    if (precisaAssinar) {
+      const assinatura = await this.pedirAssinatura();
+      if (!assinatura) return; // cancelou ou não assinou → não salva
+
+      this.savingEdit.set(true);
+      try {
+        const file = await firstValueFrom(
+          this.signatureFileService.create({
+            nome: `assinatura_${editorId}_${Date.now()}`,
+            conteudo: assinatura,
+            mimeType: 'image/png',
+            extensao: 'png',
+          }),
+        );
+        novoUserId = editorId; // a correção passa a ser atribuída a quem assinou
+        novoFileId = file.id; // nova assinatura
+        // registra o novo arquivo localmente para o nome resolver na listagem
+        this.files.update((list) => [
+          ...list,
+          { id: file.id, nome: (file as { nome?: string }).nome ?? `assinatura_${editorId}` },
+        ]);
+      } catch {
+        this.savingEdit.set(false);
+        this.error.set('Falha ao salvar a assinatura.');
+        return;
+      }
+    } else {
+      this.savingEdit.set(true);
+    }
+
+    // ── operações finais ──
+    const ops: Observable<unknown>[] = [...fieldOps];
+    if (novoStatusId) ops.push(this.controlStatusService.update(row.id, novoStatusId));
+
+    // Atualiza o controle quando assinou (nova autoria/fileId) ou mudou a obs.
+    if (precisaAssinar || obsMudou) {
       const payload: ControlUpdate = {
-        userId: row.userId,
-        fileId: row.fileId,
-        observacao: novaObs || null,
+        userId: novoUserId ?? row.userId,
+        fileId: novoFileId ?? row.fileId,
+        observacao: obsMudou ? novaObs || null : row.observacao,
       };
       ops.push(this.controlService.update(row.id, payload));
     }
 
     if (!ops.length) {
+      this.savingEdit.set(false);
       this.cancelarEdicao();
       return;
     }
 
-    this.savingEdit.set(true);
     forkJoin(ops).subscribe({
       next: () => {
-        this.aplicarEdicaoLocal(row.id, obsMudou ? novaObs || null : row.observacao);
+        this.aplicarEdicaoLocal(
+          row.id,
+          obsMudou ? novaObs || null : row.observacao,
+          novoUserId,
+          novoFileId,
+        );
         // Insere a nova versão (lote de correção) no histórico — modo normal.
         if (Object.keys(changedNormal).length && !this.expandedMachineData()[row.id]) {
           this.anexarVersao(row.id, changedNormal);
@@ -734,6 +794,29 @@ export class HistoricoComponent implements OnInit {
         this.error.set('Erro ao salvar as alterações.');
       },
     });
+  }
+
+  /**
+   * Abre o modal de assinatura e devolve o base64 (ou null se cancelado/vazio).
+   * Usado quando um usuário diferente do autor edita o controle — a alteração
+   * precisa ser assinada por quem está fazendo.
+   */
+  private async pedirAssinatura(): Promise<string | null> {
+    let assinatura: string | null = null;
+    const ref = this.modalService.openComponent(SignatureComponent, {
+      title: 'Assine para confirmar a alteração',
+      size: 'md',
+      backdrop: 'static',
+      outputs: {
+        signatureChange: (valor: unknown) => (assinatura = (valor as string) || null),
+      },
+      buttons: [
+        { text: 'Cancelar', variant: 'secondary', value: false },
+        { text: 'Confirmar', variant: 'primary', value: true },
+      ],
+    });
+    const ok = await ref.result;
+    return ok ? assinatura : null;
   }
 
   /**
@@ -764,10 +847,25 @@ export class HistoricoComponent implements OnInit {
   }
 
   /** Reflete a edição no estado local (sem refazer as buscas). */
-  private aplicarEdicaoLocal(controlId: string, obs: string | null): void {
-    // observação → atualiza o controle (rows deriva daqui)
+  private aplicarEdicaoLocal(
+    controlId: string,
+    obs: string | null,
+    novoUserId: string | null = null,
+    novoFileId: string | null = null,
+  ): void {
+    // observação (+ autoria, quando reatribuído) → atualiza o controle;
+    // rows() deriva daqui, então userNome/fileNome refletem o editor.
     this.controls.update((list) =>
-      list.map((c) => (c.id === controlId ? { ...c, observacao: obs } : c)),
+      list.map((c) =>
+        c.id === controlId
+          ? {
+              ...c,
+              observacao: obs,
+              ...(novoUserId ? { userId: novoUserId } : {}),
+              ...(novoFileId ? { fileId: novoFileId } : {}),
+            }
+          : c,
+      ),
     );
 
     const vals = this.editValues();

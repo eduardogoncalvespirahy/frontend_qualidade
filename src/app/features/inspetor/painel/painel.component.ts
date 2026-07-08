@@ -35,6 +35,8 @@ import { MachineAnswerResultService } from '../../../core/services/machine-answe
 // ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
 import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
+import { Control } from '../../../core/models/control.model';
+import { ElementSchemaRegistry } from '@angular/compiler';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -301,6 +303,15 @@ export class PainelComponent implements OnInit {
       next: (res) => this.allFormBreaks.set(this.unwrap<BreakForm>(res)),
       error: () => this.allFormBreaks.set([]),
     });
+    this.controlService.getAll(1000, 1).subscribe({
+  next: (res) => {
+    const data = this.unwrap<Control>(res);
+    console.log('controls carregados:', data.length, data);
+    this.controls.set(data);
+  },
+  error: () => this.controls.set([]),
+});
+
   }
 
   private loadAnswers(): void {
@@ -397,7 +408,6 @@ export class PainelComponent implements OnInit {
     this.step.set('parameters');
     this.loadAnswers();
     this.loadMachines();
-
   }
 
   // ============================================================
@@ -1077,5 +1087,25 @@ export class PainelComponent implements OnInit {
   });
   isFormPausedById(formId: string): boolean {
     return this.pausedFormIds().has(formId);
+  }
+
+  // Contadores do Form
+
+  readonly controls = signal<Control[]>([]);
+
+  readonly formStats = computed(() => {
+    const map = new Map<string, { count: number; ultimo: Date | null }>();
+    for (const c of this.controls()) {
+      const entry = map.get(c.formId) ?? { count: 0, ultimo: null };
+      entry.count++;
+      const d = new Date(c.dataEmissao);
+      if (!entry.ultimo || d > entry.ultimo) entry.ultimo = d;
+      map.set(c.formId, entry);
+    }
+    return map;
+  });
+
+  statsPorForm(formId: string): { count: number; ultimo: Date | null } {
+    return this.formStats().get(formId) ?? { count: 0, ultimo: null };
   }
 }

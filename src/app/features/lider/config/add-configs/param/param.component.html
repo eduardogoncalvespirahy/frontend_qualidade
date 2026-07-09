@@ -428,10 +428,23 @@
               </button>
             </div>
           }
+
+          <!-- Dica de reordenação (só com um grupo específico ativo) -->
+          @if (canReorder()) {
+            <p class="groups__hint">
+              <i class="bi bi-arrow-down-up"></i>
+              Use as setas nos cards para ordenar os parâmetros deste grupo.
+              @if (reordering()) {
+                <span class="groups__saving"
+                  ><i class="bi bi-arrow-repeat spin"></i> salvando…</span
+                >
+              }
+            </p>
+          }
         </div>
 
         <!-- Parâmetros -->
-        <div class="grid">
+        <div class="grid" [class.grid--ordered]="canReorder()">
           <!-- card de criação -->
           <button type="button" class="card card--add" (click)="novo()">
             <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
@@ -446,13 +459,48 @@
           </button>
 
           @for (a of displayedAnswers(); track trackById($index, a)) {
-            <div class="card param-card" (click)="detalhar(a)">
+            <div
+              class="card param-card"
+              [class.param-card--ordered]="canReorder()"
+              (click)="detalhar(a)"
+            >
               <div class="card__top">
                 <span class="card__icon"><i class="bi bi-list-check"></i></span>
-                <span class="badge" [class.badge--on]="isAtivo(a.status)">
-                  {{ isAtivo(a.status) ? 'Ativo' : 'Inativo' }}
-                </span>
+
+                <div class="card__top-right">
+                  <!-- Controles de ordem (só com grupo específico ativo) -->
+                  @if (canReorder()) {
+                    <div class="ordem" (click)="$event.stopPropagation()">
+                      <span class="ordem__pos" title="Posição no grupo">{{ $index + 1 }}º</span>
+                      <div class="ordem__btns">
+                        <button
+                          type="button"
+                          class="ordem__btn"
+                          title="Mover para cima"
+                          [disabled]="reordering() || isFirstNoGrupo(a.id)"
+                          (click)="moverCima(a)"
+                        >
+                          <i class="bi bi-chevron-up"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="ordem__btn"
+                          title="Mover para baixo"
+                          [disabled]="reordering() || isLastNoGrupo(a.id)"
+                          (click)="moverBaixo(a)"
+                        >
+                          <i class="bi bi-chevron-down"></i>
+                        </button>
+                      </div>
+                    </div>
+                  }
+
+                  <span class="badge" [class.badge--on]="isAtivo(a.status)">
+                    {{ isAtivo(a.status) ? 'Ativo' : 'Inativo' }}
+                  </span>
+                </div>
               </div>
+
               <h3 class="card__title">{{ a.nome }}</h3>
               <p class="card__desc">{{ a.descricao || 'Sem descrição' }}</p>
 

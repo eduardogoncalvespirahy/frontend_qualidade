@@ -332,53 +332,56 @@
           <div class="grid">
             @for (form of filteredForms(); track trackById($index, form)) {
               <button
-  type="button"
-  class="card"
-  [class.is-paused]="isFormPausedById(form.id)"
-  [disabled]="isFormPausedById(form.id)"
-  (click)="selectForm(form)"
->
-  <div class="card__top">
-    <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
-    <div class="d-flex gap-2">
-      <span class="badge" [class.badge--on]="isAtivo(form.status)">
-        {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
-      </span>
-      @if (isFormPausedById(form.id)) {
-        <span class="badge badge--warn">
-          <i class="bi bi-pause-circle me-1"></i>Pausado
-        </span>
-      }
-    </div>
-  </div>
+                type="button"
+                class="card"
+                [class.is-paused]="isFormPausedById(form.id)"
+                [disabled]="isFormPausedById(form.id)"
+                (click)="selectForm(form)"
+              >
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
+                  <div class="d-flex gap-2">
+                    <span class="badge" [class.badge--on]="isAtivo(form.status)">
+                      {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
+                    </span>
+                    @if (isFormPausedById(form.id)) {
+                      <span class="badge badge--warn">
+                        <i class="bi bi-pause-circle me-1"></i>Pausado
+                      </span>
+                    }
+                  </div>
+                </div>
 
-  <h3 class="card__title">{{ form.nome }}</h3>
-  <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
+                <h3 class="card__title">{{ form.nome }}</h3>
+                <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
 
-  <div class="d-flex justify-content-between align-items-end mt-auto pt-2" style="font-size: 12px; color: #64748b;">
-  <span><i class="bi bi-send me-1"></i>{{ statsPorForm(form.id).count }} envio(s)</span>
-  @if (statsPorForm(form.id).ultimo) {
-    <span>
-      <i class="bi bi-clock-history me-1"></i>
-      {{ statsPorForm(form.id).ultimo | date: 'dd/MM/yy HH:mm' }}
-    </span>
-  } @else {
-    <span><i class="bi bi-dash"></i> Sem envios</span>
-  }
-</div>
+                <div
+                  class="d-flex justify-content-between align-items-end mt-auto pt-2"
+                  style="font-size: 12px; color: #64748b"
+                >
+                  <span
+                    ><i class="bi bi-send me-1"></i>{{ statsPorForm(form.id).count }} envio(s)</span
+                  >
+                  @if (statsPorForm(form.id).ultimo) {
+                    <span>
+                      <i class="bi bi-clock-history me-1"></i>
+                      {{ statsPorForm(form.id).ultimo | date: 'dd/MM/yy HH:mm' }}
+                    </span>
+                  } @else {
+                    <span><i class="bi bi-dash"></i> Sem envios</span>
+                  }
+                </div>
 
-
-  <span class="card__go">
-    {{ isFormPausedById(form.id) ? 'Em pausa' : 'Preencher' }}
-    <i
-      class="bi"
-      [class.bi-pause-fill]="isFormPausedById(form.id)"
-      [class.bi-arrow-right]="!isFormPausedById(form.id)"
-    ></i>
-  </span>
-</button>
-
-}
+                <span class="card__go">
+                  {{ isFormPausedById(form.id) ? 'Em pausa' : 'Preencher' }}
+                  <i
+                    class="bi"
+                    [class.bi-pause-fill]="isFormPausedById(form.id)"
+                    [class.bi-arrow-right]="!isFormPausedById(form.id)"
+                  ></i>
+                </span>
+              </button>
+            }
           </div>
         }
       }
@@ -394,7 +397,7 @@
                   <th class="text-muted fw-semibold" style="min-width: 140px">
                     {{ selectedForm()?.nome }}
                   </th>
-                  @for (a of answers(); track a.id) {
+                  @for (a of orderedAnswers(); track a.id) {
                     <th class="text-center small" style="min-width: 110px">{{ a.nome }}</th>
                   }
                 </tr>
@@ -410,7 +413,7 @@
                         </span>
                       }
                     </td>
-                    @for (a of answers(); track a.id) {
+                    @for (a of orderedAnswers(); track a.id) {
                       <td class="p-1">
                         <input
                           class="form-control form-control-sm text-center"
@@ -435,7 +438,7 @@
           @if (answers().length) {
             <div class="formpanel">
               <div class="formpanel__fields">
-                @for (a of answers(); track trackById($index, a)) {
+                @for (a of orderedAnswers(); track trackById($index, a)) {
                   <div class="field">
                     <label class="field__label" [for]="'p-' + a.id">
                       {{ a.nome }}

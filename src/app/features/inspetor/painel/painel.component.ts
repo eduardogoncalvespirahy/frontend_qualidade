@@ -38,6 +38,11 @@ import { ControlStatusService } from '../../../core/services/control-status.serv
 import { Control } from '../../../core/models/control.model';
 import { ElementSchemaRegistry } from '@angular/compiler';
 
+import { AnswerGroups } from '../../../core/models/answer-group.model';
+import { AnswerGroupItems } from '../../../core/models/answer-group-items.model';
+import { AnswerGroupsService } from '../../../core/services/answer-group.service';
+import { AnswerGroupItemsService } from '../../../core/services/answer-groups-items.service';
+
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
 /** Campos filtráveis derivados das interfaces (sem o id). */
@@ -66,6 +71,9 @@ export class PainelComponent implements OnInit {
   private readonly formService = inject(FormService);
   private readonly answerService = inject(AnswerService);
   private readonly answerResultService = inject(AnswerResultService);
+  private readonly answerGroupsService = inject(AnswerGroupsService);
+  private readonly answerGroupItemsService = inject(AnswerGroupItemsService);
+
   private readonly auth = inject(AuthService);
 
   // ───────── navegação ─────────
@@ -76,6 +84,8 @@ export class PainelComponent implements OnInit {
   readonly sections = signal<Section[]>([]);
   readonly forms = signal<Form[]>([]);
   readonly answers = signal<Answer[]>([]); // parâmetros do formulário selecionado
+  readonly answerGroups = signal<AnswerGroups[]>([]);
+  readonly groupItems = signal<AnswerGroupItems[]>([]);
 
   // ───────── seleções ─────────
   readonly selectedLocation = signal<Location | null>(null);
@@ -110,6 +120,79 @@ export class PainelComponent implements OnInit {
   private readonly permittedLocations = computed(() =>
     this.locations().filter((l) => this.isLocationAllowed(l)),
   );
+
+  /** answerId → vínculo do grupo (1 por parâmetro). */
+  private readonly groupItemByAnswer = computed(() => {
+    const m = new Map<string, AnswerGroupItems>();
+    for (const it of this.groupItems()) {
+      if (!m.has(it.answerId)) m.set(it.answerId, it);
+    }
+    return m;
+  });
+
+  /** groupId → posição do grupo (usa a ordem de retorno/criação dos grupos). */
+  private readonly groupRank = computed(() => {
+    const m = new Map<string, number>();
+    this.answerGroups().forEach((g, i) => m.set(g.id, i));
+    return m;
+  });
+
+  /**
+   * Parâmetros ordenados conforme a ordem definida nos grupos:
+   *  1) agrupa por grupo (na ordem dos grupos),
+   *  2) dentro do grupo, pela `ordem` do item,
+   *  3) parâmetros sem grupo vão para o fim (ordenados por nome).
+   * É isso que a tela de parâmetros/envio deve consumir no lugar de answers().
+   */
+  readonly orderedAnswers = computed<Answer[]>(() => {
+    const byAnswer = this.groupItemByAnswer();
+    const rank = this.groupRank();
+    const FIM = Number.MAX_SAFE_INTEGER;
+
+    return [...this.answers()].sort((a, b) => {
+      const ia = byAnswer.get(a.id);
+      const ib = byAnswer.get(b.id);
+      const ga = ia ? (rank.get(ia.answerGroupId) ?? FIM) : FIM;
+      const gb = ib ? (rank.get(ib.answerGroupId) ?? FIM) : FIM;
+      if (ga !== gb) return ga - gb; // agrupa por grupo
+      const oa = ia?.ordem ?? FIM;
+      const ob = ib?.ordem ?? FIM;
+      if (oa !== ob) return oa - ob; // ordem dentro do grupo
+      return (a.nome ?? '').localeCompare(b.nome ?? ''); // desempate estável
+    });
+  });
+
+  /** Carrega grupos do formulário e seus itens (apenas para ordenar). */
+  private loadGroupOrder(): void {
+    const formId = this.selectedForm()?.id;
+    if (!formId) {
+      this.answerGroups.set([]);
+      this.groupItems.set([]);
+      return;
+    }
+
+    this.answerGroupsService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const groups = this.unwrap<AnswerGroups>(res).filter((g) => g.formId === formId);
+        this.answerGroups.set(groups);
+
+        const groupIds = new Set(groups.map((g) => g.id));
+        this.answerGroupItemsService.getAll(2000, 1).subscribe({
+          next: (r2) => {
+            const items = this.unwrap<AnswerGroupItems>(r2).filter((it) =>
+              groupIds.has(it.answerGroupId),
+            );
+            this.groupItems.set(items);
+          },
+          error: () => this.groupItems.set([]),
+        });
+      },
+      error: () => {
+        this.answerGroups.set([]);
+        this.groupItems.set([]);
+      },
+    });
+  }
 
   // ───────── filtros de busca (por campo das interfaces) ─────────
   readonly filtersOpen = signal(false);
@@ -304,14 +387,13 @@ export class PainelComponent implements OnInit {
       error: () => this.allFormBreaks.set([]),
     });
     this.controlService.getAll(1000, 1).subscribe({
-  next: (res) => {
-    const data = this.unwrap<Control>(res);
-    console.log('controls carregados:', data.length, data);
-    this.controls.set(data);
-  },
-  error: () => this.controls.set([]),
-});
-
+      next: (res) => {
+        const data = this.unwrap<Control>(res);
+        console.log('controls carregados:', data.length, data);
+        this.controls.set(data);
+      },
+      error: () => this.controls.set([]),
+    });
   }
 
   private loadAnswers(): void {
@@ -408,6 +490,7 @@ export class PainelComponent implements OnInit {
     this.step.set('parameters');
     this.loadAnswers();
     this.loadMachines();
+    this.loadGroupOrder(); // ← novo
   }
 
   // ============================================================
@@ -439,6 +522,8 @@ export class PainelComponent implements OnInit {
     this.forms.set([]);
     this.answers.set([]);
     this.machines.set([]);
+    this.answerGroups.set([]);
+    this.groupItems.set([]);
     this.step.set('location');
   }
 
@@ -451,6 +536,8 @@ export class PainelComponent implements OnInit {
     this.forms.set([]);
     this.answers.set([]);
     this.machines.set([]);
+    this.answerGroups.set([]);
+    this.groupItems.set([]);
     this.step.set('section');
   }
 
@@ -461,6 +548,8 @@ export class PainelComponent implements OnInit {
     this.selectedForm.set(null);
     this.answers.set([]);
     this.machines.set([]);
+    this.answerGroups.set([]);
+    this.groupItems.set([]);
     this.step.set('form');
   }
 
@@ -733,7 +822,7 @@ export class PainelComponent implements OnInit {
 
   // Agrupa todos os parâmetros em um único bloco para exibição no modal de envio.
   protected readonly agrupados = computed<{ categoria: unknown; answers: Answer[] }[]>(() => [
-    { categoria: null, answers: this.answers() },
+    { categoria: null, answers: this.orderedAnswers() },
   ]);
 
   private loadLimits(): void {

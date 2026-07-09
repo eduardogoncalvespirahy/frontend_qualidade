@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 
 import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
@@ -71,6 +72,8 @@ export class ParamComponent implements OnInit {
   readonly activeGroup = signal<string>(''); // '' = todos | 'none' = sem grupo | id do grupo
   readonly newGroupOpen = signal(false);
   readonly newGroupNome = signal('');
+  /** true enquanto uma reordenação está sendo persistida. */
+  readonly reordering = signal(false);
 
   // ───────── seleções ─────────
   readonly selectedLocation = signal<Location | null>(null);
@@ -222,15 +225,39 @@ export class ParamComponent implements OnInit {
     return m;
   });
 
+  /**
+   * Vínculos do grupo ATIVO ordenados por `ordem` (base da reordenação).
+   * Vazio quando não há um grupo específico selecionado.
+   */
+  readonly activeGroupOrder = computed<AnswerGroupItems[]>(() => {
+    const ag = this.activeGroup();
+    if (!ag || ag === 'none') return [];
+    return this.groupItems()
+      .filter((i) => i.answerGroupId === ag)
+      .sort((a, b) => a.ordem - b.ordem);
+  });
+
+  /** É possível reordenar? (um grupo específico está ativo). */
+  readonly canReorder = computed(() => {
+    const ag = this.activeGroup();
+    return !!ag && ag !== 'none';
+  });
+
   /** Parâmetros visíveis = filtrados + recorte pelo grupo ativo. */
   readonly displayedAnswers = computed(() => {
     const ag = this.activeGroup();
     const map = this.groupItemByAnswer();
-    return this.filteredAnswers().filter((a) => {
+    const base = this.filteredAnswers().filter((a) => {
       if (ag === '') return true;
       const gid = map.get(a.id)?.answerGroupId ?? '';
       return ag === 'none' ? gid === '' : gid === ag;
     });
+
+    // Num grupo específico, respeita a ordem definida (campo `ordem`).
+    if (ag && ag !== 'none') {
+      base.sort((a, b) => (map.get(a.id)?.ordem ?? 0) - (map.get(b.id)?.ordem ?? 0));
+    }
+    return base;
   });
 
   /** Id do grupo de um parâmetro (ou '' quando sem grupo). */
@@ -688,6 +715,88 @@ export class ParamComponent implements OnInit {
     } else {
       createLink();
     }
+  }
+
+  // ============================================================
+  //  ORDEM DOS ITENS DO GRUPO
+  // ============================================================
+
+  /** É o primeiro item na ordem do grupo ativo? */
+  isFirstNoGrupo(answerId: string): boolean {
+    const o = this.activeGroupOrder();
+    return o.length > 0 && o[0].answerId === answerId;
+  }
+
+  /** É o último item na ordem do grupo ativo? */
+  isLastNoGrupo(answerId: string): boolean {
+    const o = this.activeGroupOrder();
+    return o.length > 0 && o[o.length - 1].answerId === answerId;
+  }
+
+  moverCima(answer: Answer): void {
+    this.moverItem(answer, -1);
+  }
+
+  moverBaixo(answer: Answer): void {
+    this.moverItem(answer, 1);
+  }
+
+  /**
+   * Move um parâmetro na ordem do grupo ativo e persiste.
+   * Reindexa `ordem` sequencialmente (0..n-1), então é robusto a lacunas/
+   * duplicidades; só envia ao backend os vínculos cujo `ordem` mudou.
+   * Aplica a mudança localmente de forma otimista e reverte em caso de erro.
+   */
+  private moverItem(answer: Answer, dir: -1 | 1): void {
+    if (!this.guardLocation()) return;
+    if (this.reordering()) return;
+
+    const ag = this.activeGroup();
+    if (!ag || ag === 'none') return;
+
+    const ordered = this.activeGroupOrder();
+    const idx = ordered.findIndex((i) => i.answerId === answer.id);
+    const alvo = idx + dir;
+    if (idx < 0 || alvo < 0 || alvo >= ordered.length) return;
+
+    // move no array e reindexa por posição
+    const arr = ordered.slice();
+    [arr[idx], arr[alvo]] = [arr[alvo], arr[idx]];
+
+    const updates = arr
+      .map((item, pos) => ({ item, ordem: pos }))
+      .filter((u) => u.item.ordem !== u.ordem);
+    if (!updates.length) return;
+
+    // atualização otimista local
+    this.clearFeedback();
+    this.groupItems.update((list) =>
+      list.map((it) => {
+        const u = updates.find(
+          (x) => x.item.answerGroupId === it.answerGroupId && x.item.answerId === it.answerId,
+        );
+        return u ? { ...it, ordem: u.ordem } : it;
+      }),
+    );
+
+    // persiste apenas os que mudaram
+    this.reordering.set(true);
+    forkJoin(
+      updates.map((u) =>
+        this.answerGroupItemsService.update(ag, u.item.answerId, {
+          answerGroupId: ag,
+          answerId: u.item.answerId,
+          ordem: u.ordem,
+        }),
+      ),
+    ).subscribe({
+      next: () => this.reordering.set(false),
+      error: () => {
+        this.reordering.set(false);
+        this.error.set('Erro ao reordenar. Recarregando a ordem…');
+        this.loadGroupItems(); // reverte para o estado do servidor
+      },
+    });
   }
 
   private clearGroups(): void {

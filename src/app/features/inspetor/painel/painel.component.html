@@ -388,6 +388,22 @@
 
       <!-- ───── PARÂMETROS ───── -->
       @case ('parameters') {
+        <!-- LOCAL STORANGE -->
+        @if (hasDraft()) {
+          <div class="alert alert--warn d-flex justify-content-between align-items-center">
+            <span>
+              <i class="bi bi-floppy me-2"></i>
+              Rascunho restaurado — você tem respostas salvas pendentes.
+            </span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-warning"
+              (click)="descartarRascunho()"
+            >
+              <i class="bi bi-trash me-1"></i>Descartar
+            </button>
+          </div>
+        }
         <!-- MODO TABELA: formulário com máquinas -->
         @if (machines().length) {
           <div class="table-responsive rounded-3 border">

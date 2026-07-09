@@ -340,6 +340,14 @@
   background: #fef3c7;
   color: #b45309;
 }
+.alert--warn {
+  background: #fef3c7;
+  color: #b45309;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
 
 
 @keyframes shimmer {

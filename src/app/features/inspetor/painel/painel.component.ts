@@ -1,4 +1,4 @@
-​import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
@@ -25,6 +25,7 @@ import { ControlService } from '../../../core/services/control.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { BreakMachineService } from '../../../core/services/break-machine.service';
 import { BreakFormService } from '../../../core/services/break-form.service';
+import { DraftService } from '../../../core/services/draft.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
@@ -64,6 +65,12 @@ interface Filters {
   styleUrl: './painel.component.css',
 })
 export class PainelComponent implements OnInit {
+  // Salvar racunho
+  private readonly draftService = inject(DraftService);
+
+  // + signal pra controllar banner
+  readonly hasDraft = signal(false);
+
   private readonly locationService = inject(LocationService);
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
@@ -415,6 +422,19 @@ export class PainelComponent implements OnInit {
         this.fetchResults(params).subscribe({
           next: (results) => {
             this.applyResults(results);
+
+            // Restaura rascunho por cima dos valores já gravados no banco.
+            // Estamos dentro do subscribe de fetchResults, então podemos abrir
+            // outro Observable aqui sem problema — é a cadeia assíncrona normal.
+            this.draftService.load$(this.selectedForm()!.id).subscribe((draft) => {
+              if (draft) {
+                this.hasDraft.set(true);
+                // update faz merge: mantém valores existentes e sobrescreve com o rascunho.
+                // Assim respostas já salvas não desaparecem, apenas as do rascunho prevalecem.
+                this.paramValues.update((current) => ({ ...current, ...draft }));
+              }
+            });
+
             this.loading.set(false);
           },
           error: () => this.fail('Não foi possível carregar as respostas atuais.'),
@@ -444,7 +464,7 @@ export class PainelComponent implements OnInit {
     for (const r of results) {
       const last = this.latestResult(r.list);
       existing[r.id] = last;
-      values[r.id] = last?.resposta ?? '';
+      values[r.id] = /*last?.resposta ??*/ '';
     }
     this.existingResults.set(existing);
     this.paramValues.set(values);
@@ -487,6 +507,27 @@ export class PainelComponent implements OnInit {
     this.selectedForm.set(form);
     this.step.set('parameters');
     this.loadAnswers();
+
+    // Buscamos o rascunho do banco de forma assíncrona.
+    // load$() retorna um Observable, então usamos subscribe para reagir quando a resposta chegar.
+    this.draftService.load$(form.id).subscribe((draft) => {
+      if (draft) {
+        // Existe rascunho: ativa o banner e restaura os valores salvos.
+        // Verificamos machines() para saber em qual signal restaurar:
+        // machineParamValues → formulários com máquinas
+        // paramValues → formulários sem máquinas
+        this.hasDraft.set(true);
+        if (this.machines().length) {
+          this.machineParamValues.set(draft);
+        } else {
+          this.paramValues.set(draft);
+        }
+      } else {
+        // Sem rascunho: garante que o banner fique oculto
+        this.hasDraft.set(false);
+      }
+    });
+
     this.loadMachines();
     this.loadGroupOrder(); // ← novo
   }
@@ -557,6 +598,7 @@ export class PainelComponent implements OnInit {
 
   updateParam(answerId: string, value: string): void {
     this.paramValues.update((m) => ({ ...m, [answerId]: value }));
+    this.draftService.save(this.selectedForm()!.id, this.paramValues());
   }
 
   /**
@@ -971,6 +1013,12 @@ export class PainelComponent implements OnInit {
       catchError(() => of<string | null>(null)),
     );
   }
+  descartarRascunho(): void {
+    this.draftService.clear(this.selectedForm()!.id);
+    this.hasDraft.set(false);
+    this.paramValues.set({});
+    this.machineParamValues.set({});
+  }
 
   private salvarEnvio(dados: {
     userId: string | null;
@@ -1095,9 +1143,12 @@ export class PainelComponent implements OnInit {
             next: () => {
               this.paramValues.set({});
               this.machineParamValues.set({});
+              this.draftService.clear(this.selectedForm()!.id); // ← adiciona
+              this.hasDraft.set(false); // ← adiciona
               this.saving.set(false);
               this.success.set('Inspeção enviada com sucesso!');
             },
+
             error: () => {
               this.saving.set(false);
               this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
@@ -1155,8 +1206,8 @@ export class PainelComponent implements OnInit {
 
   updateMachineParam(machineId: string, answerId: string, value: string): void {
     this.machineParamValues.update((m) => ({ ...m, [`${machineId}_${answerId}`]: value }));
+    this.draftService.save(this.selectedForm()!.id, this.machineParamValues());
   }
-
   // E PARA FORMS COM PAUSA EM ANDAMENTO
 
   private readonly breakFormService = inject(BreakFormService);

@@ -1,43 +1,77 @@
 @if (item(); as item) {
   <div class="d-flex flex-column gap-3">
-
     <!-- Topo: tipo + status + breadcrumb -->
     <div class="p-3 rounded-3 bg-light border">
       <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-        <span class="badge text-bg-secondary"><strong>{{ typeLabel() }}</strong></span>
-        <span class="badge" [class]="statusClass()"><strong>{{ statusLabel() }}</strong></span>
+        <span class="badge text-bg-secondary"
+          ><strong>{{ typeLabel() }}</strong></span
+        >
+        <span class="badge" [class]="statusClass()"
+          ><strong>{{ statusLabel() }}</strong></span
+        >
       </div>
-      
+
       @if (locationNome() || sectionNome() || formNome()) {
         <div class="d-flex align-items-center gap-1 flex-wrap small text-muted">
           @if (locationNome()) {
-            <span><i class="bi bi-geo-alt me-1"></i><strong>{{ locationNome() }}</strong></span>
-            <i class="bi bi-chevron-right" style="font-size:.65rem"></i>
+            <span
+              ><i class="bi bi-geo-alt me-1"></i><strong>{{ locationNome() }}</strong></span
+            >
+            <i class="bi bi-chevron-right" style="font-size: 0.65rem"></i>
           }
           @if (sectionNome()) {
-            <span><strong>{{ sectionNome() }}</strong></span>
-            <i class="bi bi-chevron-right" style="font-size:.65rem"></i>
+            <span
+              ><strong>{{ sectionNome() }}</strong></span
+            >
+            <i class="bi bi-chevron-right" style="font-size: 0.65rem"></i>
           }
           @if (formNome()) {
-            <span class="fw-semibold text-dark"><strong> {{ formNome() }}</strong></span>
+            <span class="fw-semibold text-dark"
+              ><strong> {{ formNome() }}</strong></span
+            >
           }
         </div>
       }
     </div>
 
-    <!-- Grupo + Datas -->
+    <!-- Grupo + Categoria + Datas -->
     <div class="row g-2">
-      <div class="col-12 col-sm-6">
+      <div class="col-12 col-md-4">
         <div class="border rounded-3 p-3 h-100">
           <div class="small text-muted mb-1"><i class="bi bi-collection me-1"></i>Grupo</div>
           @if (currentGroupNome()) {
-            <span class="badge text-bg-primary fw-normal" style="font-size:.85rem">{{ currentGroupNome() }}</span>
+            <span class="badge text-bg-primary fw-normal" style="font-size: 0.85rem">{{
+              currentGroupNome()
+            }}</span>
           } @else {
             <span class="text-muted small">Sem grupo</span>
           }
         </div>
       </div>
-      <div class="col-12 col-sm-6">
+
+      @if (showCategoria()) {
+        <div class="col-12 col-md-4">
+          <div class="border rounded-3 p-3 h-100">
+            <div class="small text-muted mb-1"><i class="bi bi-tags me-1"></i>Categoria</div>
+            @if (categoriesResource.isLoading()) {
+              <span class="text-muted small"
+                ><i class="bi bi-hourglass-split me-1"></i>Carregando…</span
+              >
+            } @else if (currentCategoryNome()) {
+              <span class="badge text-bg-info fw-normal" style="font-size: 0.85rem">{{
+                currentCategoryNome()
+              }}</span>
+              @if (currentCategory()?.descricao) {
+                <div class="small text-muted mt-1">{{ currentCategory()?.descricao }}</div>
+              }
+            } @else {
+              <span class="text-muted small">Sem categoria</span>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="col-12" [class.col-md-4]="showCategoria()" [class.col-md-8]="!showCategoria()">
         <div class="border rounded-3 p-3 h-100">
           <div class="small text-muted mb-1"><i class="bi bi-clock me-1"></i>Datas</div>
           <div class="small">
@@ -54,7 +88,10 @@
 
     <!-- Limites -->
     <div class="border rounded-3 p-3">
-      <div class="small fw-semibold text-muted text-uppercase mb-2" style="font-size:.7rem;letter-spacing:.06em">
+      <div
+        class="small fw-semibold text-muted text-uppercase mb-2"
+        style="font-size: 0.7rem; letter-spacing: 0.06em"
+      >
         <i class="bi bi-sliders me-1"></i>Limites de inspeção
       </div>
       @if (limits().length === 0) {
@@ -65,13 +102,19 @@
       } @else {
         @for (l of limits(); track l.id) {
           <div class="d-flex gap-3">
-            <div class="flex-fill text-center rounded-3 p-3" style="background:#f0fdf4;border:1px solid #bbf7d0">
-              <div class="small mb-1" style="color:#16a34a">Mínimo</div>
-              <div class="fw-bold fs-4" style="color:#16a34a">{{ l.limitMin ?? '—' }}</div>
+            <div
+              class="flex-fill text-center rounded-3 p-3"
+              style="background: #f0fdf4; border: 1px solid #bbf7d0"
+            >
+              <div class="small mb-1" style="color: #16a34a">Mínimo</div>
+              <div class="fw-bold fs-4" style="color: #16a34a">{{ l.limitMin ?? '—' }}</div>
             </div>
-            <div class="flex-fill text-center rounded-3 p-3" style="background:#fff7ed;border:1px solid #fed7aa">
-              <div class="small mb-1" style="color:#c2410c">Máximo</div>
-              <div class="fw-bold fs-4" style="color:#c2410c">{{ l.limitMax ?? '—' }}</div>
+            <div
+              class="flex-fill text-center rounded-3 p-3"
+              style="background: #fff7ed; border: 1px solid #fed7aa"
+            >
+              <div class="small mb-1" style="color: #c2410c">Máximo</div>
+              <div class="fw-bold fs-4" style="color: #c2410c">{{ l.limitMax ?? '—' }}</div>
             </div>
           </div>
         }
@@ -87,6 +130,5 @@
         <i class="bi bi-trash"></i>
       </button>
     </div>
-
   </div>
 }

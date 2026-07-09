@@ -13,6 +13,8 @@ import { AnswerService } from '../../../../../../../core/services/answer.service
 import { LimitAnswerService } from '../../../../../../../core/services/limit-answer.service';
 import { AnswerGroupsService } from '../../../../../../../core/services/answer-group.service';
 import { AnswerGroupItemsService } from '../../../../../../../core/services//answer-groups-items.service';
+// Serviço de categorias (mesmo usado pelo FormComponent).
+import { CategorieAnswerService } from '../../../../../../../core/services/categorieAnswer.service';
 
 import { FormComponent } from '../form/form.component';
 import { catchError, of } from 'rxjs';
@@ -37,6 +39,7 @@ export class DetailComponent {
   private readonly answerService = inject(AnswerService);
   private readonly answerGroupsService = inject(AnswerGroupsService);
   private readonly answerGroupItemsService = inject(AnswerGroupItemsService);
+  private readonly categorieAnswerService = inject(CategorieAnswerService);
 
   // Dados do parâmetro que será exibido — obrigatório, quem abrir o modal deve passar
   readonly item = input.required<ParamItem>();
@@ -59,6 +62,38 @@ export class DetailComponent {
     return this.groups().find((g) => g.id === id)?.nome ?? id;
   });
 
+  // ─── Categorias ────────────────────────────────────────────────────────────
+  // Só Answer possui categoryId; para os demais tipos isso fica indefinido.
+  protected readonly categoriesResource = rxResource({
+    stream: () =>
+      this.categorieAnswerService
+        .getAll(1000)
+        .pipe(
+          catchError(() => of({ data: [], total: 0, page: 1, limit: 1000, totalPages: 0 } as any)),
+        ),
+  });
+
+  /** categoryId do item (quando for Answer). */
+  protected readonly currentCategoryId = computed(() => {
+    const cid = (this.item() as Partial<Answer>).categoryId;
+    return cid == null ? null : cid;
+  });
+
+  /** Categoria completa do item (resolvida pela lista carregada). */
+  protected readonly currentCategory = computed(() => {
+    const cid = this.currentCategoryId();
+    if (cid == null || cid === 0) return null;
+    const cats = this.categoriesResource.value()?.data ?? [];
+    // Answer.categoryId é number e Category.id é string → compara normalizado.
+    return cats.find((c: any) => String(c.id) === String(cid)) ?? null;
+  });
+
+  /** Nome da categoria (ou null). */
+  protected readonly currentCategoryNome = computed(() => this.currentCategory()?.nome ?? null);
+
+  /** Mostra o bloco de categoria apenas para parâmetros do formulário. */
+  protected readonly showCategoria = computed(() => this.paramType() === 'answer');
+
   // identificar se está ativo
   protected readonly isActive = computed(() => this.item().status === 1);
 
@@ -79,11 +114,10 @@ export class DetailComponent {
   });
 
   protected readonly limits = computed(() =>
-  (this.limitsResource.value()?.data ?? []).filter(
-    (l: any) => l.answerId === this.item().id && l.status === 1
-  )
-);
-
+    (this.limitsResource.value()?.data ?? []).filter(
+      (l: any) => l.answerId === this.item().id && l.status === 1,
+    ),
+  );
 
   // Avisa o pai (param.component.ts) que algo mudou e precisa recarregar
   readonly reload_return = output<boolean>();
@@ -191,32 +225,80 @@ export class DetailComponent {
         categoryId: value.categoryId,
       })
       .subscribe({
-        next: () => {
-          if (limitValue) {
-            // Sempre cria um novo limite com os valores informados
-            this.LimitAnswerService.create({
-              answerId: value.id,
-              limitMin: limitValue.limitMin,
-              limitMax: limitValue.limitMax,
-            }).subscribe({
-              next: () => {
-                // Se havia um limite anterior, desativa ele
-                if (existingLimit) {
-                  this.LimitAnswerService.update(existingLimit.id, {
-                    answerId: existingLimit.answerId,
-                    status: 0,
-                  }).subscribe({ next: afterLimit });
-                } else {
-                  afterLimit();
-                }
-              },
-            });
-          } else {
-            afterLimit();
-          }
-        },
-
+        next: () => this.applyLimit(existingLimit, limitValue, value.id, afterLimit),
       });
+  }
+
+  /**
+   * Aplica a alteração de limite mantendo histórico:
+   *  - valores informados e diferentes → cria uma NOVA versão ATIVA (status 1)
+   *    e desativa a anterior (status 0);
+   *  - valores iguais aos atuais → não faz nada;
+   *  - limites apagados → desativa o limite atual (se houver).
+   *
+   * IMPORTANTE: o `status: 1` no create é obrigatório — o backend grava
+   * `status = dto.status ?? null`. Sem isso, o novo limite ficava com status
+   * NULL e era filtrado da visualização (dava a impressão de "não atualizar").
+   */
+  private applyLimit(
+    existingLimit: LimitAnswer | null,
+    limitValue: { limitMin: string | null; limitMax: string | null } | null,
+    answerId: string,
+    done: () => void,
+  ): void {
+    const norm = (v: string | null | undefined) => (v ?? '').toString().trim();
+
+    // Nenhum valor informado → desativa o limite atual (se houver).
+    if (!limitValue) {
+      if (existingLimit) {
+        this.LimitAnswerService.update(existingLimit.id, {
+          answerId: existingLimit.answerId,
+          status: 0,
+        }).subscribe({ next: done, error: done });
+      } else {
+        done();
+      }
+      return;
+    }
+
+    // Sem mudança em relação ao limite ativo → nada a fazer.
+    if (
+      existingLimit &&
+      existingLimit.status === 1 &&
+      norm(existingLimit.limitMin) === norm(limitValue.limitMin) &&
+      norm(existingLimit.limitMax) === norm(limitValue.limitMax)
+    ) {
+      done();
+      return;
+    }
+
+    if(Number(norm(limitValue.limitMax)) <= 0){
+      limitValue.limitMax = null;
+    }
+
+    if(Number(norm(limitValue.limitMin)) <= 0){
+      limitValue.limitMin = null;
+    }    
+
+    // Cria a nova versão ATIVA e desativa a anterior (mantém histórico).
+    this.LimitAnswerService.create({
+      answerId,
+      limitMin: limitValue.limitMin,
+      limitMax: limitValue.limitMax,
+      status: 1,
+    }).subscribe({
+      next: () => {
+        if (existingLimit) {
+          this.LimitAnswerService.update(existingLimit.id, {
+            answerId: existingLimit.answerId,
+            status: 0,
+          }).subscribe({ next: done, error: done });
+        } else {
+          done();
+        }
+      },
+      error:(err) =>{ console.log(err);  return done},
+    });
   }
 
   /**

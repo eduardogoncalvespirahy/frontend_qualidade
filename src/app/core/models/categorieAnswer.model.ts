@@ -1,4 +1,4 @@
-export interface Category { //parametros/perguntas
+export interface CategorieAnswer {
   id: string;
   nome: string;
   descricao: string | null;
@@ -7,13 +7,13 @@ export interface Category { //parametros/perguntas
   dataAlteracao: Date;
 }
 
-export interface CategoryCreate {
-  nome: string;
+export interface CategorieAnswerCreate {
+  nome?: string;
   descricao?: string | null;
   status?: number;
 }
 
-export interface CategoryUpdate {
+export interface CategorieAnswerUpdate {
   nome?: string;
   descricao?: string | null;
   status?: number;

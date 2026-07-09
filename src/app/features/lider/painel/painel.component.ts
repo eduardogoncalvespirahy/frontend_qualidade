@@ -7,14 +7,14 @@ import { Answer } from '../../../core/models/answer.model';
 import { Form } from '../../../core/models/form.model';
 import { Section } from '../../../core/models/section.model';
 import { Location } from '../../../core/models/location.model';
-import { Category } from '../../../core/models/category-answer.model';
+import { CategorieAnswer } from '../../../core/models/categorieAnswer.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 
 import { AnswerService } from '../../../core/services/answer.service';
 import { FormService } from '../../../core/services/form.service';
 import { SectionService } from '../../../core/services/section.service';
 import { LocationService } from '../../../core/services/location.service';
-import { CategoryService } from '../../../core/services/category-answer.service';
+import { CategorieAnswerService } from '../../../core/services/categorieAnswer.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -45,7 +45,7 @@ interface CatStat {
 })
 export class PainelComponent implements OnInit {
   private readonly answerService = inject(AnswerService);
-  private readonly categoryService = inject(CategoryService);
+  private readonly categorieAnswerService = inject(CategorieAnswerService);
   private readonly resultService = inject(AnswerResultService);
   private readonly formService = inject(FormService);
   private readonly sectionService = inject(SectionService);
@@ -53,7 +53,7 @@ export class PainelComponent implements OnInit {
   private readonly auth = inject(AuthService);
 
   readonly answers = signal<Answer[]>([]);
-  readonly categories = signal<Category[]>([]);
+  readonly categories = signal<CategorieAnswer[]>([]);
   readonly results = signal<AnswerResult[]>([]);
   readonly forms = signal<Form[]>([]);
   readonly sections = signal<Section[]>([]);
@@ -294,7 +294,7 @@ export class PainelComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     forkJoin({
-      categories: this.categoryService.getAll(1000, 1),
+      categories: this.categorieAnswerService.getAll(1000, 1),
       answers: this.answerService.getAll(1000, 1),
       results: this.resultService.getAll(1000, 1),
       forms: this.formService.getAll(1000, 1),
@@ -302,7 +302,7 @@ export class PainelComponent implements OnInit {
       locations: this.locationService.getAll(1000, 1),
     }).subscribe({
       next: ({ categories, answers, results, forms, sections, locations }) => {
-        this.categories.set(this.unwrap<Category>(categories));
+        this.categories.set(this.unwrap<CategorieAnswer>(categories));
         this.answers.set(this.unwrap<Answer>(answers));
         this.results.set(this.unwrap<AnswerResult>(results));
         this.forms.set(this.unwrap<Form>(forms));

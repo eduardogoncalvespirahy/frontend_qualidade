@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 
-import { SignatureFile } from '../../../core/models/signature-file.model';
 import { Machine } from '../../../core/models/machine.model';
 import { Location } from '../../../core/models/location.model';
 import { Section } from '../../../core/models/section.model';
@@ -36,7 +35,6 @@ import { MachineAnswerResultService } from '../../../core/services/machine-answe
 import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
 import { Control } from '../../../core/models/control.model';
-import { ElementSchemaRegistry } from '@angular/compiler';
 
 import { AnswerGroups } from '../../../core/models/answer-group.model';
 import { AnswerGroupItems } from '../../../core/models/answer-group-items.model';

@@ -14,7 +14,7 @@ import { Answer } from '../../../../../../../core/models/answer.model';
 import { LimitAnswer } from '../../../../../../../core/models/limit-answer.model';
 import { AnswerGroups } from '../../../../../../../core/models/answer-group.model';
 
-import { CategoryService } from '../../../../../../../core/services/category-answer.service';
+import { CategorieAnswerService } from '../../../../../../../core/services/categorieAnswer.service';
 
 @Component({
   selector: 'app-form',
@@ -43,11 +43,11 @@ export class FormComponent implements OnInit {
   readonly currentGroupId = input<string>('');
 
   // traz categoria
-  private readonly categoryService = inject(CategoryService);
+  private readonly categorieAnswerService = inject(CategorieAnswerService);
 
   // para fazer as pesquisas
   protected readonly categoriesResource = rxResource({
-    stream: () => this.categoryService.getAll(),
+    stream: () => this.categorieAnswerService.getAll(),
   });
 
   protected readonly categories = computed(() => this.categoriesResource.value()?.data ?? []);

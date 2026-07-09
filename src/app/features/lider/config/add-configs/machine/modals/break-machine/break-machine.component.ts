@@ -100,7 +100,7 @@ export class BreakMachineComponent implements OnInit {
   label = (b: BreakMachine) => statusLabel(b, this.now());
   ativa = (b: BreakMachine) => isActive(b, this.now());
   expirada = (b: BreakMachine) => isExpired(b, this.now());
-  podeAtivar = (b: BreakMachine) => canActivate(b, this.now());
+  // podeAtivar = (b: BreakMachine) => canActivate(b, this.now());
   podeDesativar = (b: BreakMachine) => canDeactivate(b, this.now());
 
   // ───────── CRIAR ─────────
@@ -178,6 +178,7 @@ export class BreakMachineComponent implements OnInit {
     })
     .subscribe({
         next: () => {
+          this.now.set(new Date());
           this.saving.set(false);
           this.success.set(msg);
           this.load();

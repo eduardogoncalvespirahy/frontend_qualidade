@@ -100,7 +100,7 @@ export class BreakFormComponent implements OnInit {
   label = (b: BreakForm) => statusLabel(b, this.now());
   ativa = (b: BreakForm) => isActive(b, this.now());
   expirada = (b: BreakForm) => isExpired(b, this.now());
-  podeAtivar = (b: BreakForm) => canActivate(b, this.now());
+  // podeAtivar = (b: BreakForm) => canActivate(b, this.now());
   podeDesativar = (b: BreakForm) => canDeactivate(b, this.now());
 
   // ───────── CRIAR ─────────
@@ -177,6 +177,7 @@ export class BreakFormComponent implements OnInit {
       })
       .subscribe({
         next: () => {
+          this.now.set(new Date());
           this.saving.set(false);
           this.success.set(msg);
           this.load();

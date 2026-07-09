@@ -122,11 +122,11 @@
                 <i class="bi bi-toggle-off"></i> Desativar
               </button>
             }
-            @if (podeAtivar(b)) {
+            <!-- @if (podeAtivar(b)) {
               <button type="button" class="btn btn--ok" [disabled]="saving()" (click)="ativar(b)">
                 <i class="bi bi-toggle-on"></i> Ativar
               </button>
-            }
+            } -->
             @if (expirada(b)) {
               <span class="brk-card__note"><i class="bi bi-clock-history"></i> Encerrada</span>
             }

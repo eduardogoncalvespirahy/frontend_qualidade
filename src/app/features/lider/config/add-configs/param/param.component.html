@@ -402,6 +402,15 @@
             <button type="button" class="gchip gchip--new" (click)="toggleNewGroup()">
               <i class="bi bi-plus-lg"></i> Novo grupo
             </button>
+
+            <button
+              type="button"
+              class="gchip gchip--cats"
+              [class.is-active]="categoriesOpen()"
+              (click)="toggleCategorias()"
+            >
+              <i class="bi bi-tags"></i> Categorias
+            </button>
           </div>
 
           @if (newGroupOpen()) {
@@ -426,6 +435,110 @@
               <button type="button" class="btn btn--ghost" (click)="toggleNewGroup()">
                 Cancelar
               </button>
+            </div>
+          }
+
+          <!-- Painel de gestão de categorias -->
+          @if (categoriesOpen()) {
+            <div class="cats">
+              <div class="cats__head">
+                <span class="cats__title">
+                  <i class="bi bi-tags"></i> Categorias de parâmetro
+                </span>
+                <span class="cats__hint">Usadas ao classificar os parâmetros.</span>
+              </div>
+
+              <!-- formulário de criação/edição -->
+              <div class="cats__form">
+                <input
+                  type="text"
+                  class="ff__control"
+                  placeholder="Nome da categoria"
+                  [ngModel]="catNome()"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="catNome.set($event)"
+                  (keyup.enter)="salvarCategoria()"
+                />
+                <input
+                  type="text"
+                  class="ff__control"
+                  placeholder="Descrição (opcional)"
+                  [ngModel]="catDescricao()"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="catDescricao.set($event)"
+                />
+                <select
+                  class="ff__control cats__status"
+                  [ngModel]="catStatus()"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="catStatus.set($event)"
+                >
+                  <option [ngValue]="1">Ativo</option>
+                  <option [ngValue]="0">Inativo</option>
+                </select>
+                <button
+                  type="button"
+                  class="btn btn--primary"
+                  [disabled]="!catNome().trim() || catSaving()"
+                  (click)="salvarCategoria()"
+                >
+                  <i
+                    class="bi"
+                    [class.bi-check-lg]="!catSaving()"
+                    [class.bi-arrow-repeat]="catSaving()"
+                    [class.spin]="catSaving()"
+                  ></i>
+                  {{ catEditId() ? 'Salvar' : 'Adicionar' }}
+                </button>
+                @if (catEditId()) {
+                  <button type="button" class="btn btn--ghost" (click)="cancelarCategoria()">
+                    Cancelar
+                  </button>
+                }
+              </div>
+
+              <!-- lista -->
+              @if (catLoading()) {
+                <p class="cats__msg"><i class="bi bi-hourglass-split"></i> Carregando…</p>
+              } @else if (categories().length) {
+                <ul class="cats__list">
+                  @for (c of categories(); track c.id) {
+                    <li class="cats__item" [class.is-editing]="catEditId() === c.id">
+                      <div class="cats__info">
+                        <div class="cats__line">
+                          <span class="cats__name">{{ c.nome }}</span>
+                          <span class="badge" [class.badge--on]="isAtivo(c.status)">
+                            {{ isAtivo(c.status) ? 'Ativo' : 'Inativo' }}
+                          </span>
+                        </div>
+                        @if (c.descricao) {
+                          <span class="cats__desc">{{ c.descricao }}</span>
+                        }
+                      </div>
+                      <div class="cats__actions">
+                        <button
+                          type="button"
+                          class="ordem__btn"
+                          title="Editar"
+                          (click)="editarCategoria(c)"
+                        >
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="ordem__btn cats__del"
+                          title="Excluir"
+                          (click)="excluirCategoria(c)"
+                        >
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="cats__msg">Nenhuma categoria cadastrada.</p>
+              }
             </div>
           }
 

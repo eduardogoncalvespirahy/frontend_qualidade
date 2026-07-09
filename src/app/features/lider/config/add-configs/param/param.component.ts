@@ -9,6 +9,10 @@ import { Form } from '../../../../../core/models/form.model';
 import { Answer } from '../../../../../core/models/answer.model';
 import { AnswerGroups } from '../../../../../core/models/answer-group.model';
 import { AnswerGroupItems } from '../../../../../core/models/answer-group-items.model';
+// ⚠️ Ajuste o caminho/nome conforme seu projeto. O projeto atual tem
+//    'category-answer.model' exportando `Category`; aqui seguimos a API que você
+//    enviou (`CategorieAnswer` em 'categorieAnswer.model').
+import { CategorieAnswer } from '../../../../../core/models/categorieAnswer.model';
 
 import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
@@ -17,6 +21,8 @@ import { AnswerService } from '../../../../../core/services/answer.service';
 import { LimitAnswerService } from '../../../../../core/services/limit-answer.service';
 import { AnswerGroupsService } from '../../../../../core/services/answer-group.service';
 import { AnswerGroupItemsService } from '../../../../../core/services/answer-groups-items.service';
+// ⚠️ Ajuste o caminho/nome conforme seu projeto (ver nota acima).
+import { CategorieAnswerService } from '../../../../../core/services/categorieAnswer.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { AuthService } from '../../../../../core/services/auth.service';
 
@@ -54,6 +60,7 @@ export class ParamComponent implements OnInit {
   private readonly limitAnswerService = inject(LimitAnswerService);
   private readonly answerGroupsService = inject(AnswerGroupsService);
   private readonly answerGroupItemsService = inject(AnswerGroupItemsService);
+  private readonly categorieAnswerService = inject(CategorieAnswerService);
   private readonly modalService = inject(ModalService);
   private readonly auth = inject(AuthService);
 
@@ -74,6 +81,16 @@ export class ParamComponent implements OnInit {
   readonly newGroupNome = signal('');
   /** true enquanto uma reordenação está sendo persistida. */
   readonly reordering = signal(false);
+
+  // ───────── categorias de parâmetro (gestão global) ─────────
+  readonly categories = signal<CategorieAnswer[]>([]);
+  readonly categoriesOpen = signal(false);
+  readonly catEditId = signal<string | null>(null); // null = criando novo
+  readonly catNome = signal('');
+  readonly catDescricao = signal('');
+  readonly catStatus = signal<number>(1);
+  readonly catLoading = signal(false);
+  readonly catSaving = signal(false);
 
   // ───────── seleções ─────────
   readonly selectedLocation = signal<Location | null>(null);
@@ -550,6 +567,8 @@ export class ParamComponent implements OnInit {
         parentId: formId,
         groups: this.answerGroups(),
         currentGroupId: preGroup,
+        // Categorias disponíveis para escolha no modal (se o FormComponent aceitar).
+        categories: this.categories(),
       },
       buttons: [
         { text: 'Cancelar', variant: 'secondary', value: false },
@@ -799,12 +818,119 @@ export class ParamComponent implements OnInit {
     });
   }
 
+  // ============================================================
+  //  CATEGORIAS (gestão global de categorias de parâmetro)
+  // ============================================================
+
+  /** Abre/fecha o painel de categorias (carrega na primeira abertura). */
+  toggleCategorias(): void {
+    const open = !this.categoriesOpen();
+    this.categoriesOpen.set(open);
+    this.resetCategoriaForm();
+    if (open && this.categories().length === 0) this.loadCategories();
+  }
+
+  private loadCategories(): void {
+    this.catLoading.set(true);
+    this.categorieAnswerService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<CategorieAnswer>(res);
+        // ativas primeiro, depois por nome
+        all.sort((a, b) => b.status - a.status || (a.nome ?? '').localeCompare(b.nome ?? ''));
+        this.categories.set(all);
+        this.catLoading.set(false);
+      },
+      error: () => {
+        this.catLoading.set(false);
+        this.error.set('Não foi possível carregar as categorias.');
+      },
+    });
+  }
+
+  /** Prepara o formulário para EDITAR uma categoria existente. */
+  editarCategoria(cat: CategorieAnswer): void {
+    this.catEditId.set(cat.id);
+    this.catNome.set(cat.nome ?? '');
+    this.catDescricao.set(cat.descricao ?? '');
+    this.catStatus.set(cat.status ?? 1);
+  }
+
+  /** Cancela a edição/criação e limpa o formulário. */
+  cancelarCategoria(): void {
+    this.resetCategoriaForm();
+  }
+
+  private resetCategoriaForm(): void {
+    this.catEditId.set(null);
+    this.catNome.set('');
+    this.catDescricao.set('');
+    this.catStatus.set(1);
+  }
+
+  /** Cria (sem id) ou atualiza (com id) a categoria em edição. */
+  salvarCategoria(): void {
+    if (!this.guardLocation()) return;
+
+    const nome = this.catNome().trim();
+    if (!nome || this.catSaving()) return;
+
+    const payload = {
+      nome,
+      descricao: this.catDescricao().trim() || null,
+      status: this.catStatus(),
+    };
+
+    this.catSaving.set(true);
+    this.clearFeedback();
+
+    const id = this.catEditId();
+    const req = id
+      ? this.categorieAnswerService.update(id, payload)
+      : this.categorieAnswerService.create(payload);
+
+    req.subscribe({
+      next: () => {
+        this.catSaving.set(false);
+        this.success.set(id ? 'Categoria atualizada.' : 'Categoria criada.');
+        this.resetCategoriaForm();
+        this.loadCategories();
+      },
+      error: () => {
+        this.catSaving.set(false);
+        this.error.set('Erro ao salvar a categoria.');
+      },
+    });
+  }
+
+  /** Remove uma categoria. */
+  excluirCategoria(cat: CategorieAnswer): void {
+    if (!this.guardLocation()) return;
+
+    this.categorieAnswerService.delete(cat.id).subscribe({
+      next: () => {
+        if (this.catEditId() === cat.id) this.resetCategoriaForm();
+        this.success.set('Categoria removida.');
+        this.loadCategories();
+      },
+      error: () => this.error.set('Erro ao remover a categoria. Verifique se ela não está em uso.'),
+    });
+  }
+
+  /** Nome da categoria por id (para exibir no card do parâmetro, se quiser). */
+  categoriaNome(id: string | number | null | undefined): string {
+    if (id == null || id === '') return '';
+    return this.categories().find((c) => String(c.id) === String(id))?.nome ?? '';
+  }
+
   private clearGroups(): void {
     this.answerGroups.set([]);
     this.groupItems.set([]);
     this.activeGroup.set('');
     this.newGroupOpen.set(false);
     this.newGroupNome.set('');
+    // fecha o painel de categorias ao trocar de contexto
+    this.categoriesOpen.set(false);
+    this.resetCategoriaForm();
   }
 
   // ============================================================

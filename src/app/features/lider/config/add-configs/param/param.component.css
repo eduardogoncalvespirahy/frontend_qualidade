@@ -757,3 +757,125 @@
     height: 22px;
   }
 }
+
+/* ───────── Categorias de parâmetro (gestão global) ───────── */
+.gchip--cats {
+  border-style: dashed;
+  color: var(--accent-ink);
+}
+
+.cats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.cats__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cats__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.cats__hint {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.cats__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cats__form .ff__control {
+  flex: 1 1 200px;
+  min-width: 140px;
+}
+.cats__status {
+  flex: 0 0 130px;
+}
+
+.cats__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cats__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.cats__item.is-editing {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.cats__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.cats__line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.cats__name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.cats__desc {
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cats__actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.cats__del:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+.cats__msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 560px) {
+  .cats__form .ff__control,
+  .cats__status {
+    flex: 1 1 100%;
+  }
+}

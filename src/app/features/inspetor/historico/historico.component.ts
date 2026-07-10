@@ -13,7 +13,7 @@ import { catchError, map, mergeMap, switchMap, toArray } from 'rxjs/operators';
 
 import { Control, ControlUpdate } from '../../../core/models/control.model';
 import { Form } from '../../../core/models/form.model';
-import { User } from '../../../core/models/user.model';
+import { UserProfile } from '../../../core/models/user-profile.model';
 import { Answer } from '../../../core/models/answer.model';
 import { Machine } from '../../../core/models/machine.model';
 import { Section } from '../../../core/models/section.model';
@@ -38,11 +38,11 @@ import { LimitAnswerService } from '../../../core/services/limit-answer.service'
 import { AuthService } from '../../../core/services/auth.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
 import { SignatureFileService } from '../../../core/services/signature-file.service';
+import { RepairerAnswerResultService } from '../../../core/services/repairerAnswerResult.service';
 import { ModalService } from '../../../core/services/modal.service';
 import { SignatureComponent } from '../../../core/modals/signature/signature.component';
 import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
 
-// type File = Record<string, unknown>;
 type FileWithMetadata = File & {
   nome?: string;
   originalName?: string;
@@ -129,11 +129,12 @@ export class HistoricoComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly controlStatusService = inject(ControlStatusService);
   private readonly signatureFileService = inject(SignatureFileService);
+  private readonly repairerService = inject(RepairerAnswerResultService);
   private readonly modalService = inject(ModalService);
 
   readonly controls = signal<Control[]>([]);
   readonly forms = signal<Form[]>([]);
-  readonly users = signal<User[]>([]);
+  readonly users = signal<UserProfile[]>([]);
   readonly files = signal<File[]>([]);
   readonly answers = signal<Answer[]>([]); // todos os parâmetros (carregados 1x)
   readonly machines = signal<Machine[]>([]); // todas as máquinas (para resolver nomes)
@@ -157,6 +158,64 @@ export class HistoricoComponent implements OnInit {
   readonly editValues = signal<Record<string, string>>({});
   readonly editObs = signal<string>('');
   readonly savingEdit = signal(false);
+
+  // ───────── reparador da correção (opcional) ─────────
+  /** Texto digitado (matrícula OU nome) para identificar o reparador. */
+  readonly repairerQuery = signal<string>('');
+
+  /** Usuário resolvido a partir da matrícula/nome digitado (ou null). */
+  readonly repairerResolved = computed<UserProfile | null>(() =>
+    this.resolveRepairer(this.repairerQuery()),
+  );
+
+  /** Sugestões para o <datalist> (matrícula — nome), limitadas a 20. */
+  readonly repairerOptions = computed(() => {
+    const term = this.repairerQuery().trim().toLowerCase();
+    const base = term
+      ? this.users().filter(
+          (u) =>
+            (u.userUsername ?? '').toLowerCase().includes(term) ||
+            this.matricula(u).toLowerCase().includes(term),
+        )
+      : this.users();
+    return base
+      .slice(0, 20)
+      .map((u) => ({
+        id: u.userId,
+        matricula: this.matricula(u),
+        nome: u.userUsername ?? u.userId,
+      }));
+  });
+
+  updateRepairer(value: string): void {
+    this.repairerQuery.set(value);
+  }
+
+  /** Matrícula do usuário, tolerante ao nome do campo no model. */
+  private matricula(u: UserProfile): string {
+    const matricula = String(u.employeeMatricula ?? '').trim();
+    return matricula;
+  }
+
+  /**
+   * Resolve o reparador a partir do texto digitado:
+   *  1) matrícula exata → 2) nome exato → 3) correspondência parcial (nome/matrícula).
+   */
+  private resolveRepairer(q: string): UserProfile | null {
+    const term = (q ?? '').trim().toLowerCase();
+    if (!term) return null;
+    const users = this.users();
+    return (
+      users.find((u) => this.matricula(u).toLowerCase() === term) ??
+      users.find((u) => (u.userUsername ?? '').toLowerCase() === term) ??
+      users.find(
+        (u) =>
+          (u.userUsername ?? '').toLowerCase().includes(term) ||
+          this.matricula(u).toLowerCase().includes(term),
+      ) ??
+      null
+    );
+  }
 
   /** answerId → limite ativo (min/max) para avaliar as edições. */
   private readonly limitsByAnswer = signal<Record<string, LimitAnswer>>({});
@@ -302,8 +361,8 @@ export class HistoricoComponent implements OnInit {
 
   readonly userOptions = computed(() =>
     [...this.users()]
-      .sort((a, b) => (a.username ?? '').localeCompare(b.username ?? ''))
-      .map((u) => ({ value: u.id, label: u.username || u.id })),
+      .sort((a, b) => (a.userUsername ?? '').localeCompare(b.userUsername ?? ''))
+      .map((u) => ({ value: u.userId, label: u.userUsername || u.userId })),
   );
 
   /** Opções de status — nomes distintos que aparecem nos controles carregados. */
@@ -361,17 +420,13 @@ export class HistoricoComponent implements OnInit {
   // ───────── resolução de arquivo (defensiva) ─────────
   private fileName(file: File | undefined, fallback: string): string {
     if (!file) return fallback;
-
     const f = file as FileWithMetadata;
-
     return f.nome ?? f.originalName ?? f.fileName ?? f.descricao ?? fallback;
   }
 
   private fileUrl(file: File | undefined): string | null {
     if (!file) return null;
-
     const f = file as FileWithMetadata;
-
     return f.url ?? f.path ?? f.caminho ?? null;
   }
 
@@ -594,6 +649,7 @@ export class HistoricoComponent implements OnInit {
     this.error.set(null);
     this.editId.set(row.id);
     this.editObs.set(row.observacao ?? '');
+    this.repairerQuery.set(''); // reparador começa vazio a cada edição
 
     const vals: Record<string, string> = {};
     const md = this.expandedMachineData()[row.id];
@@ -611,6 +667,7 @@ export class HistoricoComponent implements OnInit {
     this.editId.set(null);
     this.editValues.set({});
     this.editObs.set('');
+    this.repairerQuery.set('');
   }
 
   updateEditValue(key: string, value: string): void {
@@ -652,6 +709,10 @@ export class HistoricoComponent implements OnInit {
     // passa a ser atribuída a ele (userId + nova assinatura/fileId).
     const editorId = this.auth.userId();
     const reatribuir = !!editorId && editorId !== row.userId;
+
+    // Reparador informado (opcional). Só se aplica ao modo normal (answer_result),
+    // pois o RepairerAnswerResult referencia answerResultId.
+    const repairerId = this.repairerResolved()?.userId ?? null;
 
     // ── monta as operações de campos ──
     const fieldOps: Observable<unknown>[] = [];
@@ -699,12 +760,15 @@ export class HistoricoComponent implements OnInit {
             camposMudaram = true;
             changedNormal[p.answerId] = novo;
             fieldOps.push(
-              this.answerResultService.create({
-                AnswerId: p.answerId,
-                controlId: row.id,
-                resposta: novo,
-                limitsAnswerId: p.limitsAnswerId ?? null,
-              }),
+              this.answerResultService
+                .create({
+                  AnswerId: p.answerId,
+                  controlId: row.id,
+                  resposta: novo,
+                  limitsAnswerId: p.limitsAnswerId ?? null,
+                })
+                // após criar a resposta, vincula o reparador (se informado)
+                .pipe(switchMap((created) => this.linkRepairer(created, repairerId))),
             );
           }
         }
@@ -812,6 +876,22 @@ export class HistoricoComponent implements OnInit {
   }
 
   /**
+   * Vincula o reparador ao answer_result recém-criado (RepairerAnswerResult).
+   * Não interrompe a correção se o vínculo falhar — apenas registra o erro.
+   */
+  private linkRepairer(created: AnswerResult, repairerId: string | null): Observable<AnswerResult> {
+    const answerResultId = (created as { id?: string })?.id;
+    if (!repairerId || !answerResultId) return of(created);
+    return this.repairerService.create({ answerResultId, userId: repairerId }).pipe(
+      map(() => created),
+      catchError((err) => {
+        console.error('Falha ao vincular o reparador à correção:', err);
+        return of(created);
+      }),
+    );
+  }
+
+  /**
    * Abre o modal de assinatura e devolve o base64 (ou null se cancelado/vazio).
    * Usado quando um usuário diferente do autor edita o controle — a alteração
    * precisa ser assinada por quem está fazendo.
@@ -907,7 +987,7 @@ export class HistoricoComponent implements OnInit {
     const sectionById = new Map(this.sections().map((s) => [s.id, s]));
     // employerId → location (deriva o local a partir do employer da seção)
     const locationByEmployer = new Map(this.locations().map((l) => [l.employerId, l]));
-    const userById = new Map(this.users().map((u) => [u.id, u]));
+    const userById = new Map(this.users().map((u) => [u.userId, u]));
     const fileById = new Map(this.files().map((f) => [String(f['id']), f]));
     const statusMap = this.controlStatuses();
 
@@ -930,8 +1010,8 @@ export class HistoricoComponent implements OnInit {
             locationId: location?.id ?? '',
             locationNome: location?.nome ?? '',
             userId: c.userId,
-            userNome: user?.username ?? c.userId,
-            userEmail: user?.email ?? '',
+            userNome: user?.userUsername ?? c.userId,
+            userEmail: user?.userEmail ?? '',
             fileId: c.fileId,
             fileNome: this.fileName(file, c.fileId),
             fileUrl: this.fileUrl(file),
@@ -1138,9 +1218,9 @@ export class HistoricoComponent implements OnInit {
       forms: this.fetchAllPages<Form>((l, p) => this.formService.getAll(l, p)).pipe(
         failLog('formulários'),
       ),
-      users: this.fetchAllPages<User>((l, p) => this.userService.getAll(l, p)).pipe(
-        failLog('usuários'),
-      ),
+      users: this.fetchAllPages<UserProfile>((l, p) =>
+        this.userService.getAllUserProfile(l, p),
+      ).pipe(failLog('usuários')),
       files: this.fetchAllPages<File>((l, p) => this.fileService.getAll(l, p)).pipe(
         failLog('arquivos'),
       ),
@@ -1166,7 +1246,7 @@ export class HistoricoComponent implements OnInit {
         }
         this.controls.set(this.unwrap<Control>(controls));
         this.forms.set(this.unwrap<Form>(forms));
-        this.users.set(this.unwrap<User>(users));
+        this.users.set(this.unwrap<UserProfile>(users));
         this.files.set(this.unwrap<File>(files));
         this.answers.set(this.unwrap<Answer>(answers));
         this.machines.set(this.unwrap<Machine>(machines));

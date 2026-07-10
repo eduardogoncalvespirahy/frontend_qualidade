@@ -109,9 +109,9 @@ export class LocationComponent implements OnInit {
         this.items.set(this.unwrap<Location>(res));
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
-        this.error.set('Não foi possível carregar os locais.');
+        this.error.set(`Não foi possível carregar os locais. (${err.error.message})`);
       },
     });
   }
@@ -145,7 +145,7 @@ export class LocationComponent implements OnInit {
           this.success.set('Local criado com sucesso.');
           this.load();
         },
-        error: () => this.error.set('Erro ao criar o local.'),
+        error: (err) => this.error.set(`Erro ao criar o local. (${err.error.message})`),
       });
   }
 
@@ -176,7 +176,7 @@ export class LocationComponent implements OnInit {
           this.success.set('Local atualizado com sucesso.');
           this.load();
         },
-        error: () => this.error.set('Erro ao atualizar o local.'),
+        error: (err) => this.error.set(`Erro ao atualizar o local. (${err.error.message})`),
       });
   }
 
@@ -199,7 +199,7 @@ export class LocationComponent implements OnInit {
         this.success.set('Local excluído.');
         this.load();
       },
-      error: () => this.error.set('Erro ao excluir o local.'),
+      error: (err) => this.error.set(`Erro ao excluir o local. (${err.error.message})`),
     });
   }
 

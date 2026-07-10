@@ -345,7 +345,8 @@ export class RegistrationComponent implements OnInit {
         this.users.set(this.unwrap<User>(res));
         this.loading.set(false);
       },
-      error: () => this.fail('Não foi possível carregar os usuários.'),
+      error: (err) =>
+        this.error.set(`Não foi possível carregar os usuários. (${err.error.message})`),
     });
   }
 
@@ -358,7 +359,8 @@ export class RegistrationComponent implements OnInit {
         this.credentials.set(all.filter((c) => c.userId === userId));
         this.loading.set(false);
       },
-      error: () => this.fail('Não foi possível carregar as credenciais.'),
+      error: (err) =>
+        this.error.set(`Não foi possível carregar as credenciais. (${err.error.message})`),
     });
   }
 
@@ -480,7 +482,7 @@ export class RegistrationComponent implements OnInit {
       .create({ employeeId: v.employeeId, username: v.username, email: v.email, status: v.status })
       .subscribe({
         next: () => this.done('Usuário criado.', () => this.loadUsers()),
-        error: () => this.error.set('Erro ao criar o usuário.'),
+        error: (err) => this.error.set(`Erro ao criar o usuário. (${err.error.message})`),
       });
   }
 
@@ -504,7 +506,7 @@ export class RegistrationComponent implements OnInit {
       })
       .subscribe({
         next: () => this.done('Usuário atualizado.', () => this.loadUsers()),
-        error: () => this.error.set('Erro ao atualizar o usuário.'),
+        error: (err) => this.error.set(`Erro ao atualizar o usuário. (${err.error.message})`),
       });
   }
 
@@ -512,7 +514,7 @@ export class RegistrationComponent implements OnInit {
     if (!(await this.confirmDelete(`o usuário "${item.username}"`))) return;
     this.userService.delete(item.id).subscribe({
       next: () => this.done('Usuário excluído.', () => this.loadUsers()),
-      error: () => this.error.set('Erro ao excluir o usuário.'),
+      error: (err) => this.error.set(`Erro ao excluir o usuário. (${err.error.message})`),
     });
   }
 
@@ -549,7 +551,8 @@ export class RegistrationComponent implements OnInit {
     forkJoin(requisicoes).subscribe({
       next: () =>
         this.done(`${systemIds.length} credencial(is) criada(s).`, () => this.loadCredentials()),
-      error: () => this.error.set('Erro ao criar uma ou mais credenciais.'),
+      error: (err) =>
+        this.error.set(`Erro ao criar uma ou mais credenciais. (${err.error.message})`),
     });
   }
 
@@ -569,7 +572,7 @@ export class RegistrationComponent implements OnInit {
     if (v.senha) payload.senha = v.senha;
     this.credentialService.update(item.id, payload).subscribe({
       next: () => this.done('Credencial atualizada.', () => this.loadCredentials()),
-      error: () => this.error.set('Erro ao atualizar a credencial.'),
+      error: (err) => this.error.set(`Erro ao atualizar a credencial. (${err.error.message})`),
     });
   }
 
@@ -577,7 +580,7 @@ export class RegistrationComponent implements OnInit {
     if (!(await this.confirmDelete(`a credencial "${item.systemId}"`))) return;
     this.credentialService.delete(item.id).subscribe({
       next: () => this.done('Credencial excluída.', () => this.loadCredentials()),
-      error: () => this.error.set('Erro ao excluir a credencial.'),
+      error: (err) => this.error.set(`Erro ao excluir a credencial. (${err.error.message})`),
     });
   }
 
@@ -619,7 +622,7 @@ export class RegistrationComponent implements OnInit {
     forkJoin(requisicoes).subscribe({
       next: () =>
         this.done(`${roleIds.length} regra(s) vinculada(s).`, () => this.loadCredentialRoles()),
-      error: () => this.error.set('Erro ao vincular uma ou mais regras.'),
+      error: (err) => this.error.set(`Erro ao vincular uma ou mais regras. (${err.error.message})`),
     });
   }
 
@@ -630,7 +633,7 @@ export class RegistrationComponent implements OnInit {
     if (!(await this.confirmDelete(`a regra "${role.nome}"`))) return;
     this.credentialRoleService.delete(credentialId, role.id).subscribe({
       next: () => this.done('Regra removida.', () => this.loadCredentialRoles()),
-      error: () => this.error.set('Erro ao remover a regra.'),
+      error: (err) => this.error.set(`Erro ao remover a regra. (${err.error.message})`),
     });
   }
 
@@ -674,7 +677,7 @@ export class RegistrationComponent implements OnInit {
         this.done(`${locationIds.length} local(is) vinculado(s).`, () =>
           this.loadCredentialLocations(),
         ),
-      error: () => this.error.set('Erro ao vincular um ou mais locais.'),
+      error: (err) => this.error.set(`Erro ao vincular um ou mais locais. (${err.error.message})`),
     });
   }
 
@@ -685,7 +688,7 @@ export class RegistrationComponent implements OnInit {
     if (!(await this.confirmDelete(`o local "${loc.nome}"`))) return;
     this.credentialLocationService.delete(credentialId, loc.id).subscribe({
       next: () => this.done('Local removido.', () => this.loadCredentialLocations()),
-      error: () => this.error.set('Erro ao remover o local.'),
+      error: (err) => this.error.set(`Erro ao remover o local. (${err.error.message})`),
     });
   }
 

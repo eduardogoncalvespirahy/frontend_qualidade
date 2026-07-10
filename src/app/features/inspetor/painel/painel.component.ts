@@ -1,8 +1,17 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, Observable, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { forkJoin, Observable, of, Subject } from 'rxjs';
+import { catchError, debounceTime, map, switchMap } from 'rxjs/operators';
 
 import { Machine } from '../../../core/models/machine.model';
 import { Location } from '../../../core/models/location.model';
@@ -12,6 +21,10 @@ import { Answer } from '../../../core/models/answer.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 import { BreakMachine } from '../../../core/models/break-machine.model';
 import { BreakForm } from '../../../core/models/break-form.model';
+import { LimitAnswer } from '../../../core/models/limit-answer.model';
+import { Control } from '../../../core/models/control.model';
+import { AnswerGroups } from '../../../core/models/answer-group.model';
+import { AnswerGroupItems } from '../../../core/models/answer-group-items.model';
 
 import { MachineService } from '../../../core/services/machine.service';
 import { LocationService } from '../../../core/services/location.service';
@@ -26,21 +39,15 @@ import { AuthService } from '../../../core/services/auth.service';
 import { BreakMachineService } from '../../../core/services/break-machine.service';
 import { BreakFormService } from '../../../core/services/break-form.service';
 import { DraftService } from '../../../core/services/draft.service';
-
-import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
-import { LimitAnswer } from '../../../core/models/limit-answer.model';
 import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
-
-// ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
-import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
-import { Control } from '../../../core/models/control.model';
-
-import { AnswerGroups } from '../../../core/models/answer-group.model';
-import { AnswerGroupItems } from '../../../core/models/answer-group-items.model';
 import { AnswerGroupsService } from '../../../core/services/answer-group.service';
 import { AnswerGroupItemsService } from '../../../core/services/answer-groups-items.service';
+// ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
+import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
+
+import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -61,16 +68,14 @@ interface Filters {
   selector: 'app-painel',
   standalone: true,
   imports: [CommonModule, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './painel.component.html',
   styleUrl: './painel.component.css',
 })
 export class PainelComponent implements OnInit {
-  // Salvar racunho
+  // ───────── injeções ─────────
+  private readonly destroyRef = inject(DestroyRef);
   private readonly draftService = inject(DraftService);
-
-  // + signal pra controllar banner
-  readonly hasDraft = signal(false);
-
   private readonly locationService = inject(LocationService);
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
@@ -78,7 +83,16 @@ export class PainelComponent implements OnInit {
   private readonly answerResultService = inject(AnswerResultService);
   private readonly answerGroupsService = inject(AnswerGroupsService);
   private readonly answerGroupItemsService = inject(AnswerGroupItemsService);
-
+  private readonly machineService = inject(MachineService);
+  private readonly breakMachineService = inject(BreakMachineService);
+  private readonly breakFormService = inject(BreakFormService);
+  private readonly controlService = inject(ControlService);
+  private readonly controlStatusService = inject(ControlStatusService);
+  private readonly signatureFileService = inject(SignatureFileService);
+  private readonly limitsService = inject(LimitAnswerService);
+  private readonly machineAnswerResultService = inject(MachineAnswerResultService);
+  private readonly modalService = inject(ModalService);
+  private readonly exporter = inject(FileExportService);
   private readonly auth = inject(AuthService);
 
   // ───────── navegação ─────────
@@ -89,8 +103,12 @@ export class PainelComponent implements OnInit {
   readonly sections = signal<Section[]>([]);
   readonly forms = signal<Form[]>([]);
   readonly answers = signal<Answer[]>([]); // parâmetros do formulário selecionado
+  readonly machines = signal<Machine[]>([]);
   readonly answerGroups = signal<AnswerGroups[]>([]);
   readonly groupItems = signal<AnswerGroupItems[]>([]);
+  readonly breaks = signal<BreakMachine[]>([]);
+  readonly allFormBreaks = signal<BreakForm[]>([]);
+  readonly controls = signal<Control[]>([]);
 
   // ───────── seleções ─────────
   readonly selectedLocation = signal<Location | null>(null);
@@ -103,11 +121,30 @@ export class PainelComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly success = signal<string | null>(null);
 
+  // ───────── rascunho ─────────
+  readonly hasDraft = signal(false);
+  /** Fila de salvamento do rascunho (debounced para reduzir escrita). */
+  private readonly draftSave$ = new Subject<{ formId: string; values: Record<string, string> }>();
+
   // ───────── valores do formulário de parâmetros (answerId -> resposta) ─────────
   readonly paramValues = signal<Record<string, string>>({});
+  readonly machineParamValues = signal<Record<string, string>>({});
 
   // valor atual já gravado no banco para cada answerId (a última linha existente)
   readonly existingResults = signal<Record<string, AnswerResult | null>>({});
+
+  /** answerId → id do limite ativo (usado em limitsAnswerId ao gravar). */
+  readonly limitsMap = signal<Record<string, string>>({});
+  /** answerId → limite ativo completo (usado para validar min/max localmente). */
+  private readonly limitsByAnswer = signal<Record<string, LimitAnswer>>({});
+
+  constructor() {
+    // Salva o rascunho no máximo a cada 400ms, guardando o formId do momento
+    // da digitação (evita gravar no formulário errado após navegar).
+    this.draftSave$
+      .pipe(debounceTime(400), takeUntilDestroyed())
+      .subscribe(({ formId, values }) => this.draftService.save(formId, values));
+  }
 
   // ───────── permissões de local (credentialLocation) ─────────
   /** Nomes das locations liberadas para a credencial logada. */
@@ -126,6 +163,7 @@ export class PainelComponent implements OnInit {
     this.locations().filter((l) => this.isLocationAllowed(l)),
   );
 
+  // ───────── ordenação por grupo ─────────
   /** answerId → vínculo do grupo (1 por parâmetro). */
   private readonly groupItemByAnswer = computed(() => {
     const m = new Map<string, AnswerGroupItems>();
@@ -147,7 +185,6 @@ export class PainelComponent implements OnInit {
    *  1) agrupa por grupo (na ordem dos grupos),
    *  2) dentro do grupo, pela `ordem` do item,
    *  3) parâmetros sem grupo vão para o fim (ordenados por nome).
-   * É isso que a tela de parâmetros/envio deve consumir no lugar de answers().
    */
   readonly orderedAnswers = computed<Answer[]>(() => {
     const byAnswer = this.groupItemByAnswer();
@@ -166,38 +203,6 @@ export class PainelComponent implements OnInit {
       return (a.nome ?? '').localeCompare(b.nome ?? ''); // desempate estável
     });
   });
-
-  /** Carrega grupos do formulário e seus itens (apenas para ordenar). */
-  private loadGroupOrder(): void {
-    const formId = this.selectedForm()?.id;
-    if (!formId) {
-      this.answerGroups.set([]);
-      this.groupItems.set([]);
-      return;
-    }
-
-    this.answerGroupsService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const groups = this.unwrap<AnswerGroups>(res).filter((g) => g.formId === formId);
-        this.answerGroups.set(groups);
-
-        const groupIds = new Set(groups.map((g) => g.id));
-        this.answerGroupItemsService.getAll(2000, 1).subscribe({
-          next: (r2) => {
-            const items = this.unwrap<AnswerGroupItems>(r2).filter((it) =>
-              groupIds.has(it.answerGroupId),
-            );
-            this.groupItems.set(items);
-          },
-          error: () => this.groupItems.set([]),
-        });
-      },
-      error: () => {
-        this.answerGroups.set([]);
-        this.groupItems.set([]);
-      },
-    });
-  }
 
   // ───────── filtros de busca (por campo das interfaces) ─────────
   readonly filtersOpen = signal(false);
@@ -253,7 +258,6 @@ export class PainelComponent implements OnInit {
 
   readonly filteredLocations = computed(() => {
     const f = this.filters();
-    // Restringe às locations permitidas pela credencial (credentialLocation).
     return this.permittedLocations().filter(
       (l) =>
         this.textMatch(l.nome, f.nome) &&
@@ -294,11 +298,6 @@ export class PainelComponent implements OnInit {
     return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
   }
 
-  /**
-   * IDs de employer disponíveis no nível atual.
-   * No passo 'location' usamos os locais permitidos (não os já filtrados),
-   * para que o próprio filtro de empregador não encolha as opções.
-   */
   readonly employerIdOptions = computed<string[]>(() => {
     if (this.step() === 'location') {
       return this.distinct(this.permittedLocations().map((l) => l.employerId));
@@ -309,7 +308,6 @@ export class PainelComponent implements OnInit {
     return [];
   });
 
-  /** Seções disponíveis (value = id, label = nome quando conhecido). */
   readonly sectionIdOptions = computed<{ value: string; label: string }[]>(() => {
     const byId = new Map(this.sections().map((s) => [s.id, s.nome]));
     return this.distinct(this.forms().map((f) => f.sectionId)).map((id) => ({
@@ -335,6 +333,37 @@ export class PainelComponent implements OnInit {
   readonly pageTitle = computed(() => this.titles[this.step()]);
   readonly pageDescription = computed(() => this.descriptions[this.step()]);
 
+  // ───────── máquinas / pausas ─────────
+  readonly pausedMachineIds = computed<Set<string>>(() => {
+    const now = Date.now();
+    return new Set(
+      this.breaks()
+        .filter((b) => b.status === 1 && (!b.horaFim || new Date(b.horaFim).getTime() > now))
+        .map((b) => b.machineId),
+    );
+  });
+
+  readonly pausedFormIds = computed<Set<string>>(() => {
+    const now = Date.now();
+    return new Set(
+      this.allFormBreaks()
+        .filter((b) => b.status === 1 && (!b.horaFim || new Date(b.horaFim).getTime() > now))
+        .map((b) => b.formId),
+    );
+  });
+
+  readonly formStats = computed(() => {
+    const map = new Map<string, { count: number; ultimo: Date | null }>();
+    for (const c of this.controls()) {
+      const entry = map.get(c.formId) ?? { count: 0, ultimo: null };
+      entry.count++;
+      const d = new Date(c.dataEmissao);
+      if (!entry.ultimo || d > entry.ultimo) entry.ultimo = d;
+      map.set(c.formId, entry);
+    }
+    return map;
+  });
+
   ngOnInit(): void {
     this.loadLocations();
   }
@@ -352,96 +381,129 @@ export class PainelComponent implements OnInit {
 
   private loadLocations(): void {
     this.startLoading();
-    this.locationService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        this.locations.set(this.unwrap<Location>(res));
-        this.loading.set(false);
-      },
-      error: () => this.fail('Não foi possível carregar os locais.'),
-    });
+    this.locationService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.locations.set(this.unwrap<Location>(res));
+          this.loading.set(false);
+        },
+        error: () => this.fail('Não foi possível carregar os locais.'),
+      });
   }
 
   private loadSections(): void {
     this.startLoading();
-    this.sectionService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const employerId = this.selectedLocation()?.employerId;
-        // Não há locationId em Section — vinculamos pelo employerId do local.
-        const all = this.unwrap<Section>(res);
-        this.sections.set(employerId ? all.filter((s) => s.employerId === employerId) : all);
-        this.loading.set(false);
-      },
-      error: () => this.fail('Não foi possível carregar as seções.'),
-    });
+    this.sectionService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          const employerId = this.selectedLocation()?.employerId;
+          // Não há locationId em Section — vinculamos pelo employerId do local.
+          const all = this.unwrap<Section>(res);
+          this.sections.set(employerId ? all.filter((s) => s.employerId === employerId) : all);
+          this.loading.set(false);
+        },
+        error: () => this.fail('Não foi possível carregar as seções.'),
+      });
   }
 
   private loadForms(): void {
     this.startLoading();
     const sectionId = this.selectedSection()?.id;
-    this.formService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const all = this.unwrap<Form>(res);
-        this.forms.set(all.filter((f) => f.sectionId === sectionId));
-        this.loading.set(false);
-      },
-      error: () => this.fail('Não foi possível carregar os formulários.'),
-    });
-    // carrega breaks de todos os formulários para identificar pausados
-    this.breakFormService.getAll(1000, 1).subscribe({
-      next: (res) => this.allFormBreaks.set(this.unwrap<BreakForm>(res)),
-      error: () => this.allFormBreaks.set([]),
-    });
-    this.controlService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const data = this.unwrap<Control>(res);
-        console.log('controls carregados:', data.length, data);
-        this.controls.set(data);
-      },
-      error: () => this.controls.set([]),
-    });
+    this.formService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.forms.set(this.unwrap<Form>(res).filter((f) => f.sectionId === sectionId));
+          this.loading.set(false);
+        },
+        error: () => this.fail('Não foi possível carregar os formulários.'),
+      });
+
+    this.loadFormMeta();
   }
 
-  private loadAnswers(): void {
+  /** Metadados usados nos cards de formulário: pausas em andamento e envios. */
+  private loadFormMeta(): void {
+    this.breakFormService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.allFormBreaks.set(this.unwrap<BreakForm>(res)),
+        error: () => this.allFormBreaks.set([]),
+      });
+
+    this.controlService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.controls.set(this.unwrap<Control>(res)),
+        error: () => this.controls.set([]),
+      });
+  }
+
+  // ── carga do formulário selecionado (answers + machines + breaks + results) ──
+
+  private fetchAnswers(formId: string): Observable<Answer[]> {
+    return this.answerService.getAll(1000, 1).pipe(
+      map((res) => this.unwrap<Answer>(res).filter((a) => a.formId === formId)),
+      catchError(() => of<Answer[]>([])),
+    );
+  }
+
+  private fetchMachines(formId: string): Observable<Machine[]> {
+    return this.machineService.getAll(1000, 1).pipe(
+      map((res) => this.unwrap<Machine>(res).filter((m) => m.formId === formId)),
+      catchError(() => of<Machine[]>([])),
+    );
+  }
+
+  private fetchMachineBreaks(): Observable<BreakMachine[]> {
+    return this.breakMachineService.getAll(1000, 1).pipe(
+      map((res) => this.unwrap<BreakMachine>(res)),
+      catchError(() => of<BreakMachine[]>([])),
+    );
+  }
+
+  /**
+   * Carrega tudo o que a etapa de parâmetros precisa em paralelo e, só depois
+   * de ter answers + machines, restaura o rascunho no signal correto. Isso
+   * elimina a antiga condição de corrida (rascunho restaurado antes de saber
+   * se o formulário tinha máquinas).
+   */
+  private loadFormData(formId: string): void {
     this.startLoading();
-    const formId = this.selectedForm()?.id;
-    this.answerService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const all = this.unwrap<Answer>(res);
-        const params = all.filter((a) => a.formId === formId);
-        this.answers.set(params);
-        this.loadLimits();
 
-        if (params.length === 0) {
-          this.paramValues.set({});
-          this.existingResults.set({});
+    forkJoin({
+      answers: this.fetchAnswers(formId),
+      machines: this.fetchMachines(formId),
+      breaks: this.fetchMachineBreaks(),
+    })
+      .pipe(
+        switchMap(({ answers, machines, breaks }) => {
+          this.answers.set(answers);
+          this.machines.set(machines);
+          this.breaks.set(breaks);
+          this.loadLimits(); // depende de answers()
+
+          return this.fetchResults(answers).pipe(
+            map((results) => ({ results, isMachine: machines.length > 0 })),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: ({ results, isMachine }) => {
+          this.applyResults(results);
+          this.restoreDraft(formId, isMachine);
           this.loading.set(false);
-          return;
-        }
-
-        // busca o valor já gravado de cada parâmetro
-        this.fetchResults(params).subscribe({
-          next: (results) => {
-            this.applyResults(results);
-
-            // Restaura rascunho por cima dos valores já gravados no banco.
-            // Estamos dentro do subscribe de fetchResults, então podemos abrir
-            // outro Observable aqui sem problema — é a cadeia assíncrona normal.
-            this.draftService.load$(this.selectedForm()!.id).subscribe((draft) => {
-              if (draft) {
-                this.hasDraft.set(true);
-                // update faz merge: mantém valores existentes e sobrescreve com o rascunho.
-                // Assim respostas já salvas não desaparecem, apenas as do rascunho prevalecem.
-                this.paramValues.update((current) => ({ ...current, ...draft }));
-              }
-            });
-
-            this.loading.set(false);
-          },
-          error: () => this.fail('Não foi possível carregar as respostas atuais.'),
-        });
-      },
-      error: () => this.fail('Não foi possível carregar os parâmetros.'),
-    });
+        },
+        error: () => this.fail('Não foi possível carregar os parâmetros.'),
+      });
   }
 
   /** Busca, para cada answer, suas linhas em answer_result. */
@@ -457,23 +519,101 @@ export class PainelComponent implements OnInit {
     );
   }
 
-  /** Aplica o último valor de cada answer ao estado (existingResults + paramValues). */
+  /**
+   * Aplica o último valor de cada answer ao estado.
+   * Observação: o formulário inicia em branco (a resposta anterior fica só em
+   * `existingResults`, exibida como "valor atual"); é o comportamento original.
+   */
   private applyResults(results: { id: string; list: AnswerResult[] }[]): void {
     const existing: Record<string, AnswerResult | null> = {};
     const values: Record<string, string> = {};
     for (const r of results) {
-      const last = this.latestResult(r.list);
-      existing[r.id] = last;
-      values[r.id] = /*last?.resposta ??*/ '';
+      existing[r.id] = this.latestResult(r.list);
+      values[r.id] = '';
     }
     this.existingResults.set(existing);
     this.paramValues.set(values);
   }
 
-  /** Linha atual do parâmetro. O backend já retorna apenas a mais recente
-   *  (ORDER BY data_criacao DESC LIMIT 1), então basta pegar a primeira. */
   private latestResult(list: AnswerResult[]): AnswerResult | null {
     return list?.[0] ?? null;
+  }
+
+  /** Restaura o rascunho no signal correto (após saber se o form tem máquinas). */
+  private restoreDraft(formId: string, isMachine: boolean): void {
+    this.draftService
+      .load$(formId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((draft) => {
+        const temRascunho = !!draft && Object.keys(draft).length > 0;
+        this.hasDraft.set(temRascunho);
+        if (!temRascunho) return;
+
+        if (isMachine) {
+          this.machineParamValues.set(draft!);
+        } else {
+          // merge: mantém o que já existe e sobrescreve com o rascunho.
+          this.paramValues.update((cur) => ({ ...cur, ...draft }));
+        }
+      });
+  }
+
+  private loadLimits(): void {
+    this.limitsService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          const all = this.unwrap<LimitAnswer>(res);
+          const answerIds = new Set(this.answers().map((a) => a.id));
+          const idMap: Record<string, string> = {};
+          const fullMap: Record<string, LimitAnswer> = {};
+          for (const l of all) {
+            if (l.status === 1 && answerIds.has(l.answerId)) {
+              idMap[l.answerId] = l.id;
+              fullMap[l.answerId] = l;
+            }
+          }
+          this.limitsMap.set(idMap);
+          this.limitsByAnswer.set(fullMap);
+        },
+        error: () => {
+          this.limitsMap.set({});
+          this.limitsByAnswer.set({});
+        },
+      });
+  }
+
+  /** Grupos do formulário e seus itens (apenas para ordenar os parâmetros). */
+  private loadGroupOrder(): void {
+    const formId = this.selectedForm()?.id;
+    if (!formId) {
+      this.answerGroups.set([]);
+      this.groupItems.set([]);
+      return;
+    }
+
+    this.answerGroupsService
+      .getAll(1000, 1)
+      .pipe(
+        map((res) => this.unwrap<AnswerGroups>(res).filter((g) => g.formId === formId)),
+        switchMap((groups) => {
+          this.answerGroups.set(groups);
+          const groupIds = new Set(groups.map((g) => g.id));
+          return this.answerGroupItemsService.getAll(2000, 1).pipe(
+            map((r2) =>
+              this.unwrap<AnswerGroupItems>(r2).filter((it) => groupIds.has(it.answerGroupId)),
+            ),
+            catchError(() => of<AnswerGroupItems[]>([])),
+          );
+        }),
+        catchError(() => {
+          this.answerGroups.set([]);
+          return of<AnswerGroupItems[]>([]);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((items) => this.groupItems.set(items));
   }
 
   // ============================================================
@@ -504,32 +644,15 @@ export class PainelComponent implements OnInit {
   selectForm(form: Form): void {
     this.clearFeedback();
     this.resetFilters();
+    // limpa o estado do formulário anterior antes de carregar o novo
+    this.hasDraft.set(false);
+    this.paramValues.set({});
+    this.machineParamValues.set({});
     this.selectedForm.set(form);
     this.step.set('parameters');
-    this.loadAnswers();
 
-    // Buscamos o rascunho do banco de forma assíncrona.
-    // load$() retorna um Observable, então usamos subscribe para reagir quando a resposta chegar.
-    this.draftService.load$(form.id).subscribe((draft) => {
-      if (draft) {
-        // Existe rascunho: ativa o banner e restaura os valores salvos.
-        // Verificamos machines() para saber em qual signal restaurar:
-        // machineParamValues → formulários com máquinas
-        // paramValues → formulários sem máquinas
-        this.hasDraft.set(true);
-        if (this.machines().length) {
-          this.machineParamValues.set(draft);
-        } else {
-          this.paramValues.set(draft);
-        }
-      } else {
-        // Sem rascunho: garante que o banner fique oculto
-        this.hasDraft.set(false);
-      }
-    });
-
-    this.loadMachines();
-    this.loadGroupOrder(); // ← novo
+    this.loadFormData(form.id); // answers + machines + breaks + results + rascunho
+    this.loadGroupOrder();
   }
 
   // ============================================================
@@ -559,10 +682,7 @@ export class PainelComponent implements OnInit {
     this.selectedForm.set(null);
     this.sections.set([]);
     this.forms.set([]);
-    this.answers.set([]);
-    this.machines.set([]);
-    this.answerGroups.set([]);
-    this.groupItems.set([]);
+    this.resetFormState();
     this.step.set('location');
   }
 
@@ -573,10 +693,7 @@ export class PainelComponent implements OnInit {
     this.selectedSection.set(null);
     this.selectedForm.set(null);
     this.forms.set([]);
-    this.answers.set([]);
-    this.machines.set([]);
-    this.answerGroups.set([]);
-    this.groupItems.set([]);
+    this.resetFormState();
     this.step.set('section');
   }
 
@@ -585,11 +702,20 @@ export class PainelComponent implements OnInit {
     this.clearFeedback();
     this.resetFilters();
     this.selectedForm.set(null);
+    this.resetFormState();
+    this.step.set('form');
+  }
+
+  /** Zera o estado do formulário selecionado (parâmetros, máquinas, grupos e rascunho em memória). */
+  private resetFormState(): void {
     this.answers.set([]);
     this.machines.set([]);
     this.answerGroups.set([]);
     this.groupItems.set([]);
-    this.step.set('form');
+    this.paramValues.set({});
+    this.machineParamValues.set({});
+    this.existingResults.set({});
+    this.hasDraft.set(false);
   }
 
   // ============================================================
@@ -598,7 +724,18 @@ export class PainelComponent implements OnInit {
 
   updateParam(answerId: string, value: string): void {
     this.paramValues.update((m) => ({ ...m, [answerId]: value }));
-    this.draftService.save(this.selectedForm()!.id, this.paramValues());
+    this.queueDraftSave(this.paramValues());
+  }
+
+  updateMachineParam(machineId: string, answerId: string, value: string): void {
+    this.machineParamValues.update((m) => ({ ...m, [`${machineId}_${answerId}`]: value }));
+    this.queueDraftSave(this.machineParamValues());
+  }
+
+  /** Enfileira o salvamento do rascunho (debounced) para o formulário atual. */
+  private queueDraftSave(values: Record<string, string>): void {
+    const formId = this.selectedForm()?.id;
+    if (formId) this.draftSave$.next({ formId, values });
   }
 
   /**
@@ -638,11 +775,24 @@ export class PainelComponent implements OnInit {
     }, 0);
   });
 
-  /** Recarrega os valores gravados após salvar. */
-  private refreshResults(): void {
-    const params = this.answers();
-    if (!params.length) return;
-    this.fetchResults(params).subscribe((results) => this.applyResults(results));
+  isPaused(machineId: string): boolean {
+    return this.pausedMachineIds().has(machineId);
+  }
+
+  isFormPausedById(formId: string): boolean {
+    return this.pausedFormIds().has(formId);
+  }
+
+  statsPorForm(formId: string): { count: number; ultimo: Date | null } {
+    return this.formStats().get(formId) ?? { count: 0, ultimo: null };
+  }
+
+  descartarRascunho(): void {
+    const formId = this.selectedForm()?.id;
+    if (formId) this.draftService.clear(formId);
+    this.hasDraft.set(false);
+    this.paramValues.set({});
+    this.machineParamValues.set({});
   }
 
   // ============================================================
@@ -680,8 +830,6 @@ export class PainelComponent implements OnInit {
   //  EXPORTAÇÃO (CSV / PDF) — adapta-se à etapa atual
   // ============================================================
 
-  private readonly exporter = inject(FileExportService);
-
   /** Há algo para exportar na etapa atual? */
   readonly canExport = computed(() => {
     switch (this.step()) {
@@ -701,6 +849,7 @@ export class PainelComponent implements OnInit {
   private statusLabel(status: number): string {
     return status === 1 ? 'Ativo' : 'Inativo';
   }
+
   private fmtDate(d: Date | string | null | undefined): string {
     if (!d) return '';
     const t = new Date(d);
@@ -819,7 +968,7 @@ export class PainelComponent implements OnInit {
         { key: 'informado', label: 'Valor informado', align: 'right' },
         { key: 'alterado', label: 'Alterado?', align: 'center' },
       ],
-      rows: this.answers().map((a) => ({
+      rows: this.orderedAnswers().map((a) => ({
         parametro: a.nome,
         descricao: a.descricao ?? '',
         atual: this.existingResults()[a.id]?.resposta ?? '',
@@ -851,42 +1000,10 @@ export class PainelComponent implements OnInit {
   //  MODAL DE ENVIO — exclusivo do painel
   // ============================================================
 
-  private readonly modalService = inject(ModalService);
-  private readonly limitsService = inject(LimitAnswerService);
-  private readonly machineAnswerResultService = inject(MachineAnswerResultService);
-
-  /** answerId → id do limite ativo (usado em limitsAnswerId ao gravar). */
-  readonly limitsMap = signal<Record<string, string>>({});
-  /** answerId → limite ativo completo (usado para validar min/max localmente). */
-  private readonly limitsByAnswer = signal<Record<string, LimitAnswer>>({});
-
   // Agrupa todos os parâmetros em um único bloco para exibição no modal de envio.
   protected readonly agrupados = computed<{ categoria: unknown; answers: Answer[] }[]>(() => [
     { categoria: null, answers: this.orderedAnswers() },
   ]);
-
-  private loadLimits(): void {
-    this.limitsService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const all = this.unwrap<LimitAnswer>(res);
-        const answerIds = new Set(this.answers().map((a) => a.id));
-        const idMap: Record<string, string> = {};
-        const fullMap: Record<string, LimitAnswer> = {};
-        for (const l of all) {
-          if (l.status === 1 && answerIds.has(l.answerId)) {
-            idMap[l.answerId] = l.id;
-            fullMap[l.answerId] = l;
-          }
-        }
-        this.limitsMap.set(idMap);
-        this.limitsByAnswer.set(fullMap);
-      },
-      error: () => {
-        this.limitsMap.set({});
-        this.limitsByAnswer.set({});
-      },
-    });
-  }
 
   protected async enviar(): Promise<void> {
     let ref: ComponentModalRef<ModalEnvioComponent, boolean> | undefined;
@@ -915,49 +1032,8 @@ export class PainelComponent implements OnInit {
     const confirmed = await ref.result;
     if (!confirmed) return;
 
-    const dados = ref.instance.value();
-    this.salvarEnvio(dados);
+    this.salvarEnvio(ref.instance.value());
   }
-
-  private readonly signatureFileService = inject(SignatureFileService);
-  private readonly controlService = inject(ControlService);
-  private readonly controlStatusService = inject(ControlStatusService);
-
-  // private verificaControlAnteriorByFormId(formId: string): void {
-  //   this.controlService.getByFormId(formId).subscribe({
-  //     next: (controls) => {
-  //       if (!controls?.length) return;
-
-  //       // Pega o controle MAIS RECENTE sem confiar na ordem do backend:
-  //       // ordena por dataEmissao (ou dataCriacao) de forma decrescente.
-  //       const anterior = this.maisRecente(controls, (c: any) => c.dataEmissao ?? c.dataCriacao);
-  //       if (!anterior) return;
-
-  //       this.controlStatusService.getByControl(anterior.id).subscribe({
-  //         next: (res) => {
-  //           // getByControl pode devolver um único objeto OU uma lista — normaliza.
-  //           const status = Array.isArray(res)
-  //             ? this.maisRecente(res as any[], (s: any) => s.dataAlteracao ?? s.dataCriacao)
-  //             : res;
-
-  //           // statusId pode vir como número (2) ou string ('2') — compara normalizado.
-  //           const atual = String((status as any)?.statusId ?? '').trim();
-
-  //           // Só age quando o controle anterior estava em 'correção' (2) → 'pendente' (3).
-  //           if (atual === '2') {
-  //             this.controlStatusService.update(anterior.id, '3').subscribe({
-  //               next: () =>
-  //                 console.log(`Status do controle ${anterior.id} atualizado 2 → 3 (pendente).`),
-  //               error: (err) => console.error('Erro ao atualizar status do controle:', err),
-  //             });
-  //           }
-  //         },
-  //         error: (err) => console.error('Erro ao buscar status do controle:', err),
-  //       });
-  //     },
-  //     error: (err) => console.error('Erro ao buscar controles anteriores:', err),
-  //   });
-  // }
 
   /** Item mais recente de uma lista, pela data extraída em `getDate` (desc). */
   private maisRecente<T>(
@@ -971,8 +1047,8 @@ export class PainelComponent implements OnInit {
 
   /**
    * Valida um valor contra o limite ativo do parâmetro (SÍNCRONO).
-   * Regras: sem limite ou valor não numérico → não é violação (retorna true).
-   * limitMin/limitMax ausentes são tratados como -∞/+∞ (não como 0).
+   * Sem limite ou valor não numérico → não é violação. limitMin/limitMax
+   * ausentes são tratados como -∞/+∞ (não como 0).
    */
   private dentroDoLimite(answerId: string, valor: string): boolean {
     const limit = this.limitsByAnswer()[answerId];
@@ -993,6 +1069,10 @@ export class PainelComponent implements OnInit {
     return v >= min && v <= max;
   }
 
+  /**
+   * Resolve o controle anterior a ser marcado como pendente (2 → 3),
+   * ANTES de criar o novo. Só retorna id quando o anterior está em 'correção'.
+   */
   private controleAnteriorParaPendente(formId: string): Observable<string | null> {
     return this.controlService.getByFormId(formId).pipe(
       switchMap((controls) => {
@@ -1002,7 +1082,7 @@ export class PainelComponent implements OnInit {
         return this.controlStatusService.getByControl(anterior.id).pipe(
           map((res) => {
             const status = Array.isArray(res)
-              ? this.maisRecente(res as any[], (s: any) => s.dataAlteracao ?? s.dataCriacao)
+              ? this.maisRecente(res, (s: any) => s.dataAlteracao ?? s.dataCriacao)
               : res;
             const atual = String((status as any)?.statusId ?? '').trim();
             return atual === '2' ? String(anterior.id) : null;
@@ -1012,12 +1092,6 @@ export class PainelComponent implements OnInit {
       }),
       catchError(() => of<string | null>(null)),
     );
-  }
-  descartarRascunho(): void {
-    this.draftService.clear(this.selectedForm()!.id);
-    this.hasDraft.set(false);
-    this.paramValues.set({});
-    this.machineParamValues.set({});
   }
 
   private salvarEnvio(dados: {
@@ -1056,105 +1130,11 @@ export class PainelComponent implements OnInit {
             ),
           ),
         ),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: ({ control, anteriorPendenteId }) => {
-          const resultOps: Observable<unknown>[] = [];
-          let algumForaDoLimite = false;
-
-          if (dados.temMaquina) {
-            for (const [chave, valor] of Object.entries(dados.machineRespostas)) {
-              if (!valor?.trim()) continue;
-              // chave = `${machineId}_${answerId}` — corta no primeiro '_'
-              const sep = chave.indexOf('_');
-              if (sep < 0) continue;
-              const machineId = chave.slice(0, sep);
-              const answerId = chave.slice(sep + 1);
-
-              if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
-
-              resultOps.push(
-                this.machineAnswerResultService
-                  .create({
-                    machineId,
-                    answerId,
-                    controlId: control.id,
-                    resposta: valor,
-                    limitsAnswerId: this.limitsMap()[answerId] ?? null,
-                  })
-                  .pipe(
-                    catchError((err) => {
-                      console.error(
-                        `Falha ao salvar resposta da máquina ${machineId} para o parâmetro ${answerId}:`,
-                        err,
-                      );
-                      return of(null);
-                    }),
-                  ),
-              );
-            }
-          } else {
-            for (const a of this.answers()) {
-              const valor = dados.respostas[a.id];
-              if (!valor?.trim()) continue;
-
-              if (!this.dentroDoLimite(a.id, valor)) algumForaDoLimite = true;
-
-              resultOps.push(
-                this.answerResultService
-                  .create({
-                    AnswerId: a.id,
-                    controlId: control.id,
-                    resposta: valor,
-                    limitsAnswerId: this.limitsMap()[a.id] ?? null,
-                  })
-                  .pipe(
-                    catchError((err) => {
-                      console.error(`Falha ao salvar resposta do parâmetro ${a.id}:`, err);
-                      return of(null);
-                    }),
-                  ),
-              );
-            }
-          }
-
-          // UM único status para o NOVO controle: 1 = normalizado, 2 = correção.
-          const statusOp = this.controlStatusService.create({
-            controlId: control.id,
-            statusId: algumForaDoLimite ? '2' : '1',
-          });
-
-          // Só AGORA (novo controle já criado) marcamos o ANTERIOR como pendente (2 → 3).
-          // A guarda `!== control.id` é segurança extra: o anterior foi resolvido antes
-          // de criar o novo, então nunca deveria ser o mesmo id.
-          const ops: Observable<unknown>[] = [statusOp, ...resultOps];
-          if (anteriorPendenteId && anteriorPendenteId !== String(control.id)) {
-            ops.push(
-              this.controlStatusService.update(anteriorPendenteId, '3').pipe(
-                catchError((err) => {
-                  console.error('Erro ao atualizar status do controle anterior:', err);
-                  return of(null);
-                }),
-              ),
-            );
-          }
-
-          forkJoin(ops).subscribe({
-            next: () => {
-              this.paramValues.set({});
-              this.machineParamValues.set({});
-              this.draftService.clear(this.selectedForm()!.id); // ← adiciona
-              this.hasDraft.set(false); // ← adiciona
-              this.saving.set(false);
-              this.success.set('Inspeção enviada com sucesso!');
-            },
-
-            error: () => {
-              this.saving.set(false);
-              this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
-            },
-          });
-        },
+        next: ({ control, anteriorPendenteId }) =>
+          this.persistirRespostas(dados, control, anteriorPendenteId),
         error: () => {
           this.saving.set(false);
           this.error.set('Falhou ao registrar a inspeção.');
@@ -1162,88 +1142,106 @@ export class PainelComponent implements OnInit {
       });
   }
 
-  // ============================================================
-  //  Trazendo Machines
-  // ============================================================
+  /** Grava respostas + status do novo controle e, por fim, marca o anterior como pendente. */
+  private persistirRespostas(
+    dados: {
+      respostas: Record<string, string>;
+      machineRespostas: Record<string, string>;
+      temMaquina: boolean;
+    },
+    control: Control,
+    anteriorPendenteId: string | null,
+  ): void {
+    const resultOps: Observable<unknown>[] = [];
+    let algumForaDoLimite = false;
 
-  private readonly machineService = inject(MachineService);
-  private readonly breakMachineService = inject(BreakMachineService);
+    if (dados.temMaquina) {
+      for (const [chave, valor] of Object.entries(dados.machineRespostas)) {
+        if (!valor?.trim()) continue;
+        const sep = chave.indexOf('_'); // chave = `${machineId}_${answerId}`
+        if (sep < 0) continue;
+        const machineId = chave.slice(0, sep);
+        const answerId = chave.slice(sep + 1);
 
-  readonly machines = signal<Machine[]>([]);
-  readonly machineParamValues = signal<Record<string, string>>({});
-  readonly breaks = signal<BreakMachine[]>([]);
+        if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
 
-  readonly pausedMachineIds = computed<Set<string>>(() => {
-    const now = new Date();
-    return new Set(
-      this.breaks()
-        .filter(
-          (b) => b.status === 1 && (!b.horaFim || new Date(b.horaFim).getTime() > now.getTime()),
-        )
-        .map((b) => b.machineId),
-    );
-  });
+        resultOps.push(
+          this.machineAnswerResultService
+            .create({
+              machineId,
+              answerId,
+              controlId: control.id,
+              resposta: valor,
+              limitsAnswerId: this.limitsMap()[answerId] ?? null,
+            })
+            .pipe(
+              catchError((err) => {
+                console.error(`Falha ao salvar resposta da máquina ${machineId}/${answerId}:`, err);
+                return of(null);
+              }),
+            ),
+        );
+      }
+    } else {
+      for (const a of this.answers()) {
+        const valor = dados.respostas[a.id];
+        if (!valor?.trim()) continue;
 
-  private loadMachines(): void {
-    const formId = this.selectedForm()?.id;
-    this.machineService.getAll(1000, 1).subscribe({
-      next: (res) => {
-        const all = this.unwrap<Machine>(res);
-        this.machines.set(all.filter((m) => m.formId === formId));
-      },
-      error: () => {},
-    });
+        if (!this.dentroDoLimite(a.id, valor)) algumForaDoLimite = true;
 
-    this.breakMachineService.getAll(1000, 1).subscribe({
-      next: (res) => this.breaks.set(this.unwrap<BreakMachine>(res)),
-      error: () => this.breaks.set([]),
-    });
-  }
-
-  isPaused(machineId: string): boolean {
-    return this.pausedMachineIds().has(machineId);
-  }
-
-  updateMachineParam(machineId: string, answerId: string, value: string): void {
-    this.machineParamValues.update((m) => ({ ...m, [`${machineId}_${answerId}`]: value }));
-    this.draftService.save(this.selectedForm()!.id, this.machineParamValues());
-  }
-  // E PARA FORMS COM PAUSA EM ANDAMENTO
-
-  private readonly breakFormService = inject(BreakFormService);
-  readonly allFormBreaks = signal<BreakForm[]>([]);
-
-  readonly pausedFormIds = computed<Set<string>>(() => {
-    const now = new Date();
-    return new Set(
-      this.allFormBreaks()
-        .filter(
-          (b) => b.status === 1 && (!b.horaFim || new Date(b.horaFim).getTime() > now.getTime()),
-        )
-        .map((b) => b.formId),
-    );
-  });
-  isFormPausedById(formId: string): boolean {
-    return this.pausedFormIds().has(formId);
-  }
-
-  // Contadores do Form
-
-  readonly controls = signal<Control[]>([]);
-
-  readonly formStats = computed(() => {
-    const map = new Map<string, { count: number; ultimo: Date | null }>();
-    for (const c of this.controls()) {
-      const entry = map.get(c.formId) ?? { count: 0, ultimo: null };
-      entry.count++;
-      const d = new Date(c.dataEmissao);
-      if (!entry.ultimo || d > entry.ultimo) entry.ultimo = d;
-      map.set(c.formId, entry);
+        resultOps.push(
+          this.answerResultService
+            .create({
+              AnswerId: a.id,
+              controlId: control.id,
+              resposta: valor,
+              limitsAnswerId: this.limitsMap()[a.id] ?? null,
+            })
+            .pipe(
+              catchError((err) => {
+                console.error(`Falha ao salvar resposta do parâmetro ${a.id}:`, err);
+                return of(null);
+              }),
+            ),
+        );
+      }
     }
-    return map;
-  });
 
-  statsPorForm(formId: string): { count: number; ultimo: Date | null } {
-    return this.formStats().get(formId) ?? { count: 0, ultimo: null };
+    // UM único status para o NOVO controle: 1 = normalizado, 2 = correção.
+    const statusOp = this.controlStatusService.create({
+      controlId: control.id,
+      statusId: algumForaDoLimite ? '2' : '1',
+    });
+
+    const ops: Observable<unknown>[] = [statusOp, ...resultOps];
+
+    // Só agora (novo controle já criado) marcamos o ANTERIOR como pendente (2 → 3).
+    if (anteriorPendenteId && anteriorPendenteId !== String(control.id)) {
+      ops.push(
+        this.controlStatusService.update(anteriorPendenteId, '3').pipe(
+          catchError((err) => {
+            console.error('Erro ao atualizar status do controle anterior:', err);
+            return of(null);
+          }),
+        ),
+      );
+    }
+
+    forkJoin(ops)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.paramValues.set({});
+          this.machineParamValues.set({});
+          this.draftService.clear(this.selectedForm()!.id);
+          this.hasDraft.set(false);
+          this.saving.set(false);
+          this.success.set('Inspeção enviada com sucesso!');
+        },
+        error: () => {
+          this.saving.set(false);
+          this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
+        },
+      });
   }
 }

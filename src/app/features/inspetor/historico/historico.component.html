@@ -179,7 +179,7 @@
     </div>
   } @else {
     <ol class="timeline">
-      @for (r of filtered(); track r.id) {
+      @for (r of paged(); track r.id) {
         <li class="tl-item">
           <div class="tl-marker"><i class="bi bi-clipboard-check"></i></div>
           <div class="tl-card">
@@ -386,7 +386,7 @@
                             </div>
                           </div>
                         }
-                      </div>                
+                      </div>
                     </details>
                   }
                 }
@@ -458,5 +458,65 @@
         </li>
       }
     </ol>
+
+    <!-- Paginação -->
+    @if (totalItems() > 0) {
+      <nav class="pager" aria-label="Paginação do histórico">
+        <div class="pager__info">
+          Mostrando <strong>{{ pageStart() }}</strong
+          >–<strong>{{ pageEnd() }}</strong> de <strong>{{ totalItems() }}</strong>
+        </div>
+
+        <div class="pager__controls">
+          <button
+            type="button"
+            class="pager__btn"
+            (click)="prevPage()"
+            [disabled]="currentPage() === 1"
+            aria-label="Página anterior"
+          >
+            <i class="bi bi-chevron-left"></i>
+          </button>
+
+          @for (p of pageNumbers(); track p) {
+            <button
+              type="button"
+              class="pager__btn"
+              [class.is-active]="p === currentPage()"
+              (click)="goToPage(p)"
+            >
+              {{ p }}
+            </button>
+          }
+
+          <button
+            type="button"
+            class="pager__btn"
+            (click)="nextPage()"
+            [disabled]="currentPage() === totalPages()"
+            aria-label="Próxima página"
+          >
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+
+        <label class="pager__size">
+          <span>Por página</span>
+          <select
+            class="ff__control"
+            [ngModel]="pageSize()"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="setPageSize(+$event)"
+          >
+            <option [ngValue]="5">5</option>
+            <option [ngValue]="10">10</option>
+            <option [ngValue]="20">20</option>
+            <option [ngValue]="50">50</option>
+          </select>
+        </label>
+      </nav>
+    }
   }
 </section>
+
+<app-scroll-top />

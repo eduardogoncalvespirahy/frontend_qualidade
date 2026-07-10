@@ -8,8 +8,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, firstValueFrom, Observable, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { forkJoin, firstValueFrom, Observable, of, range } from 'rxjs';
+import { catchError, map, mergeMap, switchMap, toArray } from 'rxjs/operators';
 
 import { Control, ControlUpdate } from '../../../core/models/control.model';
 import { Form } from '../../../core/models/form.model';
@@ -21,6 +21,8 @@ import { Location } from '../../../core/models/location.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 import { MachineAnswerResult } from '../../../core/models/machine-answer-result.model';
 import { LimitAnswer } from '../../../core/models/limit-answer.model';
+import { PaginatedResult } from '../../../core/models/paginated.model';
+import { File } from '../../../core/models/file.model';
 
 import { ControlService } from '../../../core/services/control.service';
 import { FormService } from '../../../core/services/form.service';
@@ -38,8 +40,18 @@ import { ControlStatusService } from '../../../core/services/control-status.serv
 import { SignatureFileService } from '../../../core/services/signature-file.service';
 import { ModalService } from '../../../core/services/modal.service';
 import { SignatureComponent } from '../../../core/modals/signature/signature.component';
+import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
 
-type FileLike = Record<string, unknown>;
+// type File = Record<string, unknown>;
+type FileWithMetadata = File & {
+  nome?: string;
+  originalName?: string;
+  fileName?: string;
+  descricao?: string;
+  url?: string;
+  path?: string;
+  caminho?: string;
+};
 
 /** Nível de edição permitido conforme o status do controle. */
 type EditLevel = 'campos' | 'obs' | null;
@@ -97,7 +109,7 @@ interface VersaoResposta {
 @Component({
   selector: 'app-historico-inspetor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ScrollTopComponent],
   templateUrl: './historico.component.html',
   styleUrl: './historico.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -122,7 +134,7 @@ export class HistoricoComponent implements OnInit {
   readonly controls = signal<Control[]>([]);
   readonly forms = signal<Form[]>([]);
   readonly users = signal<User[]>([]);
-  readonly files = signal<FileLike[]>([]);
+  readonly files = signal<File[]>([]);
   readonly answers = signal<Answer[]>([]); // todos os parâmetros (carregados 1x)
   readonly machines = signal<Machine[]>([]); // todas as máquinas (para resolver nomes)
   readonly sections = signal<Section[]>([]);
@@ -329,6 +341,7 @@ export class HistoricoComponent implements OnInit {
       }
       return next;
     });
+    this.page.set(1); // volta para a primeira página ao filtrar
   }
 
   readonly activeFilterCount = computed(() => {
@@ -342,25 +355,24 @@ export class HistoricoComponent implements OnInit {
 
   resetFilters(): void {
     this.filters.set({ ...this.emptyFilters });
+    this.page.set(1); // reset de página
   }
 
   // ───────── resolução de arquivo (defensiva) ─────────
-  private fileName(file: FileLike | undefined, fallback: string): string {
+  private fileName(file: File | undefined, fallback: string): string {
     if (!file) return fallback;
-    return (
-      (file['nome'] as string) ??
-      (file['originalName'] as string) ??
-      (file['fileName'] as string) ??
-      (file['name'] as string) ??
-      (file['descricao'] as string) ??
-      fallback
-    );
+
+    const f = file as FileWithMetadata;
+
+    return f.nome ?? f.originalName ?? f.fileName ?? f.descricao ?? fallback;
   }
-  private fileUrl(file: FileLike | undefined): string | null {
+
+  private fileUrl(file: File | undefined): string | null {
     if (!file) return null;
-    return (
-      (file['url'] as string) ?? (file['path'] as string) ?? (file['caminho'] as string) ?? null
-    );
+
+    const f = file as FileWithMetadata;
+
+    return f.url ?? f.path ?? f.caminho ?? null;
   }
 
   // ───────── agrupamento de versões (histórico de correções) ─────────
@@ -443,12 +455,12 @@ export class HistoricoComponent implements OnInit {
 
     // resultados são por controle → precisam ser buscados na expansão
     forkJoin({
-      machineResults: this.machineAnswerResultService
-        .getControlIdAll(row.id, 1000, 1)
-        .pipe(catchError(() => of(null))),
-      answerResults: this.answerResultService
-        .getControlIdAll(row.id, 1000, 1)
-        .pipe(catchError(() => of(null))),
+      machineResults: this.fetchAllPages<MachineAnswerResult>((l, p) =>
+        this.machineAnswerResultService.getControlIdAll(row.id, l, p),
+      ).pipe(catchError(() => of(null))),
+      answerResults: this.fetchAllPages<AnswerResult>((l, p) =>
+        this.answerResultService.getControlIdAll(row.id, l, p),
+      ).pipe(catchError(() => of(null))),
     }).subscribe({
       next: ({ machineResults, answerResults }) => {
         const answerIdSet = new Set(answers.map((a) => a.id));
@@ -742,7 +754,10 @@ export class HistoricoComponent implements OnInit {
         // registra o novo arquivo localmente para o nome resolver na listagem
         this.files.update((list) => [
           ...list,
-          { id: file.id, nome: (file as { nome?: string }).nome ?? `assinatura_${editorId}` },
+          {
+            ...file,
+            nome: (file as { nome?: string }).nome ?? `assinatura_${editorId}`,
+          },
         ]);
       } catch {
         this.savingEdit.set(false);
@@ -967,6 +982,65 @@ export class HistoricoComponent implements OnInit {
     );
   });
 
+  // ============================================================
+  //  PAGINAÇÃO (client-side sobre `filtered`)
+  // ============================================================
+  readonly pageSize = signal(10);
+  readonly page = signal(1);
+
+  /** Total de itens após os filtros. */
+  readonly totalItems = computed(() => this.filtered().length);
+
+  /** Total de páginas (mínimo 1). */
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.totalItems() / this.pageSize())));
+
+  /** Página atual sempre dentro do intervalo válido (clamp — dispensa effect). */
+  readonly currentPage = computed(() => Math.min(Math.max(1, this.page()), this.totalPages()));
+
+  /** Fatia visível da timeline. */
+  readonly paged = computed<HistoryRow[]>(() => {
+    const size = this.pageSize();
+    const start = (this.currentPage() - 1) * size;
+    return this.filtered().slice(start, start + size);
+  });
+
+  /** Índice do primeiro item exibido (1-based; 0 quando vazio). */
+  readonly pageStart = computed(() =>
+    this.totalItems() === 0 ? 0 : (this.currentPage() - 1) * this.pageSize() + 1,
+  );
+
+  /** Índice do último item exibido. */
+  readonly pageEnd = computed(() =>
+    Math.min(this.currentPage() * this.pageSize(), this.totalItems()),
+  );
+
+  /** Janela de números de página para os botões (até 5). */
+  readonly pageNumbers = computed<number[]>(() => {
+    const total = this.totalPages();
+    const cur = this.currentPage();
+    const janela = 5;
+    let start = Math.max(1, cur - Math.floor(janela / 2));
+    const end = Math.min(total, start + janela - 1);
+    start = Math.max(1, end - janela + 1);
+    const arr: number[] = [];
+    for (let i = start; i <= end; i++) arr.push(i);
+    return arr;
+  });
+
+  goToPage(p: number): void {
+    this.page.set(Math.min(Math.max(1, p), this.totalPages()));
+  }
+  prevPage(): void {
+    this.goToPage(this.currentPage() - 1);
+  }
+  nextPage(): void {
+    this.goToPage(this.currentPage() + 1);
+  }
+  setPageSize(size: number): void {
+    this.pageSize.set(Math.max(1, size));
+    this.page.set(1);
+  }
+
   // ───────── formatação de datas ─────────
   private readonly dateFmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' });
   private readonly dateTimeFmt = new Intl.DateTimeFormat('pt-BR', {
@@ -995,9 +1069,55 @@ export class HistoricoComponent implements OnInit {
     return (r['data'] ?? r['items'] ?? r['results'] ?? []) as T[];
   }
 
+  /**
+   * Busca TODOS os registros de um endpoint paginado, sem cap fixo.
+   *
+   * Estratégia (custo mínimo + escalável):
+   *  1) faz 1 requisição do primeiro "chunk" (padrão 1000). Se tudo couber
+   *     numa página — caso atual — resolve com essa única requisição
+   *     (mesmo desempenho de antes, sem regressão);
+   *  2) se houver mais páginas, busca as restantes EM PARALELO com
+   *     concorrência limitada (evita disparar dezenas de chamadas de uma vez)
+   *     e concatena os resultados preservando a ordem das páginas.
+   *
+   * Assim o `getAll(1000, 1)` fixo deixa de "perder" registros quando o
+   * volume ultrapassar o chunk.
+   */
+  private fetchAllPages<T>(
+    load: (limit: number, page: number) => Observable<PaginatedResult<T>>,
+    chunk = 1000,
+    concorrencia = 4,
+  ): Observable<T[]> {
+    return load(chunk, 1).pipe(
+      switchMap((first) => {
+        const data = first?.data ?? [];
+        const limit = first?.limit || chunk;
+        const total = first?.total ?? data.length;
+        const pages = first?.totalPages ?? (limit > 0 ? Math.ceil(total / limit) : 1);
+
+        // Cabe tudo na primeira página → uma única requisição.
+        if (!pages || pages <= 1) return of(data);
+
+        // Páginas 2..pages em paralelo (concorrência limitada) e em ordem.
+        return range(2, pages - 1).pipe(
+          mergeMap((p) => load(limit, p), concorrencia),
+          toArray(),
+          map((restantes) => {
+            const ordenadas = restantes
+              .slice()
+              .sort((a, b) => (a.page ?? 0) - (b.page ?? 0))
+              .flatMap((r) => r?.data ?? []);
+            return [...data, ...ordenadas];
+          }),
+        );
+      }),
+    );
+  }
+
   reload(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.page.set(1); // volta para a primeira página ao recarregar
     // limpa caches de expansão para não misturar com dados antigos
     this.expandedId.set(null);
     this.expandedData.set({});
@@ -1012,15 +1132,33 @@ export class HistoricoComponent implements OnInit {
       });
 
     forkJoin({
-      controls: this.controlService.getAll(1000, 1).pipe(failLog('controles')),
-      forms: this.formService.getAll(1000, 1).pipe(failLog('formulários')),
-      users: this.userService.getAll(1000, 1).pipe(failLog('usuários')),
-      files: this.fileService.getAll(1000, 1).pipe(failLog('arquivos')),
-      answers: this.answerService.getAll(1000, 1).pipe(failLog('parâmetros')),
-      machines: this.machineService.getAll(1000, 1).pipe(failLog('máquinas')),
-      sections: this.sectionService.getAll(1000, 1).pipe(failLog('seções')),
-      locations: this.locationService.getAll(1000, 1).pipe(failLog('locais')),
-      limits: this.limitService.getAll(1000, 1).pipe(failLog('limites')),
+      controls: this.fetchAllPages<Control>((l, p) => this.controlService.getAll(l, p)).pipe(
+        failLog('controles'),
+      ),
+      forms: this.fetchAllPages<Form>((l, p) => this.formService.getAll(l, p)).pipe(
+        failLog('formulários'),
+      ),
+      users: this.fetchAllPages<User>((l, p) => this.userService.getAll(l, p)).pipe(
+        failLog('usuários'),
+      ),
+      files: this.fetchAllPages<File>((l, p) => this.fileService.getAll(l, p)).pipe(
+        failLog('arquivos'),
+      ),
+      answers: this.fetchAllPages<Answer>((l, p) => this.answerService.getAll(l, p)).pipe(
+        failLog('parâmetros'),
+      ),
+      machines: this.fetchAllPages<Machine>((l, p) => this.machineService.getAll(l, p)).pipe(
+        failLog('máquinas'),
+      ),
+      sections: this.fetchAllPages<Section>((l, p) => this.sectionService.getAll(l, p)).pipe(
+        failLog('seções'),
+      ),
+      locations: this.fetchAllPages<Location>((l, p) => this.locationService.getAll(l, p)).pipe(
+        failLog('locais'),
+      ),
+      limits: this.fetchAllPages<LimitAnswer>((l, p) => this.limitService.getAll(l, p)).pipe(
+        failLog('limites'),
+      ),
     }).subscribe({
       next: ({ controls, forms, users, files, answers, machines, sections, locations, limits }) => {
         if (controls == null) {
@@ -1029,7 +1167,7 @@ export class HistoricoComponent implements OnInit {
         this.controls.set(this.unwrap<Control>(controls));
         this.forms.set(this.unwrap<Form>(forms));
         this.users.set(this.unwrap<User>(users));
-        this.files.set(this.unwrap<FileLike>(files));
+        this.files.set(this.unwrap<File>(files));
         this.answers.set(this.unwrap<Answer>(answers));
         this.machines.set(this.unwrap<Machine>(machines));
         this.sections.set(this.unwrap<Section>(sections));

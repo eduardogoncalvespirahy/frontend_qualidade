@@ -25,6 +25,7 @@ import { LimitAnswer } from '../../../core/models/limit-answer.model';
 import { Control } from '../../../core/models/control.model';
 import { AnswerGroups } from '../../../core/models/answer-group.model';
 import { AnswerGroupItems } from '../../../core/models/answer-group-items.model';
+import { FormTime } from '../../../core/models/form-time.model';
 
 import { MachineService } from '../../../core/services/machine.service';
 import { LocationService } from '../../../core/services/location.service';
@@ -46,6 +47,7 @@ import { AnswerGroupsService } from '../../../core/services/answer-group.service
 import { AnswerGroupItemsService } from '../../../core/services/answer-groups-items.service';
 // ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
 import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
+import { FormTimeService } from '../../../core/services/form-time.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 
@@ -94,6 +96,7 @@ export class PainelComponent implements OnInit {
   private readonly modalService = inject(ModalService);
   private readonly exporter = inject(FileExportService);
   private readonly auth = inject(AuthService);
+  private readonly formTimeService = inject(FormTimeService);
 
   // ───────── navegação ─────────
   readonly step = signal<Step>('location');
@@ -443,6 +446,14 @@ export class PainelComponent implements OnInit {
       .subscribe({
         next: (res) => this.controls.set(this.unwrap<Control>(res)),
         error: () => this.controls.set([]),
+      });
+
+    this.formTimeService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.formTimes.set(this.unwrap<FormTime>(res)),
+        error: () => this.formTimes.set([]),
       });
   }
 
@@ -1243,5 +1254,39 @@ export class PainelComponent implements OnInit {
           this.error.set('Inspeção registrada, mas falhou ao salvar algumas respostas.');
         },
       });
+  }
+
+  // Colocando uma cor nos Forms
+
+  readonly formTimes = signal<FormTime[]>([]);
+
+  // Mapa formId → FormTime para acesso rápido nos cards
+  readonly formTimeMap = computed(() => {
+    const map = new Map<string, FormTime>();
+    for (const ft of this.formTimes()) {
+      map.set(ft.formId, ft);
+    }
+    return map;
+  });
+
+  formStatusColor(formId: string): 'green' | 'yellow' | 'red' | '' {
+    const ft = this.formTimeMap().get(formId);
+    if (!ft) return ''; // sem FormTime configurado → sem indicador
+
+    const stats = this.statsPorForm(formId);
+    if (!stats.ultimo) return 'red'; // nunca enviou → atrasado
+
+    // Converte "HH:MM:SS" para milissegundos
+    const toMs = (hms: string): number => {
+      const [h, m, s] = hms.split(':').map(Number);
+      return ((h * 60 + m) * 60 + s) * 1000;
+    };
+
+    const execMs = toMs(ft.tempoExecucao);
+    const elapsed = Date.now() - stats.ultimo.getTime();
+
+    if (elapsed >= execMs) return 'red'; // atrasado
+    if (elapsed >= execMs * 0.75) return 'yellow'; // últimos 25%
+    return 'green'; // tranquilo
   }
 }

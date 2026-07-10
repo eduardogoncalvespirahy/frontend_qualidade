@@ -461,6 +461,35 @@
 .btn:disabled { opacity: .65; cursor: not-allowed; }
 
 .spin { animation: spin 1s linear infinite; display: inline-block; }
+
+/* ─── Status de tempo dos formulários ─── */
+.card--status-green {
+  background: #dcfce7;
+  border-color: #16a34a;
+}
+.card--status-green:hover {
+  border-color: #15803d;
+  box-shadow: 0 12px 28px rgba(22, 163, 74, .18);
+}
+
+.card--status-yellow {
+  background: #fef9c3;
+  border-color: #ca8a04;
+}
+.card--status-yellow:hover {
+  border-color: #a16207;
+  box-shadow: 0 12px 28px rgba(202, 138, 4, .18);
+}
+
+.card--status-red {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+.card--status-red:hover {
+  border-color: #b91c1c;
+  box-shadow: 0 12px 28px rgba(220, 38, 38, .18);
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ───────── Responsivo ───────── */

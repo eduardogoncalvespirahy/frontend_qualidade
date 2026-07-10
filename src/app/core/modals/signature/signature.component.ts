@@ -119,12 +119,12 @@ export class SignatureComponent implements AfterViewInit, OnDestroy {
       img.src = image;
     }
 
-    console.table({
-      cssWidth: rect.width,
-      cssHeight: rect.height,
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-    });
+    // console.table({
+    //   cssWidth: rect.width,
+    //   cssHeight: rect.height,
+    //   canvasWidth: canvas.width,
+    //   canvasHeight: canvas.height,
+    // });
   }
 
   // ============================================================

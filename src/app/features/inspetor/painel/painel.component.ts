@@ -50,6 +50,7 @@ import { FileExportService, ExportColumn } from '../../../core/services/file-exp
 import { FormTimeService } from '../../../core/services/form-time.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
+import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
 
 type Step = 'location' | 'section' | 'form' | 'parameters';
 
@@ -69,7 +70,7 @@ interface Filters {
 @Component({
   selector: 'app-painel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ScrollTopComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './painel.component.html',
   styleUrl: './painel.component.css',

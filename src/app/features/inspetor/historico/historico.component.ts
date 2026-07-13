@@ -21,6 +21,7 @@ import { Location } from '../../../core/models/location.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 import { MachineAnswerResult } from '../../../core/models/machine-answer-result.model';
 import { LimitAnswer } from '../../../core/models/limit-answer.model';
+import { RepairerAnswerResult } from '../../../core/models/repairerAnswerResult.model';
 import { PaginatedResult } from '../../../core/models/paginated.model';
 import { File } from '../../../core/models/file.model';
 
@@ -92,7 +93,9 @@ interface ParamRow {
   nome: string;
   resposta: string;
   limitsAnswerId: string | null;
+  answerResultId: string | null; // operador
 }
+
 
 interface MachineData {
   maquinas: { id: string; nome: string }[];
@@ -104,6 +107,7 @@ interface MachineData {
 interface VersaoResposta {
   dataCriacao: string;
   valores: Record<string, string>;
+  answerResultIds: string[]; // IDs dos registros deste lote (para resolver reparador)
 }
 
 @Component({
@@ -141,6 +145,7 @@ export class HistoricoComponent implements OnInit {
   readonly sections = signal<Section[]>([]);
   readonly locations = signal<Location[]>([]);
 
+  readonly repairerByAnswerResultId = signal<Record<string, string>>({}); // answerResultId → userId
   readonly expandedId = signal<string | null>(null);
   readonly expandedLoading = signal<string | null>(null);
   readonly expandedData = signal<Record<string, ParamRow[]>>({});
@@ -472,9 +477,14 @@ export class HistoricoComponent implements OnInit {
 
   private loteParaVersao(lote: (AnswerResult & Record<string, unknown>)[]): VersaoResposta {
     const valores: Record<string, string> = {};
-    for (const r of lote) valores[r.AnswerId] = r.resposta;
+    const answerResultIds: string[] = [];
+    for (const r of lote) {
+      valores[r.AnswerId] = r.resposta;
+      const id = (r as { id?: string }).id;
+      if (id) answerResultIds.push(id);
+    }
     const raw = lote[0]['dataCriacao'] ?? lote[0]['data_criacao'] ?? lote[0]['createdAt'] ?? '';
-    return { dataCriacao: String(raw), valores };
+    return { dataCriacao: String(raw), valores, answerResultIds };
   }
 
   // ───────── expandir detalhes ─────────
@@ -583,14 +593,16 @@ export class HistoricoComponent implements OnInit {
     for (const r of ordenados) latestMap.set(r.AnswerId, r);
 
     const linhas: ParamRow[] = answers.map((a) => {
-      const res = latestMap.get(a.id);
-      return {
-        answerId: a.id,
-        nome: a.nome,
-        resposta: res?.resposta ?? '—',
-        limitsAnswerId: res?.limitsAnswerId ?? null,
-      };
-    });
+  const res = latestMap.get(a.id);
+  return {
+    answerId: a.id,
+    nome: a.nome,
+    resposta: res?.resposta ?? '—',
+    limitsAnswerId: res?.limitsAnswerId ?? null,
+    answerResultId: res ? (res as { id?: string }).id ?? null : null, // ← novo
+  };
+});
+
     this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
 
     // agrupa versões por rajada (registros consecutivos em até 10s = mesmo envio)
@@ -920,10 +932,11 @@ export class HistoricoComponent implements OnInit {
    * ficando como a versão MAIS RECENTE (o template mostra as anteriores em
    * "Histórico de correções" e os valores atuais nos cards).
    */
-  private anexarVersao(controlId: string, valores: Record<string, string>): void {
+  private anexarVersao(controlId: string, valores: Record<string, string>, answerResultIds: string[] = []): void {
     const nova: VersaoResposta = {
       dataCriacao: new Date().toISOString(),
       valores: { ...valores },
+      answerResultIds,
     };
     this.expandedHistory.update((h) => ({
       ...h,
@@ -1239,8 +1252,11 @@ export class HistoricoComponent implements OnInit {
       limits: this.fetchAllPages<LimitAnswer>((l, p) => this.limitService.getAll(l, p)).pipe(
         failLog('limites'),
       ),
+      repairers: this.fetchAllPages<RepairerAnswerResult>((l, p) =>
+        this.repairerService.getAll(l, p),
+      ).pipe(failLog('reparadores')),
     }).subscribe({
-      next: ({ controls, forms, users, files, answers, machines, sections, locations, limits }) => {
+      next: ({ controls, forms, users, files, answers, machines, sections, locations, limits, repairers }) => {
         if (controls == null) {
           this.error.set('Não foi possível carregar o histórico.');
         }
@@ -1259,6 +1275,14 @@ export class HistoricoComponent implements OnInit {
           if (l.status === 1) limitMap[l.answerId] = l;
         }
         this.limitsByAnswer.set(limitMap);
+
+        const repMap: Record<string, string> = {};
+        for (const rep of this.unwrap<RepairerAnswerResult>(repairers)) {
+          const arId = (rep as { answerResultId?: string }).answerResultId ?? '';
+          const uid = (rep as { userId?: string }).userId ?? '';
+          if (arId && uid) repMap[arId] = uid;
+        }
+        this.repairerByAnswerResultId.set(repMap);
 
         this.loading.set(false);
 
@@ -1285,5 +1309,33 @@ export class HistoricoComponent implements OnInit {
         this.error.set('Não foi possível carregar o histórico.');
       },
     });
+  }
+
+  reparadorDaVersao(answerResultIds: string[]): string | null {
+    const repMap = this.repairerByAnswerResultId();
+    const userById = new Map(this.users().map((u) => [u.userId, u]));
+    for (const id of answerResultIds) {
+      const userId = repMap[id];
+      if (userId) {
+        const user = userById.get(userId);
+        return user?.userUsername ?? userId;
+      }
+    }
+    return null;
+  }
+
+  reparadorDoControle(controlId: string): string | null {
+    const params = this.expandedData()[controlId] ?? [];
+    const repMap = this.repairerByAnswerResultId();
+    const userById = new Map(this.users().map((u) => [u.userId, u]));
+    for (const p of params) {
+      if (!p.answerResultId) continue;
+      const userId = repMap[p.answerResultId];
+      if (userId) {
+        const user = userById.get(userId);
+        return user?.userUsername ?? userId;
+      }
+    }
+    return null;
   }
 }

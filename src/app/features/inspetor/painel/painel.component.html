@@ -332,16 +332,21 @@
           <div class="grid">
             @for (form of filteredForms(); track trackById($index, form)) {
               <button
-  type="button"
-  class="card"
-  [class.is-paused]="isFormPausedById(form.id)"
-  [disabled]="isFormPausedById(form.id)"
-  (click)="selectForm(form)"
-  [style.border-left]="formStatusColor(form.id) === 'green'  ? '4px solid #22c55e' :
-                        formStatusColor(form.id) === 'yellow' ? '4px solid #f59e0b' :
-                        formStatusColor(form.id) === 'red'    ? '4px solid #ef4444' : ''"
->
-
+                type="button"
+                class="card"
+                [class.is-paused]="isFormPausedById(form.id)"
+                [disabled]="isFormPausedById(form.id)"
+                (click)="selectForm(form)"
+                [style.border-left]="
+                  formStatusColor(form.id) === 'green'
+                    ? '4px solid #22c55e'
+                    : formStatusColor(form.id) === 'yellow'
+                      ? '4px solid #f59e0b'
+                      : formStatusColor(form.id) === 'red'
+                        ? '4px solid #ef4444'
+                        : ''
+                "
+              >
                 <div class="card__top">
                   <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
                   <div class="d-flex gap-2">
@@ -532,5 +537,3 @@
     }
   }
 </section>
-
-<app-scroll-top />

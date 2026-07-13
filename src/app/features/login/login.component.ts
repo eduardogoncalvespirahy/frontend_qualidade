@@ -96,6 +96,8 @@ export class LoginComponent {
 
     this.lembrarAcesso(this.rememberAccess());
 
+    // O AuthService.login autentica via cookies httpOnly (setados pelo servidor)
+    // e encadeia o carregamento do perfil/roles — não há token para tratar aqui.
     this.auth
       .login(request)
       .pipe(
@@ -104,22 +106,39 @@ export class LoginComponent {
         }),
       )
       .subscribe({
-        next: () => {
-          if (
-            this.auth.roles().includes('ADMIN') ||
-            (this.auth.roles().includes('INSPETOR') && this.auth.roles().includes('LIDER'))
-          ) {
-            this.router.navigate(['/']);
-          } else if (this.auth.roles().includes('LIDER')) {
-            this.router.navigate(['/lider']);
-          } else if (this.auth.roles().includes('INSPETOR')) {
-            this.router.navigate(['/inspetor']);
-          }
-        },
+        next: () => this.redirecionarPorRole(),
         error: (err) => {
+          console.log(err);
           this.error.set(err?.error?.message ?? 'Não foi possível entrar. Verifique os dados.');
         },
       });
+  }
+
+  /** Redireciona conforme as roles já carregadas pelo login. */
+  private redirecionarPorRole(): void {
+    const roles = this.auth.roles();
+
+    const isAdmin = roles.includes('ADMIN');
+    const isLider = roles.includes('LIDER');
+    const isInspetor = roles.includes('INSPETOR');
+
+    if (isAdmin || (isInspetor && isLider)) {
+      this.router.navigate(['/']);
+      return;
+    }
+
+    if (isLider) {
+      this.router.navigate(['/lider']);
+      return;
+    }
+
+    if (isInspetor) {
+      this.router.navigate(['/inspetor']);
+      return;
+    }
+
+    // Sem role reconhecida → destino padrão (evita ficar preso no login).
+    this.router.navigate(['/']);
   }
 
   protected lembrarAcesso(status: boolean): void {

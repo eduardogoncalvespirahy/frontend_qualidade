@@ -1,4 +1,5 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, inject, signal } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 
@@ -6,11 +7,13 @@ import {
   Observable,
   EMPTY,
   catchError,
+  filter,
   finalize,
   forkJoin,
   map,
   of,
   switchMap,
+  take,
   tap,
   throwError,
 } from 'rxjs';
@@ -25,10 +28,15 @@ import { environment } from '../../../environments/environment';
 import { LoginRequest, LoginResponse } from '../models/auth.model';
 import { UserProfile } from '../models/user-profile.model';
 
-const TOKEN_KEY = 'aq_token';
-const REFRESH_KEY = 'aq_refresh';
+// Identificadores NÃO sensíveis, mantidos no cliente apenas para restaurar a
+// sessão e carregar o perfil após um reload. O token e o refreshToken NÃO são
+// mais guardados aqui — vivem em cookies httpOnly setados pelo servidor.
 const USER_ID = 'aq_userId';
 const CREDENTIAL_ID = 'aq_credentialId';
+
+// Chaves legadas (token/refresh no cliente). Mantidas só para limpeza.
+const LEGACY_TOKEN_KEY = 'aq_token';
+const LEGACY_REFRESH_KEY = 'aq_refresh';
 
 @Injectable({
   providedIn: 'root',
@@ -37,6 +45,7 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly cookie = inject(CookieService);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
 
   private readonly userService = inject(UserService);
   private readonly credentialRoleService = inject(CredentialRoleService);
@@ -46,19 +55,23 @@ export class AuthService {
   // AUTH
   // =====================================================
 
-  private readonly _token = signal<string | null>(this.read(TOKEN_KEY));
-
+  // O token real fica no cookie httpOnly (inacessível ao JS). Mantemos uma
+  // cópia EM MEMÓRIA só para o tempo de vida da aba (útil para quem quiser ler
+  // auth.token()). Após um reload ela é null — a autenticação continua válida
+  // pelo cookie, e o estado é derivado do userId persistido.
+  private readonly _token = signal<string | null>(null);
   readonly token = this._token.asReadonly();
 
-  readonly isAuthenticated = computed(() => !!this._token());
-
   private readonly _userId = signal<string | null>(this.read(USER_ID));
-
   readonly userId = this._userId.asReadonly();
 
   private readonly _credentialId = signal<string | null>(this.read(CREDENTIAL_ID));
-
   readonly credentialId = this._credentialId.asReadonly();
+
+  // Autenticação é derivada da presença do userId persistido (o servidor é a
+  // fonte de verdade: se o cookie estiver expirado, a 1ª chamada dá 401 e o
+  // fluxo de refresh/logout assume).
+  readonly isAuthenticated = computed(() => !!this._userId());
 
   // =====================================================
   // PROFILE
@@ -114,14 +127,44 @@ export class AuthService {
   // =====================================================
 
   login(request: LoginRequest): Observable<UserProfile> {
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/auth/login`, request).pipe(
-      tap((response) => {
-        this.insert(response);
-      }),
+    // withCredentials: o servidor devolve os cookies httpOnly (token/refresh)
+    // no Set-Cookie; o navegador os guarda e reenvia nas próximas chamadas.
+    return this.http
+      .post<LoginResponse>(`${environment.apiUrl}/auth/login`, request, {
+        withCredentials: true,
+      })
+      .pipe(
+        tap((response) => this.persistSession(response)),
 
-      // Carrega perfil + roles (reaproveita loadProfile).
-      switchMap(() => this.loadProfile()),
-    );
+        // Carrega perfil + roles (reaproveita loadProfile).
+        switchMap(() => this.loadProfile()),
+      );
+  }
+
+  // =====================================================
+  // REFRESH
+  // =====================================================
+
+  /**
+   * Renova o token usando o cookie httpOnly de refresh (enviado automaticamente
+   * com withCredentials). O servidor rotaciona o refresh e reescreve os cookies;
+   * aqui só atualizamos userId/credentialId (e o token em memória).
+   *
+   * Em caso de falha (refresh inválido/expirado), encerra a sessão localmente.
+   * Ideal ser chamado por um HTTP interceptor ao receber 401.
+   */
+  refresh(): Observable<LoginResponse> {
+    return this.http
+      .post<LoginResponse>(`${environment.apiUrl}/auth/refresh`, {}, { withCredentials: true })
+      .pipe(
+        tap((response) => this.persistSession(response)),
+        catchError((error) => {
+          this.clearProfile();
+          this.clear();
+          this.router.navigate(['/login']);
+          return throwError(() => error);
+        }),
+      );
   }
 
   // =====================================================
@@ -129,10 +172,11 @@ export class AuthService {
   // =====================================================
 
   restoreSession(): void {
-    const token = this._token();
     const userId = this._userId();
 
-    if (!token || !userId) {
+    // Sem userId persistido não há o que restaurar. O token não é verificável
+    // aqui (é httpOnly); a validade real é conferida ao carregar o perfil.
+    if (!userId) {
       return;
     }
 
@@ -213,6 +257,40 @@ export class AuthService {
     this.refreshProfile();
   }
 
+  /**
+   * Garante que o perfil (e as roles/locations) estejam carregados antes de
+   * uma verificação — essencial para os guards logo após um reload, quando as
+   * roles ainda não vieram. Reaproveita o carregamento em andamento, se houver.
+   *
+   *  - perfil já carregado            → true;
+   *  - sem userId (sem sessão)        → false;
+   *  - carregamento em andamento      → aguarda terminar e devolve o resultado;
+   *  - senão                          → dispara loadProfile e mapeia sucesso/erro.
+   */
+  ensureProfileLoaded(): Observable<boolean> {
+    if (this.isProfileLoaded()) {
+      return of(true);
+    }
+
+    if (!this._userId()) {
+      return of(false);
+    }
+
+    if (this._loading()) {
+      // espera o loadProfile em andamento concluir (sucesso → profile setado).
+      return toObservable(this._loading, { injector: this.injector }).pipe(
+        filter((loading) => !loading),
+        take(1),
+        map(() => this.isProfileLoaded()),
+      );
+    }
+
+    return this.loadProfile().pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    );
+  }
+
   private clearProfile(): void {
     this._userProfile.set(null);
     this._roles.set([]);
@@ -224,25 +302,36 @@ export class AuthService {
   // =====================================================
 
   logout(): void {
-    this.clearProfile();
-    this.clear();
-
-    this.router.navigate(['/login']);
+    // Pede ao servidor para invalidar a sessão e limpar os cookies httpOnly.
+    // Independente do resultado, limpamos o estado local e vamos para o login.
+    this.http
+      .post(`${environment.apiUrl}/auth/logout`, {}, { withCredentials: true })
+      .pipe(
+        catchError(() => of(null)),
+        finalize(() => {
+          this.clearProfile();
+          this.clear();
+          this.router.navigate(['/login']);
+        }),
+      )
+      .subscribe();
   }
 
   // =====================================================
-  // COOKIE MANAGEMENT
+  // SESSION STATE (client-side, não sensível)
   // =====================================================
 
-  private insert(response: LoginResponse): void {
-    this.write(TOKEN_KEY, response.token);
-    this.write(REFRESH_KEY, response.refreshToken);
+  /** Persiste apenas identificadores não sensíveis + token em memória. */
+  private persistSession(response: LoginResponse): void {
     this.write(USER_ID, response.userId);
     this.write(CREDENTIAL_ID, response.credentialId);
 
-    this._token.set(response.token);
     this._userId.set(response.userId);
     this._credentialId.set(response.credentialId);
+
+    // token/refresh são cookies httpOnly do servidor; guardamos o token só em
+    // memória (opcional). NÃO escrevemos token/refresh em cookie no cliente.
+    this._token.set(response.token ?? null);
   }
 
   private read(key: string): string | null {
@@ -252,7 +341,6 @@ export class AuthService {
   private write(key: string, value: string): void {
     this.cookie.set(key, value, {
       path: '/',
-      // httpOnly: location.protocol === 'https:',
       sameSite: 'Strict',
       secure: location.protocol === 'https:',
       maxAge: 3600000,
@@ -260,10 +348,11 @@ export class AuthService {
   }
 
   private clear(): void {
-    this.cookie.delete(TOKEN_KEY);
-    this.cookie.delete(REFRESH_KEY);
+    // Remove os identificadores do cliente + eventuais cookies legados.
     this.cookie.delete(USER_ID);
     this.cookie.delete(CREDENTIAL_ID);
+    this.cookie.delete(LEGACY_TOKEN_KEY);
+    this.cookie.delete(LEGACY_REFRESH_KEY);
 
     this._token.set(null);
     this._userId.set(null);

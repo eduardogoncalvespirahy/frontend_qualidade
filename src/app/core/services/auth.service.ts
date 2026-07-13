@@ -252,7 +252,7 @@ export class AuthService {
   private write(key: string, value: string): void {
     this.cookie.set(key, value, {
       path: '/',
-      httpOnly: location.protocol === 'https:',
+      // httpOnly: location.protocol === 'https:',
       sameSite: 'Strict',
       secure: location.protocol === 'https:',
       maxAge: 3600000,

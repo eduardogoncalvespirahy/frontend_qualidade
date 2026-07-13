@@ -251,9 +251,10 @@ export class AuthService {
 
   private write(key: string, value: string): void {
     this.cookie.set(key, value, {
-      httpOnly: environment.production,
-      secure: environment.production,
-      sameSite: environment.production ? 'Strict' : 'Lax',
+      path: '/',
+      httpOnly: location.protocol === 'https:',
+      sameSite: 'Strict',
+      secure: location.protocol === 'https:',
       maxAge: 3600000,
     });
   }

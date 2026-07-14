@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, firstValueFrom, Observable, of, range } from 'rxjs';
+import { forkJoin, firstValueFrom, from, Observable, of, range } from 'rxjs';
 import { catchError, map, mergeMap, switchMap, toArray } from 'rxjs/operators';
 
 import { Control, ControlUpdate } from '../../../core/models/control.model';
@@ -93,9 +93,8 @@ interface ParamRow {
   nome: string;
   resposta: string;
   limitsAnswerId: string | null;
-  answerResultId: string | null; // operador
+  answerResultId: string | null;
 }
-
 
 interface MachineData {
   maquinas: { id: string; nome: string }[];
@@ -107,7 +106,7 @@ interface MachineData {
 interface VersaoResposta {
   dataCriacao: string;
   valores: Record<string, string>;
-  answerResultIds: string[]; // IDs dos registros deste lote (para resolver reparador)
+  answerResultIds: string[]; // IDs deste lote (para resolver o reparador)
 }
 
 @Component({
@@ -152,28 +151,30 @@ export class HistoricoComponent implements OnInit {
   readonly expandedHistory = signal<Record<string, VersaoResposta[]>>({});
   readonly expandedMachineData = signal<Record<string, MachineData>>({});
 
+  /**
+   * controlId → nome do ÚLTIMO operador/reparador inserido (mais recente).
+   * Resolvido ao montar o modo normal, a partir do answer_result mais novo
+   * que possua reparador vinculado.
+   */
+  readonly operatorByControl = signal<Record<string, string | null>>({});
+
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly controlStatuses = signal<Record<string, string[]>>({});
 
   // ───────── edição por status ─────────
-  /** controlId em edição (ou null). */
   readonly editId = signal<string | null>(null);
-  /** valores editados: answerId (modo normal) OU machineId_answerId (modo máquina). */
   readonly editValues = signal<Record<string, string>>({});
   readonly editObs = signal<string>('');
   readonly savingEdit = signal(false);
 
   // ───────── reparador da correção (opcional) ─────────
-  /** Texto digitado (matrícula OU nome) para identificar o reparador. */
   readonly repairerQuery = signal<string>('');
 
-  /** Usuário resolvido a partir da matrícula/nome digitado (ou null). */
   readonly repairerResolved = computed<UserProfile | null>(() =>
     this.resolveRepairer(this.repairerQuery()),
   );
 
-  /** Sugestões para o <datalist> (matrícula — nome), limitadas a 20. */
   readonly repairerOptions = computed(() => {
     const term = this.repairerQuery().trim().toLowerCase();
     const base = term
@@ -183,29 +184,24 @@ export class HistoricoComponent implements OnInit {
             this.matricula(u).toLowerCase().includes(term),
         )
       : this.users();
-    return base
-      .slice(0, 20)
-      .map((u) => ({
-        id: u.userId,
-        matricula: this.matricula(u),
-        nome: u.userUsername ?? u.userId,
-      }));
+    return base.slice(0, 20).map((u) => ({
+      id: u.userId,
+      matricula: this.matricula(u),
+      nome: u.userUsername ?? u.userId,
+    }));
   });
 
   updateRepairer(value: string): void {
     this.repairerQuery.set(value);
   }
 
-  /** Matrícula do usuário, tolerante ao nome do campo no model. */
+  /** Mapa compartilhado userId → UserProfile (evita reconstruir em cada chamada). */
+  private readonly userByIdMap = computed(() => new Map(this.users().map((u) => [u.userId, u])));
+
   private matricula(u: UserProfile): string {
-    const matricula = String(u.employeeMatricula ?? '').trim();
-    return matricula;
+    return String(u.employeeMatricula ?? '').trim();
   }
 
-  /**
-   * Resolve o reparador a partir do texto digitado:
-   *  1) matrícula exata → 2) nome exato → 3) correspondência parcial (nome/matrícula).
-   */
   private resolveRepairer(q: string): UserProfile | null {
     const term = (q ?? '').trim().toLowerCase();
     if (!term) return null;
@@ -226,14 +222,8 @@ export class HistoricoComponent implements OnInit {
   private readonly limitsByAnswer = signal<Record<string, LimitAnswer>>({});
 
   // ───────── permissões de local (credentialLocation) ─────────
-  /** Nomes dos locais liberados para a credencial logada. */
   readonly allowedLocations = computed(() => this.auth.locations());
 
-  /**
-   * Um local é permitido para a credencial?
-   * - Lista vazia = sem restrição (libera tudo, ex.: admin).
-   * - Caso contrário, precisa constar em allowedLocations (por nome ou id).
-   */
   private isLocationAllowed(loc: Location | null | undefined): boolean {
     if (!loc) return false;
     const allowed = this.allowedLocations();
@@ -241,11 +231,6 @@ export class HistoricoComponent implements OnInit {
     return allowed.includes(loc.nome) || allowed.includes(loc.id);
   }
 
-  /**
-   * Conjunto de formIds cujo local a credencial pode ver.
-   * Caminho: Location(permitida) → employerId → Section → Form.
-   * Retorna null quando NÃO há restrição (lista vazia) = liberar todos.
-   */
   readonly permittedFormIds = computed<Set<string> | null>(() => {
     const allowed = this.allowedLocations();
     if (allowed.length === 0) return null; // sem restrição
@@ -267,14 +252,12 @@ export class HistoricoComponent implements OnInit {
     );
   });
 
-  /** O formId está no escopo permitido? (null = sem restrição). */
   private isFormAllowed(formId: string): boolean {
     const p = this.permittedFormIds();
     return !p || p.has(formId);
   }
 
   // ───────── mapas para o filtro por local ─────────
-  /** formId → employerId (via section.employerId). */
   private readonly formEmployerById = computed(() => {
     const secEmp = new Map(this.sections().map((s) => [s.id, s.employerId]));
     const m = new Map<string, string>();
@@ -282,17 +265,14 @@ export class HistoricoComponent implements OnInit {
     return m;
   });
 
-  /** formId → sectionId. */
   private readonly formSectionById = computed(
     () => new Map(this.forms().map((f) => [f.id, f.sectionId])),
   );
 
-  /** locationId → employerId. */
   private readonly locationEmployerById = computed(
     () => new Map(this.locations().map((l) => [l.id, l.employerId])),
   );
 
-  /** formId → lista de parâmetros (para reuso ao expandir os detalhes). */
   private readonly answersByForm = computed(() => {
     const m = new Map<string, Answer[]>();
     for (const a of this.answers()) {
@@ -303,12 +283,10 @@ export class HistoricoComponent implements OnInit {
     return m;
   });
 
-  /** machineId → nome. */
   private readonly machineNameById = computed(
     () => new Map(this.machines().map((m) => [m.id, m.nome])),
   );
 
-  /** employerIds dos locais permitidos (null = sem restrição). */
   private readonly permittedEmployerIds = computed<Set<string> | null>(() => {
     const allowed = this.allowedLocations();
     if (allowed.length === 0) return null;
@@ -319,7 +297,6 @@ export class HistoricoComponent implements OnInit {
     );
   });
 
-  /** Opções de local — só os permitidos pela credencial. */
   readonly locationOptions = computed(() =>
     this.locations()
       .filter((l) => this.isLocationAllowed(l))
@@ -327,7 +304,6 @@ export class HistoricoComponent implements OnInit {
       .map((l) => ({ value: l.id, label: l.nome })),
   );
 
-  /** Opções de seção — permitidas e, se um local estiver escolhido, só as dele. */
   readonly sectionOptions = computed(() => {
     const f = this.filters();
     const pe = this.permittedEmployerIds();
@@ -338,12 +314,6 @@ export class HistoricoComponent implements OnInit {
       .map((s) => ({ value: s.id, label: s.nome || s.id }));
   });
 
-  /**
-   * Opções de formulário em cascata:
-   * - se há seção escolhida → só os formulários dela;
-   * - senão, se há local escolhido → só os do local;
-   * - senão → todos os permitidos.
-   */
   readonly formOptions = computed(() => {
     const f = this.filters();
     const p = this.permittedFormIds();
@@ -361,7 +331,6 @@ export class HistoricoComponent implements OnInit {
       .map((fm) => ({ value: fm.id, label: fm.nome || fm.id }));
   });
 
-  /** Alias compatível: mesmo conteúdo de formOptions (cascata). */
   readonly formOptionsCascata = this.formOptions;
 
   readonly userOptions = computed(() =>
@@ -370,7 +339,6 @@ export class HistoricoComponent implements OnInit {
       .map((u) => ({ value: u.userId, label: u.userUsername || u.userId })),
   );
 
-  /** Opções de status — nomes distintos que aparecem nos controles carregados. */
   readonly statusOptions = computed(() => {
     const set = new Set<string>();
     for (const nomes of Object.values(this.controlStatuses())) {
@@ -396,7 +364,6 @@ export class HistoricoComponent implements OnInit {
   updateFilter<K extends keyof Filters>(key: K, value: Filters[K]): void {
     this.filters.update((f) => {
       const next = { ...f, [key]: value };
-      // Cascata: trocar o local limpa seção e formulário; trocar a seção limpa o formulário.
       if (key === 'locationId') {
         next.sectionId = '';
         next.formId = '';
@@ -405,7 +372,7 @@ export class HistoricoComponent implements OnInit {
       }
       return next;
     });
-    this.page.set(1); // volta para a primeira página ao filtrar
+    this.page.set(1);
   }
 
   readonly activeFilterCount = computed(() => {
@@ -419,7 +386,7 @@ export class HistoricoComponent implements OnInit {
 
   resetFilters(): void {
     this.filters.set({ ...this.emptyFilters });
-    this.page.set(1); // reset de página
+    this.page.set(1);
   }
 
   // ───────── resolução de arquivo (defensiva) ─────────
@@ -436,8 +403,6 @@ export class HistoricoComponent implements OnInit {
   }
 
   // ───────── agrupamento de versões (histórico de correções) ─────────
-
-  /** Instante (ms) de um registro, tolerando diferentes nomes de campo. */
   private getDataCriacao(r: Record<string, unknown>): number {
     const raw = r['dataCriacao'] ?? r['data_criacao'] ?? r['createdAt'] ?? r['created_at'] ?? null;
     if (!raw) return 0;
@@ -445,16 +410,10 @@ export class HistoricoComponent implements OnInit {
     return Number.isNaN(ms) ? 0 : ms;
   }
 
-  /** Ordena (cópia) por data de criação ascendente, tolerando o nome do campo. */
   private sortByDataAsc<T extends Record<string, unknown>>(records: T[]): T[] {
     return [...records].sort((a, b) => this.getDataCriacao(a) - this.getDataCriacao(b));
   }
 
-  /**
-   * Agrupa registros de answer_result em "versões" de envio.
-   * Registros consecutivos com menos de 10s de intervalo = mesmo lote.
-   * Espera receber os registros já ordenados por data asc.
-   */
   private agruparVersoes(records: (AnswerResult & Record<string, unknown>)[]): VersaoResposta[] {
     if (!records.length) return [];
     const versoes: VersaoResposta[] = [];
@@ -463,7 +422,6 @@ export class HistoricoComponent implements OnInit {
 
     for (const r of records) {
       const ms = this.getDataCriacao(r);
-      // compara com o registro ANTERIOR (rajada), não com o início do lote
       if (lote.length && ms - prevMs > 10_000) {
         versoes.push(this.loteParaVersao(lote));
         lote = [];
@@ -489,14 +447,12 @@ export class HistoricoComponent implements OnInit {
 
   // ───────── expandir detalhes ─────────
   toggleDetails(row: HistoryRow): void {
-    // fecha se já estava aberta
     if (this.expandedId() === row.id) {
       this.expandedId.set(null);
       this.cancelarEdicao();
       return;
     }
 
-    // Blindagem: não expande detalhes de um local fora do escopo.
     if (!this.isFormAllowed(row.formId)) {
       this.error.set('Você não tem acesso a este local.');
       return;
@@ -506,10 +462,8 @@ export class HistoricoComponent implements OnInit {
     this.expandedId.set(row.id);
     this.cancelarEdicao();
 
-    // já carregou antes — usa cache
     if (this.expandedData()[row.id] || this.expandedMachineData()[row.id]) return;
 
-    // parâmetros deste formulário (já carregados no reload — sem nova requisição)
     const answers = this.answersByForm().get(row.formId) ?? [];
     if (!answers.length) {
       this.expandedData.update((d) => ({ ...d, [row.id]: [] }));
@@ -518,7 +472,6 @@ export class HistoricoComponent implements OnInit {
 
     this.expandedLoading.set(row.id);
 
-    // resultados são por controle → precisam ser buscados na expansão
     forkJoin({
       machineResults: this.fetchAllPages<MachineAnswerResult>((l, p) =>
         this.machineAnswerResultService.getControlIdAll(row.id, l, p),
@@ -550,7 +503,6 @@ export class HistoricoComponent implements OnInit {
     answers: Answer[],
     allMachine: MachineAnswerResult[],
   ): void {
-    // ordena asc por data → o último de cada célula é o valor mais recente
     const ordenados = this.sortByDataAsc(
       allMachine as unknown as (MachineAnswerResult & Record<string, unknown>)[],
     ) as unknown as MachineAnswerResult[];
@@ -583,47 +535,60 @@ export class HistoricoComponent implements OnInit {
       dataCriacao?: string;
     })[];
 
-    // ordena por data asc (tolerante ao nome do campo) para histórico correto
+    // ordena por data asc → o último por answerId é o valor atual
     const ordenados = this.sortByDataAsc(
       allResults as unknown as Record<string, unknown>[],
     ) as unknown as typeof allResults;
 
-    // última resposta por answerId = valor atual
     const latestMap = new Map<string, (typeof ordenados)[number]>();
     for (const r of ordenados) latestMap.set(r.AnswerId, r);
 
     const linhas: ParamRow[] = answers.map((a) => {
-  const res = latestMap.get(a.id);
-  return {
-    answerId: a.id,
-    nome: a.nome,
-    resposta: res?.resposta ?? '—',
-    limitsAnswerId: res?.limitsAnswerId ?? null,
-    answerResultId: res ? (res as { id?: string }).id ?? null : null, // ← novo
-  };
-});
+      const res = latestMap.get(a.id);
+      return {
+        answerId: a.id,
+        nome: a.nome,
+        resposta: res?.resposta ?? '—',
+        limitsAnswerId: res?.limitsAnswerId ?? null,
+        answerResultId: res ? ((res as { id?: string }).id ?? null) : null,
+      };
+    });
 
     this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
 
-    // agrupa versões por rajada (registros consecutivos em até 10s = mesmo envio)
     const versoes = this.agruparVersoes(
       ordenados as unknown as (AnswerResult & Record<string, unknown>)[],
     );
     this.expandedHistory.update((d) => ({ ...d, [controlId]: versoes }));
+
+    // ── operador = ÚLTIMO reparador inserido (answer_result mais recente) ──
+    this.operatorByControl.update((m) => ({
+      ...m,
+      [controlId]: this.resolverUltimoOperador(ordenados),
+    }));
+  }
+
+  /**
+   * Percorre os answer_results do MAIS RECENTE ao mais antigo e devolve o nome
+   * do primeiro que tiver reparador vinculado — ou seja, o ÚLTIMO operador
+   * inserido (não o primeiro criado).
+   */
+  private resolverUltimoOperador(
+    ordenadosAsc: { id?: string }[] | (AnswerResult & { id?: string })[],
+  ): string | null {
+    const repMap = this.repairerByAnswerResultId();
+    const userById = this.userByIdMap();
+    for (let i = ordenadosAsc.length - 1; i >= 0; i--) {
+      const id = (ordenadosAsc[i] as { id?: string }).id;
+      const uid = id ? repMap[id] : undefined;
+      if (uid) return userById.get(uid)?.userUsername ?? uid;
+    }
+    return null;
   }
 
   // ============================================================
   //  EDIÇÃO POR STATUS
-  //  1 = normalizado, 2 = correção → editam CAMPOS (+ observação)
-  //  3 = pendente                  → edita apenas a OBSERVAÇÃO
-  //  (fonte única da regra: nivelEdicao)
   // ============================================================
-
-  /**
-   * Tipo do status atual do controle derivado dos nomes já carregados.
-   * 1 = normalizado, 2 = correção, 3 = pendente.
-   * Assume que o último nome da lista é o mais recente.
-   */
   statusTipo(controlId: string): number | null {
     const nomes = this.controlStatuses()[controlId];
     if (!nomes?.length) return null;
@@ -634,7 +599,6 @@ export class HistoricoComponent implements OnInit {
     return null;
   }
 
-  /** Regra central de edição por status. */
   private nivelEdicao(controlId: string): EditLevel {
     switch (this.statusTipo(controlId)) {
       case 1:
@@ -647,12 +611,10 @@ export class HistoricoComponent implements OnInit {
     }
   }
 
-  /** Pode editar os campos (respostas)? Normalizado (1) e correção (2). */
   podeEditarCampos(controlId: string): boolean {
     return this.nivelEdicao(controlId) === 'campos';
   }
 
-  /** Pode editar a observação? Qualquer status editável (1, 2 ou 3). */
   podeEditarObs(controlId: string): boolean {
     return this.nivelEdicao(controlId) !== null;
   }
@@ -661,7 +623,7 @@ export class HistoricoComponent implements OnInit {
     this.error.set(null);
     this.editId.set(row.id);
     this.editObs.set(row.observacao ?? '');
-    this.repairerQuery.set(''); // reparador começa vazio a cada edição
+    this.repairerQuery.set('');
 
     const vals: Record<string, string> = {};
     const md = this.expandedMachineData()[row.id];
@@ -690,11 +652,6 @@ export class HistoricoComponent implements OnInit {
     this.editObs.set(value);
   }
 
-  /**
-   * Valor está dentro do limite ativo do parâmetro?
-   * Sem limite ou valor não numérico → não é violação (true).
-   * limitMin/limitMax ausentes = -∞/+∞.
-   */
   dentroDoLimite(answerId: string, valor: string): boolean {
     const limit = this.limitsByAnswer()[answerId];
     if (!limit) return true;
@@ -717,16 +674,12 @@ export class HistoricoComponent implements OnInit {
     this.error.set(null);
     const vals = this.editValues();
 
-    // Quem está editando (usuário logado). Se for OUTRO usuário, a alteração
-    // passa a ser atribuída a ele (userId + nova assinatura/fileId).
     const editorId = this.auth.userId();
     const reatribuir = !!editorId && editorId !== row.userId;
 
-    // Reparador informado (opcional). Só se aplica ao modo normal (answer_result),
-    // pois o RepairerAnswerResult referencia answerResultId.
     const repairerId = this.repairerResolved()?.userId ?? null;
+    const repairerNome = this.repairerResolved()?.userUsername ?? repairerId;
 
-    // ── monta as operações de campos ──
     const fieldOps: Observable<unknown>[] = [];
     const changedNormal: Record<string, string> = {};
     let camposMudaram = false;
@@ -779,7 +732,6 @@ export class HistoricoComponent implements OnInit {
                   resposta: novo,
                   limitsAnswerId: p.limitsAnswerId ?? null,
                 })
-                // após criar a resposta, vincula o reparador (se informado)
                 .pipe(switchMap((created) => this.linkRepairer(created, repairerId))),
             );
           }
@@ -791,21 +743,15 @@ export class HistoricoComponent implements OnInit {
       }
     }
 
-    // ── observação ──
     const novaObs = this.editObs().trim();
     const obsAtual = (row.observacao ?? '').trim();
     const obsMudou = this.podeEditarObs(row.id) && novaObs !== obsAtual;
 
-    // Nada mudou → apenas sai da edição.
     if (!camposMudaram && !obsMudou) {
       this.cancelarEdicao();
       return;
     }
 
-    // Assinatura é exigida sempre que houver CORREÇÃO de campos (o fileId do
-    // controle aponta para o binário da assinatura, então cada correção precisa
-    // de uma nova assinatura do usuário atual). Também exigimos quando OUTRO
-    // usuário altera apenas a observação (para registrar a autoria).
     const precisaAssinar = camposMudaram || (reatribuir && obsMudou);
 
     let novoUserId: string | null = null;
@@ -813,7 +759,7 @@ export class HistoricoComponent implements OnInit {
 
     if (precisaAssinar) {
       const assinatura = await this.pedirAssinatura();
-      if (!assinatura) return; // cancelou ou não assinou → não salva
+      if (!assinatura) return;
 
       this.savingEdit.set(true);
       try {
@@ -825,15 +771,11 @@ export class HistoricoComponent implements OnInit {
             extensao: 'png',
           }),
         );
-        novoUserId = editorId; // a correção passa a ser atribuída a quem assinou
-        novoFileId = file.id; // nova assinatura
-        // registra o novo arquivo localmente para o nome resolver na listagem
+        novoUserId = editorId;
+        novoFileId = file.id;
         this.files.update((list) => [
           ...list,
-          {
-            ...file,
-            nome: (file as { nome?: string }).nome ?? `assinatura_${editorId}`,
-          },
+          { ...file, nome: (file as { nome?: string }).nome ?? `assinatura_${editorId}` },
         ]);
       } catch {
         this.savingEdit.set(false);
@@ -844,11 +786,9 @@ export class HistoricoComponent implements OnInit {
       this.savingEdit.set(true);
     }
 
-    // ── operações finais ──
     const ops: Observable<unknown>[] = [...fieldOps];
     if (novoStatusId) ops.push(this.controlStatusService.update(row.id, novoStatusId));
 
-    // Atualiza o controle quando assinou (nova autoria/fileId) ou mudou a obs.
     if (precisaAssinar || obsMudou) {
       const payload: ControlUpdate = {
         userId: novoUserId ?? row.userId,
@@ -864,6 +804,8 @@ export class HistoricoComponent implements OnInit {
       return;
     }
 
+    const houveReparador = !!repairerId && camposMudaram && !this.expandedMachineData()[row.id];
+
     forkJoin(ops).subscribe({
       next: () => {
         this.aplicarEdicaoLocal(
@@ -872,9 +814,12 @@ export class HistoricoComponent implements OnInit {
           novoUserId,
           novoFileId,
         );
-        // Insere a nova versão (lote de correção) no histórico — modo normal.
         if (Object.keys(changedNormal).length && !this.expandedMachineData()[row.id]) {
           this.anexarVersao(row.id, changedNormal);
+        }
+        // Reflete imediatamente o ÚLTIMO operador (esta correção é a mais recente).
+        if (houveReparador) {
+          this.operatorByControl.update((m) => ({ ...m, [row.id]: repairerNome }));
         }
         if (novoStatusId) this.atualizarStatusLocal(row.id);
         this.savingEdit.set(false);
@@ -887,15 +832,15 @@ export class HistoricoComponent implements OnInit {
     });
   }
 
-  /**
-   * Vincula o reparador ao answer_result recém-criado (RepairerAnswerResult).
-   * Não interrompe a correção se o vínculo falhar — apenas registra o erro.
-   */
   private linkRepairer(created: AnswerResult, repairerId: string | null): Observable<AnswerResult> {
     const answerResultId = (created as { id?: string })?.id;
     if (!repairerId || !answerResultId) return of(created);
     return this.repairerService.create({ answerResultId, userId: repairerId }).pipe(
-      map(() => created),
+      map(() => {
+        // mantém o mapa local coerente para futuras resoluções de operador
+        this.repairerByAnswerResultId.update((m) => ({ ...m, [answerResultId]: repairerId }));
+        return created;
+      }),
       catchError((err) => {
         console.error('Falha ao vincular o reparador à correção:', err);
         return of(created);
@@ -903,11 +848,6 @@ export class HistoricoComponent implements OnInit {
     );
   }
 
-  /**
-   * Abre o modal de assinatura e devolve o base64 (ou null se cancelado/vazio).
-   * Usado quando um usuário diferente do autor edita o controle — a alteração
-   * precisa ser assinada por quem está fazendo.
-   */
   private async pedirAssinatura(): Promise<string | null> {
     let assinatura: string | null = null;
     const ref = this.modalService.openComponent(SignatureComponent, {
@@ -926,13 +866,11 @@ export class HistoricoComponent implements OnInit {
     return ok ? assinatura : null;
   }
 
-  /**
-   * Insere reativamente uma nova versão no histórico de correções.
-   * `valores` contém apenas os campos alterados neste envio (como um lote real),
-   * ficando como a versão MAIS RECENTE (o template mostra as anteriores em
-   * "Histórico de correções" e os valores atuais nos cards).
-   */
-  private anexarVersao(controlId: string, valores: Record<string, string>, answerResultIds: string[] = []): void {
+  private anexarVersao(
+    controlId: string,
+    valores: Record<string, string>,
+    answerResultIds: string[] = [],
+  ): void {
     const nova: VersaoResposta = {
       dataCriacao: new Date().toISOString(),
       valores: { ...valores },
@@ -944,7 +882,6 @@ export class HistoricoComponent implements OnInit {
     }));
   }
 
-  /** Atualiza o status no estado local recarregando o nome do status (chip). */
   private atualizarStatusLocal(controlId: string): void {
     this.controlStatusService
       .getStatusNamesByControl(controlId)
@@ -954,15 +891,12 @@ export class HistoricoComponent implements OnInit {
       });
   }
 
-  /** Reflete a edição no estado local (sem refazer as buscas). */
   private aplicarEdicaoLocal(
     controlId: string,
     obs: string | null,
     novoUserId: string | null = null,
     novoFileId: string | null = null,
   ): void {
-    // observação (+ autoria, quando reatribuído) → atualiza o controle;
-    // rows() deriva daqui, então userNome/fileNome refletem o editor.
     this.controls.update((list) =>
       list.map((c) =>
         c.id === controlId
@@ -998,44 +932,40 @@ export class HistoricoComponent implements OnInit {
   readonly rows = computed<HistoryRow[]>(() => {
     const formById = new Map(this.forms().map((f) => [f.id, f]));
     const sectionById = new Map(this.sections().map((s) => [s.id, s]));
-    // employerId → location (deriva o local a partir do employer da seção)
     const locationByEmployer = new Map(this.locations().map((l) => [l.employerId, l]));
-    const userById = new Map(this.users().map((u) => [u.userId, u]));
+    const userById = this.userByIdMap();
     const fileById = new Map(this.files().map((f) => [String(f['id']), f]));
     const statusMap = this.controlStatuses();
 
-    return (
-      this.controls()
-        // Restringe aos controles cujo formulário está num local permitido.
-        .filter((c) => this.isFormAllowed(c.formId))
-        .map((c) => {
-          const form = formById.get(c.formId);
-          const section = form ? sectionById.get(form.sectionId) : undefined;
-          const location = section ? locationByEmployer.get(section.employerId) : undefined;
-          const user = userById.get(c.userId);
-          const file = fileById.get(c.fileId);
-          return {
-            id: c.id,
-            formId: c.formId,
-            formNome: form?.nome ?? c.formId,
-            sectionId: section?.id ?? form?.sectionId ?? '',
-            sectionNome: section?.nome ?? '',
-            locationId: location?.id ?? '',
-            locationNome: location?.nome ?? '',
-            userId: c.userId,
-            userNome: user?.userUsername ?? c.userId,
-            userEmail: user?.userEmail ?? '',
-            fileId: c.fileId,
-            fileNome: this.fileName(file, c.fileId),
-            fileUrl: this.fileUrl(file),
-            observacao: c.observacao,
-            dataEmissao: c.dataEmissao,
-            dataCriacao: c.dataCriacao,
-            statusNomes: (statusMap[c.id] ?? []).join(', '),
-          } as HistoryRow;
-        })
-        .sort((a, b) => new Date(b.dataEmissao).getTime() - new Date(a.dataEmissao).getTime())
-    );
+    return this.controls()
+      .filter((c) => this.isFormAllowed(c.formId))
+      .map((c) => {
+        const form = formById.get(c.formId);
+        const section = form ? sectionById.get(form.sectionId) : undefined;
+        const location = section ? locationByEmployer.get(section.employerId) : undefined;
+        const user = userById.get(c.userId);
+        const file = fileById.get(c.fileId);
+        return {
+          id: c.id,
+          formId: c.formId,
+          formNome: form?.nome ?? c.formId,
+          sectionId: section?.id ?? form?.sectionId ?? '',
+          sectionNome: section?.nome ?? '',
+          locationId: location?.id ?? '',
+          locationNome: location?.nome ?? '',
+          userId: c.userId,
+          userNome: user?.userUsername ?? c.userId,
+          userEmail: user?.userEmail ?? '',
+          fileId: c.fileId,
+          fileNome: this.fileName(file, c.fileId),
+          fileUrl: this.fileUrl(file),
+          observacao: c.observacao,
+          dataEmissao: c.dataEmissao,
+          dataCriacao: c.dataCriacao,
+          statusNomes: (statusMap[c.id] ?? []).join(', '),
+        } as HistoryRow;
+      })
+      .sort((a, b) => new Date(b.dataEmissao).getTime() - new Date(a.dataEmissao).getTime());
   });
 
   private textMatch(value: string | null | undefined, term: string): boolean {
@@ -1076,38 +1006,27 @@ export class HistoricoComponent implements OnInit {
   });
 
   // ============================================================
-  //  PAGINAÇÃO (client-side sobre `filtered`)
+  //  PAGINAÇÃO DA TIMELINE (client-side sobre `filtered`)
   // ============================================================
   readonly pageSize = signal(10);
   readonly page = signal(1);
 
-  /** Total de itens após os filtros. */
   readonly totalItems = computed(() => this.filtered().length);
-
-  /** Total de páginas (mínimo 1). */
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.totalItems() / this.pageSize())));
-
-  /** Página atual sempre dentro do intervalo válido (clamp — dispensa effect). */
   readonly currentPage = computed(() => Math.min(Math.max(1, this.page()), this.totalPages()));
 
-  /** Fatia visível da timeline. */
   readonly paged = computed<HistoryRow[]>(() => {
     const size = this.pageSize();
     const start = (this.currentPage() - 1) * size;
     return this.filtered().slice(start, start + size);
   });
 
-  /** Índice do primeiro item exibido (1-based; 0 quando vazio). */
   readonly pageStart = computed(() =>
     this.totalItems() === 0 ? 0 : (this.currentPage() - 1) * this.pageSize() + 1,
   );
-
-  /** Índice do último item exibido. */
   readonly pageEnd = computed(() =>
     Math.min(this.currentPage() * this.pageSize(), this.totalItems()),
   );
-
-  /** Janela de números de página para os botões (até 5). */
   readonly pageNumbers = computed<number[]>(() => {
     const total = this.totalPages();
     const cur = this.currentPage();
@@ -1132,6 +1051,50 @@ export class HistoricoComponent implements OnInit {
   setPageSize(size: number): void {
     this.pageSize.set(Math.max(1, size));
     this.page.set(1);
+  }
+
+  // ============================================================
+  //  PAGINAÇÃO POR DEMANDA — HISTÓRICO DE CORREÇÕES (por controle)
+  //  Mostra as correções anteriores (mais recentes primeiro) em lotes,
+  //  com "Carregar mais". Não busca nada novo: apenas revela mais itens
+  //  já carregados, então não há custo de rede nem perda de desempenho.
+  // ============================================================
+  readonly correcoesPageSize = signal(5);
+  private readonly correcoesVisible = signal<Record<string, number>>({});
+
+  /** Correções ANTERIORES (todas menos a versão atual), mais recentes primeiro. */
+  correcoesAnteriores(controlId: string): VersaoResposta[] {
+    const versoes = this.expandedHistory()[controlId] ?? [];
+    if (versoes.length <= 1) return [];
+    return versoes.slice(0, -1).reverse();
+  }
+
+  totalCorrecoes(controlId: string): number {
+    return this.correcoesAnteriores(controlId).length;
+  }
+
+  private correcoesLimite(controlId: string): number {
+    return this.correcoesVisible()[controlId] ?? this.correcoesPageSize();
+  }
+
+  /** Fatia visível das correções anteriores (paginação por demanda). */
+  correcoesVisiveis(controlId: string): VersaoResposta[] {
+    return this.correcoesAnteriores(controlId).slice(0, this.correcoesLimite(controlId));
+  }
+
+  temMaisCorrecoes(controlId: string): boolean {
+    return this.totalCorrecoes(controlId) > this.correcoesLimite(controlId);
+  }
+
+  correcoesRestantes(controlId: string): number {
+    return Math.max(0, this.totalCorrecoes(controlId) - this.correcoesLimite(controlId));
+  }
+
+  verMaisCorrecoes(controlId: string): void {
+    this.correcoesVisible.update((m) => ({
+      ...m,
+      [controlId]: this.correcoesLimite(controlId) + this.correcoesPageSize(),
+    }));
   }
 
   // ───────── formatação de datas ─────────
@@ -1162,20 +1125,6 @@ export class HistoricoComponent implements OnInit {
     return (r['data'] ?? r['items'] ?? r['results'] ?? []) as T[];
   }
 
-  /**
-   * Busca TODOS os registros de um endpoint paginado, sem cap fixo.
-   *
-   * Estratégia (custo mínimo + escalável):
-   *  1) faz 1 requisição do primeiro "chunk" (padrão 1000). Se tudo couber
-   *     numa página — caso atual — resolve com essa única requisição
-   *     (mesmo desempenho de antes, sem regressão);
-   *  2) se houver mais páginas, busca as restantes EM PARALELO com
-   *     concorrência limitada (evita disparar dezenas de chamadas de uma vez)
-   *     e concatena os resultados preservando a ordem das páginas.
-   *
-   * Assim o `getAll(1000, 1)` fixo deixa de "perder" registros quando o
-   * volume ultrapassar o chunk.
-   */
   private fetchAllPages<T>(
     load: (limit: number, page: number) => Observable<PaginatedResult<T>>,
     chunk = 1000,
@@ -1188,10 +1137,8 @@ export class HistoricoComponent implements OnInit {
         const total = first?.total ?? data.length;
         const pages = first?.totalPages ?? (limit > 0 ? Math.ceil(total / limit) : 1);
 
-        // Cabe tudo na primeira página → uma única requisição.
         if (!pages || pages <= 1) return of(data);
 
-        // Páginas 2..pages em paralelo (concorrência limitada) e em ordem.
         return range(2, pages - 1).pipe(
           mergeMap((p) => load(limit, p), concorrencia),
           toArray(),
@@ -1210,12 +1157,13 @@ export class HistoricoComponent implements OnInit {
   reload(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.page.set(1); // volta para a primeira página ao recarregar
-    // limpa caches de expansão para não misturar com dados antigos
+    this.page.set(1);
     this.expandedId.set(null);
     this.expandedData.set({});
     this.expandedHistory.set({});
     this.expandedMachineData.set({});
+    this.operatorByControl.set({});
+    this.correcoesVisible.set({});
     this.cancelarEdicao();
 
     const failLog = (label: string) =>
@@ -1256,7 +1204,18 @@ export class HistoricoComponent implements OnInit {
         this.repairerService.getAll(l, p),
       ).pipe(failLog('reparadores')),
     }).subscribe({
-      next: ({ controls, forms, users, files, answers, machines, sections, locations, limits, repairers }) => {
+      next: ({
+        controls,
+        forms,
+        users,
+        files,
+        answers,
+        machines,
+        sections,
+        locations,
+        limits,
+        repairers,
+      }) => {
         if (controls == null) {
           this.error.set('Não foi possível carregar o histórico.');
         }
@@ -1269,7 +1228,6 @@ export class HistoricoComponent implements OnInit {
         this.sections.set(this.unwrap<Section>(sections));
         this.locations.set(this.unwrap<Location>(locations));
 
-        // mapa answerId → limite ativo (para avaliar edições)
         const limitMap: Record<string, LimitAnswer> = {};
         for (const l of this.unwrap<LimitAnswer>(limits)) {
           if (l.status === 1) limitMap[l.answerId] = l;
@@ -1286,23 +1244,30 @@ export class HistoricoComponent implements OnInit {
 
         this.loading.set(false);
 
-        // busca status apenas dos controles VISÍVEIS (dentro do escopo permitido)
+        // Status apenas dos controles VISÍVEIS, com concorrência limitada
+        // (evita disparar centenas/milhares de requisições simultâneas).
         const visiveis = this.controls().filter((c) => this.isFormAllowed(c.formId));
         if (!visiveis.length) {
           this.controlStatuses.set({});
           return;
         }
-        forkJoin(
-          visiveis.map((c) =>
-            this.controlStatusService
-              .getStatusNamesByControl(c.id)
-              .pipe(catchError(() => of([] as string[]))),
-          ),
-        ).subscribe((results) => {
-          const map: Record<string, string[]> = {};
-          visiveis.forEach((c, i) => (map[c.id] = results[i] as string[]));
-          this.controlStatuses.set(map);
-        });
+        from(visiveis)
+          .pipe(
+            mergeMap(
+              (c) =>
+                this.controlStatusService.getStatusNamesByControl(c.id).pipe(
+                  map((nomes) => ({ id: c.id, nomes: nomes as string[] })),
+                  catchError(() => of({ id: c.id, nomes: [] as string[] })),
+                ),
+              6,
+            ),
+            toArray(),
+          )
+          .subscribe((list) => {
+            const map: Record<string, string[]> = {};
+            for (const it of list) map[it.id] = it.nomes;
+            this.controlStatuses.set(map);
+          });
       },
       error: () => {
         this.loading.set(false);
@@ -1311,31 +1276,19 @@ export class HistoricoComponent implements OnInit {
     });
   }
 
+  /** Operador/reparador de uma versão específica = o ÚLTIMO inserido no lote. */
   reparadorDaVersao(answerResultIds: string[]): string | null {
     const repMap = this.repairerByAnswerResultId();
-    const userById = new Map(this.users().map((u) => [u.userId, u]));
-    for (const id of answerResultIds) {
-      const userId = repMap[id];
-      if (userId) {
-        const user = userById.get(userId);
-        return user?.userUsername ?? userId;
-      }
+    const userById = this.userByIdMap();
+    for (let i = answerResultIds.length - 1; i >= 0; i--) {
+      const userId = repMap[answerResultIds[i]];
+      if (userId) return userById.get(userId)?.userUsername ?? userId;
     }
     return null;
   }
 
+  /** Operador/reparador do controle = o ÚLTIMO inserido (mais recente). */
   reparadorDoControle(controlId: string): string | null {
-    const params = this.expandedData()[controlId] ?? [];
-    const repMap = this.repairerByAnswerResultId();
-    const userById = new Map(this.users().map((u) => [u.userId, u]));
-    for (const p of params) {
-      if (!p.answerResultId) continue;
-      const userId = repMap[p.answerResultId];
-      if (userId) {
-        const user = userById.get(userId);
-        return user?.userUsername ?? userId;
-      }
-    }
-    return null;
+    return this.operatorByControl()[controlId] ?? null;
   }
 }

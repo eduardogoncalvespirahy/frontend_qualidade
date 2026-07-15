@@ -1352,12 +1352,10 @@ export class PainelComponent implements OnInit {
       })
       .pipe(
         catchError((err) => {
-          console.log('Erro ao criar status do controle anterior:', err);
+          console.error('Erro ao criar status do controle anterior:', err);
           return of(null);
         }),
       );
-
-    console.log('statusOp: ',statusOp);
 
     const ops: Observable<unknown>[] = [statusOp, ...resultOps];
 

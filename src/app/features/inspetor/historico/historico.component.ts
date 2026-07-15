@@ -653,6 +653,11 @@ export class HistoricoComponent implements OnInit {
     this.editObs.set(value);
   }
 
+  /** Existe um limite ativo cadastrado pra este parâmetro? (decide se a célula deve ser colorida). */
+  temLimiteAtivo(answerId: string): boolean {
+    return !!this.limitsByAnswer()[answerId];
+  }
+
   dentroDoLimite(answerId: string, valor: string): boolean {
     const limit = this.limitsByAnswer()[answerId];
     if (!limit) return true;

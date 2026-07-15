@@ -271,6 +271,10 @@
                             <td class="fw-semibold small">{{ m.nome }}</td>
                             @for (a of md.answers; track a.id) {
                               @let cellKey = m.id + '_' + a.id;
+                              @let cellVal = md.cells[cellKey];
+                              @let temLimite = !!cellVal && temLimiteAtivo(a.id);
+                              @let ok = temLimite && dentroDoLimite(a.id, cellVal);
+                              @let err = temLimite && !dentroDoLimite(a.id, cellVal);
                               <td class="text-center">
                                 @if (editing && canCampos) {
                                   <input
@@ -282,8 +286,18 @@
                                     (ngModelChange)="updateEditValue(cellKey, $event)"
                                   />
                                 } @else {
-                                  <span class="badge text-bg-light border fw-semibold text-dark">
-                                    {{ md.cells[cellKey] || '—' }}
+                                  <span
+                                    class="badge border fw-semibold"
+                                    [class.text-bg-light]="!ok && !err"
+                                    [class.text-dark]="!ok && !err"
+                                    [class.bg-success-subtle]="ok"
+                                    [class.border-success]="ok"
+                                    [class.text-success]="ok"
+                                    [class.bg-danger-subtle]="err"
+                                    [class.border-danger]="err"
+                                    [class.text-danger]="err"
+                                  >
+                                    {{ cellVal || '—' }}
                                   </span>
                                 }
                               </td>
@@ -350,7 +364,9 @@
                 @if (!expandedMachineData()[r.id]) {
                   @if (reparadorDoControle(r.id); as rep) {
                     <div class="mt-2">
-                      <span class="badge bg-info-subtle border border-info-subtle text-info-emphasis">
+                      <span
+                        class="badge bg-info-subtle border border-info-subtle text-info-emphasis"
+                      >
                         <i class="bi bi-person-gear me-1"></i> Reparado por: {{ rep }}
                       </span>
                     </div>
@@ -369,12 +385,17 @@
                       <div class="mt-2 d-flex flex-column gap-2">
                         @for (v of versoes.slice(0, -1); track $index) {
                           <div class="border rounded p-2 bg-light">
-                            <div class="d-flex align-items-center gap-2 flex-wrap" style="font-size: 0.72rem">
+                            <div
+                              class="d-flex align-items-center gap-2 flex-wrap"
+                              style="font-size: 0.72rem"
+                            >
                               <span class="text-muted">
                                 <i class="bi bi-calendar2-event"></i> {{ dataHora(v.dataCriacao) }}
                               </span>
                               @if (reparadorDaVersao(v.answerResultIds); as rep) {
-                                <span class="badge bg-info-subtle border border-info-subtle text-info-emphasis">
+                                <span
+                                  class="badge bg-info-subtle border border-info-subtle text-info-emphasis"
+                                >
                                   <i class="bi bi-person-gear me-1"></i> {{ rep }}
                                 </span>
                               }

@@ -156,12 +156,30 @@ export class BreakMachineComponent implements OnInit {
 
   // ───────── regra de sobreposição ─────────
   /**
+   * Lê a hora de fim de forma tolerante ao nome/formato do campo retornado
+   * pela API (horaFim, hora_fim, dataFim…). Retorna null quando não há fim.
+   */
+  private getHoraFim(b: BreakMachine): string | Date | null {
+    const raw = b as unknown as Record<string, unknown>;
+    const v =
+      b.horaFim ?? raw['hora_fim'] ?? raw['horafim'] ?? raw['dataFim'] ?? raw['data_fim'] ?? null;
+    return (v as string | Date | null) ?? null;
+  }
+  /** True quando a parada tem hora de fim preenchida (não vazia). */
+  private temFim(b: BreakMachine): boolean {
+    const v = this.getHoraFim(b);
+    if (v == null) return false;
+    if (typeof v === 'string') return v.trim().length > 0;
+    return true;
+  }
+
+  /**
    * Parada ATIVA agora e SEM hora de fim (aberta/indefinida). SÓ esse caso
    * bloqueia a criação — uma parada ativa COM hora de fim permite criar outra
    * (que deverá começar após esse fim).
    */
   readonly paradaAbertaAtiva = computed(
-    () => this.breaks().find((b) => isActive(b, this.now()) && !b.horaFim) ?? null,
+    () => this.breaks().find((b) => isActive(b, this.now()) && !this.temFim(b)) ?? null,
   );
   /** Só bloqueia quando há uma parada ativa sem hora de fim. */
   readonly podeCriar = computed(() => !this.paradaAbertaAtiva());
@@ -172,8 +190,9 @@ export class BreakMachineComponent implements OnInit {
    */
   readonly minInicioNova = computed(() => {
     const now = this.now();
-    const ativaComFim = this.breaks().find((b) => isActive(b, now) && !!b.horaFim);
-    const base = ativaComFim?.horaFim ? new Date(ativaComFim.horaFim as unknown as string) : now;
+    const ativaComFim = this.breaks().find((b) => isActive(b, now) && this.temFim(b));
+    const fimVal = ativaComFim ? this.getHoraFim(ativaComFim) : null;
+    const base = fimVal ? new Date(fimVal as unknown as string) : now;
     const floor = base.getTime() > now.getTime() ? base : now;
     return this.toLocalInput(floor);
   });
@@ -327,10 +346,10 @@ export class BreakMachineComponent implements OnInit {
     const now = new Date();
 
     // Bloqueia apenas se houver parada ATIVA e SEM hora de fim (aberta).
-    const abertaAtiva = this.breaks().find((b) => isActive(b, now) && !b.horaFim);
+    const abertaAtiva = this.breaks().find((b) => isActive(b, now) && !this.temFim(b));
     if (abertaAtiva) {
       this.error.set(
-        'Há uma parada ativa sem hora de fim. Informe a hora de fim (ou desative) antes de criar outra.',
+        `Há uma parada ativa sem hora de fim (iniciada em ${this.fmt(abertaAtiva.horaInicio)}). Informe a hora de fim (ou desative) antes de criar outra.`,
       );
       return;
     }
@@ -352,12 +371,13 @@ export class BreakMachineComponent implements OnInit {
     }
 
     // Se há parada ATIVA COM hora de fim, a nova só pode começar após esse fim.
-    const ativaComFim = this.breaks().find((b) => isActive(b, now) && !!b.horaFim);
-    if (ativaComFim?.horaFim) {
-      const fimAtual = new Date(ativaComFim.horaFim as unknown as string);
+    const ativaComFim = this.breaks().find((b) => isActive(b, now) && this.temFim(b));
+    const fimAtualVal = ativaComFim ? this.getHoraFim(ativaComFim) : null;
+    if (fimAtualVal) {
+      const fimAtual = new Date(fimAtualVal as unknown as string);
       if (ini.getTime() < fimAtual.getTime()) {
         this.error.set(
-          `A nova parada deve começar após o fim da parada em andamento (${this.fmt(ativaComFim.horaFim)}).`,
+          `A nova parada deve começar após o fim da parada em andamento (${this.fmt(fimAtualVal)}).`,
         );
         return;
       }

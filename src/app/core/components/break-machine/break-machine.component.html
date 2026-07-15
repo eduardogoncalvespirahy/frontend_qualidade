@@ -23,11 +23,11 @@
   }
 
   <!-- Bloqueio: parada ativa sem hora de fim -->
-  @if (!podeCriar()) {
+  @if (paradaAbertaAtiva(); as pa) {
     <div class="alert alert--warn">
       <i class="bi bi-info-circle"></i>
-      Há uma parada ativa sem hora de fim. Informe a hora de fim (ou desative) para registrar uma
-      nova.
+      Há uma parada ativa sem hora de fim (iniciada em {{ fmt(pa.horaInicio) }}). Informe a hora de
+      fim (ou desative) para registrar uma nova.
     </div>
   }
 

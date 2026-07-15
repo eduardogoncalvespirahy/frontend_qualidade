@@ -15,7 +15,8 @@ import { AuthService } from '../../../../../core/services/auth.service';
 import { FormularioFormComponent } from './modals/form/form.component';
 import { FormTimeComponent } from './modals/form-time/form-time.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
-import { BreakFormComponent } from './modals/break-form/break-form.component';
+import { BreakFormComponent } from '../../../../../core/components/break-form/break-form.component';
+
 
 type Step = 'location' | 'section' | 'form' | 'break' | 'time';
 

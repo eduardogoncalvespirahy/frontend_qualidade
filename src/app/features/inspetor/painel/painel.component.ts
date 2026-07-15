@@ -51,8 +51,10 @@ import { FormTimeService } from '../../../core/services/form-time.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
+import { BreakFormComponent } from '../../../core/components/break-form/break-form.component';
 
-type Step = 'location' | 'section' | 'form' | 'parameters';
+
+type Step = 'location' | 'section' | 'form' | 'parameters' | 'break';
 
 /** Campos filtráveis derivados das interfaces (sem o id). */
 interface Filters {
@@ -70,7 +72,7 @@ interface Filters {
 @Component({
   selector: 'app-painel',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollTopComponent],
+  imports: [CommonModule, FormsModule, ScrollTopComponent, BreakFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './painel.component.html',
   styleUrl: './painel.component.css',
@@ -326,12 +328,14 @@ export class PainelComponent implements OnInit {
     section: 'Seções',
     form: 'Formulários',
     parameters: 'Parâmetros',
+    break: 'Paradas',
   };
   private readonly descriptions: Record<Step, string> = {
     location: 'Selecione um local para começar.',
     section: 'Escolha a seção que deseja inspecionar.',
     form: 'Escolha o formulário a ser preenchido.',
     parameters: 'Informe os valores de cada parâmetro e salve.',
+    break: 'Gerencie as paradas deste formulário.',
   };
 
   readonly pageTitle = computed(() => this.titles[this.step()]);
@@ -455,6 +459,20 @@ export class PainelComponent implements OnInit {
       .subscribe({
         next: (res) => this.formTimes.set(this.unwrap<FormTime>(res)),
         error: () => this.formTimes.set([]),
+      });
+  }
+
+  /**
+   * Recarrega só as paradas de formulário — usado ao voltar da etapa de paradas
+   * para refletir o selo "Pausado" nos cards sem recarregar tudo.
+   */
+  private refreshFormBreaks(): void {
+    this.breakFormService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.allFormBreaks.set(this.unwrap<BreakForm>(res)),
+        error: () => this.allFormBreaks.set([]),
       });
   }
 
@@ -667,6 +685,18 @@ export class PainelComponent implements OnInit {
     this.loadGroupOrder();
   }
 
+  /** Abre a gestão de paradas do formulário (mesma lógica do líder). */
+  openBreaks(form: Form): void {
+    // Blindagem: não permite gerir paradas de um local fora das permissões.
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
+    this.clearFeedback();
+    this.selectedForm.set(form);
+    this.step.set('break');
+  }
+
   // ============================================================
   //  RETROCEDER / NAVEGAR PELA TRILHA
   // ============================================================
@@ -675,6 +705,9 @@ export class PainelComponent implements OnInit {
     this.clearFeedback();
     switch (this.step()) {
       case 'parameters':
+        this.goToForms();
+        break;
+      case 'break':
         this.goToForms();
         break;
       case 'form':
@@ -716,6 +749,8 @@ export class PainelComponent implements OnInit {
     this.selectedForm.set(null);
     this.resetFormState();
     this.step.set('form');
+    // ao voltar de "paradas", reflete a alteração no selo "Pausado" dos cards
+    this.refreshFormBreaks();
   }
 
   /** Zera o estado do formulário selecionado (parâmetros, máquinas, grupos e rascunho em memória). */

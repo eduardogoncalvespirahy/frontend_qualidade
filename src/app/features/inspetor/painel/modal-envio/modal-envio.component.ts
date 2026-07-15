@@ -18,7 +18,8 @@ import { Answer } from '../../../../core/models/answer.model';
 import { Machine } from '../../../../core/models/machine.model';
 import { UserProfile } from '../../../../core/models/user-profile.model';
 import { UserService } from '../../../../core/services/user.service';
-import { SignatureComponent } from '../../../../core/modals/signature/signature.component';
+import { SignatureComponent } from '../../../../core/components/signature/signature.component';
+
 
 interface CategoriaGrupo {
   categoria: unknown;

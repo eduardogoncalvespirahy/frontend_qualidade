@@ -41,8 +41,9 @@ import { ControlStatusService } from '../../../core/services/control-status.serv
 import { SignatureFileService } from '../../../core/services/signature-file.service';
 import { RepairerAnswerResultService } from '../../../core/services/repairerAnswerResult.service';
 import { ModalService } from '../../../core/services/modal.service';
-import { SignatureComponent } from '../../../core/modals/signature/signature.component';
+
 import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
+import { SignatureComponent } from '../../../core/components/signature/signature.component';
 
 type FileWithMetadata = File & {
   nome?: string;

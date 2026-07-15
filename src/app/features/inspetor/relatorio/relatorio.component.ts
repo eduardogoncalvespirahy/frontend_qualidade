@@ -22,7 +22,8 @@ import { BarSpec, DonutSpec, RangeSpec } from '../../../core/services/chart.serv
 import { ChartComponent } from '../../../core/modals/chart/chart.component';
 
 import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
-import { FileExportLayoutComponent } from '../../../core/modals/file-export-layout/file-export-layout.component';
+import { FileExportLayoutComponent } from '../../../core/components/file-export-layout/file-export-layout.component';
+
 
 type Metric = 'avg' | 'max' | 'min';
 

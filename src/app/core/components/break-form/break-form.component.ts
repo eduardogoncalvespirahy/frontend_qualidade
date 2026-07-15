@@ -10,8 +10,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BreakFormService } from '../../../../../../../core/services/break-form.service';
-import { BreakForm } from '../../../../../../../core/models/break-form.model';
+import { BreakFormService } from '../../services/break-form.service';
+import { BreakForm } from '../../models/break-form.model';
 import {
   canActivate,
   canDeactivate,
@@ -19,7 +19,7 @@ import {
   isExpired,
   statusLabel,
   validateBreakTimes,
-} from '../../../../../../../core/helpers/break-rules.helper';
+} from '../../helpers/break-rules.helper';
 
 @Component({
   selector: 'app-break-form',

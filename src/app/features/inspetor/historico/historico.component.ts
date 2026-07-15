@@ -495,7 +495,7 @@ export class HistoricoComponent implements OnInit {
 
         this.expandedLoading.set(null);
       },
-      error: () => this.expandedLoading.set(null),
+      error: (err) =>{  console.error(err);  this.expandedLoading.set(null)},
     });
   }
 

@@ -156,30 +156,12 @@ export class BreakMachineComponent implements OnInit {
 
   // ───────── regra de sobreposição ─────────
   /**
-   * Lê a hora de fim de forma tolerante ao nome/formato do campo retornado
-   * pela API (horaFim, hora_fim, dataFim…). Retorna null quando não há fim.
-   */
-  private getHoraFim(b: BreakMachine): string | Date | null {
-    const raw = b as unknown as Record<string, unknown>;
-    const v =
-      b.horaFim ?? raw['hora_fim'] ?? raw['horafim'] ?? raw['dataFim'] ?? raw['data_fim'] ?? null;
-    return (v as string | Date | null) ?? null;
-  }
-  /** True quando a parada tem hora de fim preenchida (não vazia). */
-  private temFim(b: BreakMachine): boolean {
-    const v = this.getHoraFim(b);
-    if (v == null) return false;
-    if (typeof v === 'string') return v.trim().length > 0;
-    return true;
-  }
-
-  /**
    * Parada ATIVA agora e SEM hora de fim (aberta/indefinida). SÓ esse caso
    * bloqueia a criação — uma parada ativa COM hora de fim permite criar outra
    * (que deverá começar após esse fim).
    */
   readonly paradaAbertaAtiva = computed(
-    () => this.breaks().find((b) => isActive(b, this.now()) && !this.temFim(b)) ?? null,
+    () => this.breaks().find((b) => isActive(b, this.now()) && !b.horaFim) ?? null,
   );
   /** Só bloqueia quando há uma parada ativa sem hora de fim. */
   readonly podeCriar = computed(() => !this.paradaAbertaAtiva());
@@ -190,9 +172,8 @@ export class BreakMachineComponent implements OnInit {
    */
   readonly minInicioNova = computed(() => {
     const now = this.now();
-    const ativaComFim = this.breaks().find((b) => isActive(b, now) && this.temFim(b));
-    const fimVal = ativaComFim ? this.getHoraFim(ativaComFim) : null;
-    const base = fimVal ? new Date(fimVal as unknown as string) : now;
+    const ativaComFim = this.breaks().find((b) => isActive(b, now) && !!b.horaFim);
+    const base = ativaComFim?.horaFim ? new Date(ativaComFim.horaFim as unknown as string) : now;
     const floor = base.getTime() > now.getTime() ? base : now;
     return this.toLocalInput(floor);
   });
@@ -346,7 +327,7 @@ export class BreakMachineComponent implements OnInit {
     const now = new Date();
 
     // Bloqueia apenas se houver parada ATIVA e SEM hora de fim (aberta).
-    const abertaAtiva = this.breaks().find((b) => isActive(b, now) && !this.temFim(b));
+    const abertaAtiva = this.breaks().find((b) => isActive(b, now) && !b.horaFim);
     if (abertaAtiva) {
       this.error.set(
         `Há uma parada ativa sem hora de fim (iniciada em ${this.fmt(abertaAtiva.horaInicio)}). Informe a hora de fim (ou desative) antes de criar outra.`,
@@ -371,13 +352,12 @@ export class BreakMachineComponent implements OnInit {
     }
 
     // Se há parada ATIVA COM hora de fim, a nova só pode começar após esse fim.
-    const ativaComFim = this.breaks().find((b) => isActive(b, now) && this.temFim(b));
-    const fimAtualVal = ativaComFim ? this.getHoraFim(ativaComFim) : null;
-    if (fimAtualVal) {
-      const fimAtual = new Date(fimAtualVal as unknown as string);
+    const ativaComFim = this.breaks().find((b) => isActive(b, now) && !!b.horaFim);
+    if (ativaComFim?.horaFim) {
+      const fimAtual = new Date(ativaComFim.horaFim as unknown as string);
       if (ini.getTime() < fimAtual.getTime()) {
         this.error.set(
-          `A nova parada deve começar após o fim da parada em andamento (${this.fmt(fimAtualVal)}).`,
+          `A nova parada deve começar após o fim da parada em andamento (${this.fmt(ativaComFim.horaFim)}).`,
         );
         return;
       }
@@ -388,9 +368,9 @@ export class BreakMachineComponent implements OnInit {
       .create({
         machineId: this.machineId(),
         userId: this.auth.userId()!,
-        horaInicio: this.toServerDate(ini),
-        horaFim: fim ? this.toServerDate(fim) : undefined,
-        motivo: v.motivo.trim(),
+        horaInicio: this.toServerDate(ini) as unknown as Date,
+        horaFim: fim ? (this.toServerDate(fim) as unknown as Date) : undefined,
+        motivo: v.motivo.trim() || undefined,
         status: 1,
       })
       .subscribe({
@@ -429,13 +409,13 @@ export class BreakMachineComponent implements OnInit {
       .update(b.id, {
         machineId: b.machineId,
         userId: this.auth.userId()!,
-        horaInicio: this.toServerDate(this.parseServerDate(b.horaInicio)),
+        horaInicio: this.toServerDate(this.parseServerDate(b.horaInicio)) as unknown as Date,
         horaFim: horaFim
-          ? this.toServerDate(horaFim)
+          ? (this.toServerDate(horaFim) as unknown as Date)
           : b.horaFim
-            ? this.toServerDate(this.parseServerDate(b.horaFim))
+            ? (this.toServerDate(this.parseServerDate(b.horaFim)) as unknown as Date)
             : undefined,
-        motivo: b.motivo,
+        motivo: b.motivo ?? undefined,
         status,
       })
       .subscribe({
@@ -453,29 +433,34 @@ export class BreakMachineComponent implements OnInit {
   }
 
   // ───────── datas ─────────
-  /** Date -> string local para input[type=datetime-local] (YYYY-MM-DDTHH:mm). */
   private toLocalInput(d: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
+
   private fromLocalInput(s: string): Date {
     return new Date(s);
   }
+
   /**
-   * Converte Date para string local sem Z antes de enviar ao backend.
-   * A coluna hora_inicio/hora_fim é TIMESTAMP (sem fuso): pg armazena
-   * exatamente o valor recebido. Enviar sem Z garante que o valor local
-   * (ex.: "10:20") seja salvo como-está, sem conversão de fuso.
+   * Envia hora local sem Z — coluna TIMESTAMP (sem fuso) armazena como-está,
+   * evitando a conversão indevida pelo Node/pg em UTC.
    */
   private toServerDate(d: Date): string {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
 
+  private parseServerDate(d: Date | string): Date {
+    if (d instanceof Date) return d;
+    return new Date(d.endsWith('Z') ? d : d + 'Z');
+  }
+
   private readonly dtFmt = new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
   });
+
   fmt(d: Date | string | null | undefined): string {
     if (!d) return '—';
     const s = typeof d === 'string' && !d.endsWith('Z') ? d + 'Z' : d;
@@ -501,14 +486,9 @@ export class BreakMachineComponent implements OnInit {
   trackById(_: number, b: BreakMachine): string {
     return b.id;
   }
+
   private clearFeedback(): void {
     this.error.set(null);
     this.success.set(null);
-  }
-
-  /** Converte string do servidor (sem Z) para Date UTC correto. */
-  private parseServerDate(d: Date | string): Date {
-    if (d instanceof Date) return d;
-    return new Date(d.endsWith('Z') ? d : d + 'Z');
   }
 }

@@ -330,7 +330,7 @@ export class BreakFormComponent implements OnInit {
     const abertaAtiva = this.breaks().find((b) => isActive(b, now) && !b.horaFim);
     if (abertaAtiva) {
       this.error.set(
-        'Há uma parada ativa sem hora de fim. Informe a hora de fim (ou desative) antes de criar outra.',
+        `Há uma parada ativa sem hora de fim (iniciada em ${this.fmt(abertaAtiva.horaInicio)}). Informe a hora de fim (ou desative) antes de criar outra.`,
       );
       return;
     }
@@ -381,9 +381,9 @@ export class BreakFormComponent implements OnInit {
           this.novo.set({ horaInicio: this.toLocalInput(new Date()), horaFim: '', motivo: '' });
           this.load();
         },
-        error: () => {
+        error: (err) => {
           this.saving.set(false);
-          this.error.set('Erro ao criar a parada.');
+          this.error.set(`Erro ao criar a parada. - ${err.error.message}`);
         },
       });
   }

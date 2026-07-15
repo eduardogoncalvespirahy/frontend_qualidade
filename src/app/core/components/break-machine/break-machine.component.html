@@ -2,7 +2,7 @@
   <header class="brk__head">
     <div>
       <span class="brk__eyebrow">Paradas</span>
-      <h2 class="brk__title">Paradas da máquina</h2>
+      <h2 class="brk__title">Paradas do máquina</h2>
     </div>
     <button
       type="button"
@@ -23,11 +23,11 @@
   }
 
   <!-- Bloqueio: parada ativa sem hora de fim -->
-  @if (paradaAbertaAtiva(); as pa) {
+  @if (!podeCriar()) {
     <div class="alert alert--warn">
       <i class="bi bi-info-circle"></i>
-      Há uma parada ativa sem hora de fim (iniciada em {{ fmt(pa.horaInicio) }}). Informe a hora de
-      fim (ou desative) para registrar uma nova.
+      Há uma parada ativa sem hora de fim. Informe a hora de fim (ou desative) para registrar uma
+      nova.
     </div>
   }
 
@@ -48,9 +48,9 @@
         />
       </div>
       <div class="ff">
-        <label class="ff__label" for="brk-fim"
-          >Hora de fim <span class="ff__optional">(opcional)</span></label
-        >
+        <label class="ff__label" for="brk-fim">
+          Hora de fim <span class="ff__optional">(opcional)</span>
+        </label>
         <input
           id="brk-fim"
           type="datetime-local"
@@ -63,7 +63,7 @@
         />
       </div>
       <div class="ff ff--wide">
-        <label class="ff__label" for="brk-motivo">Motivo</label>
+        <label class="ff__label" for="brk-motivo">Motivo (opcional)</label>
         <input
           id="brk-motivo"
           type="text"
@@ -101,7 +101,7 @@
   } @else if (ordenadas().length === 0) {
     <div class="empty">
       <i class="bi bi-pause-circle"></i>
-      <p>Nenhuma parada registrada para esta máquina.</p>
+      <p>Nenhuma parada registrada para este máquina.</p>
     </div>
   } @else {
     <!-- Filtros -->
@@ -229,10 +229,9 @@
 
             <div class="brk-card__times">
               <span><i class="bi bi-play-fill"></i> {{ fmt(b.horaInicio) }}</span>
-              <span
-                ><i class="bi bi-stop-fill"></i>
-                {{ b.horaFim ? fmt(b.horaFim) : 'Em aberto' }}</span
-              >
+              <span>
+                <i class="bi bi-stop-fill"></i> {{ b.horaFim ? fmt(b.horaFim) : 'Em aberto' }}
+              </span>
             </div>
 
             <span class="brk-card__user">

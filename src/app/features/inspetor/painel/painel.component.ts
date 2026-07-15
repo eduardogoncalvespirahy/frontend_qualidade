@@ -1270,9 +1270,9 @@ export class PainelComponent implements OnInit {
       .subscribe({
         next: ({ control, anteriorPendenteId }) =>
           this.persistirRespostas(dados, control, anteriorPendenteId),
-        error: () => {
+        error: (err) => {
           this.saving.set(false);
-          this.error.set('Falhou ao registrar a inspeção.');
+          this.error.set(`Falhou ao registrar a inspeção.- ${err}`);
         },
       });
   }
@@ -1352,10 +1352,12 @@ export class PainelComponent implements OnInit {
       })
       .pipe(
         catchError((err) => {
-          console.error('Erro ao criar status do controle anterior:', err);
+          console.log('Erro ao criar status do controle anterior:', err);
           return of(null);
         }),
       );
+
+    console.log('statusOp: ',statusOp);
 
     const ops: Observable<unknown>[] = [statusOp, ...resultOps];
 

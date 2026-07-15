@@ -4,7 +4,12 @@
       <span class="brk__eyebrow">Paradas</span>
       <h2 class="brk__title">Paradas do formulário</h2>
     </div>
-    <button type="button" class="btn btn--primary" (click)="toggleForm()">
+    <button
+      type="button"
+      class="btn btn--primary"
+      [disabled]="!formOpen() && !podeCriar()"
+      (click)="toggleForm()"
+    >
       <i class="bi" [class.bi-plus-lg]="!formOpen()" [class.bi-x-lg]="formOpen()"></i>
       {{ formOpen() ? 'Cancelar' : 'Nova parada' }}
     </button>
@@ -17,6 +22,15 @@
     <div class="alert alert--success"><i class="bi bi-check-circle"></i> {{ success() }}</div>
   }
 
+  <!-- Bloqueio: parada ativa sem hora de fim -->
+  @if (!podeCriar()) {
+    <div class="alert alert--warn">
+      <i class="bi bi-info-circle"></i>
+      Há uma parada ativa sem hora de fim. Informe a hora de fim (ou desative) para registrar uma
+      nova.
+    </div>
+  }
+
   <!-- Form de criação -->
   @if (formOpen()) {
     <div class="brk__form">
@@ -26,7 +40,7 @@
           id="brk-ini"
           type="datetime-local"
           class="ff__control"
-          min="2020-01-01T00:00"
+          [min]="minInicioNova()"
           max="2100-12-31T23:59"
           [ngModel]="novo().horaInicio"
           [ngModelOptions]="{ standalone: true }"
@@ -61,7 +75,12 @@
         />
       </div>
       <div class="brk__form-actions">
-        <button type="button" class="btn btn--primary" [disabled]="saving()" (click)="criar()">
+        <button
+          type="button"
+          class="btn btn--primary"
+          [disabled]="saving() || !podeCriar()"
+          (click)="criar()"
+        >
           <i class="bi bi-check-lg"></i> Criar parada
         </button>
       </div>
@@ -85,54 +104,195 @@
       <p>Nenhuma parada registrada para este formulário.</p>
     </div>
   } @else {
-    <div class="brk__grid">
-      @for (b of ordenadas(); track trackById($index, b)) {
-        <div class="brk-card" [class.is-off]="!ativa(b)">
-          <div class="brk-card__top">
-            <span class="brk-card__icon"><i class="bi bi-pause-circle"></i></span>
-            <span
-              class="badge"
-              [class.badge--on]="ativa(b)"
-              [class.badge--sched]="label(b) === 'Agendada'"
-              [class.badge--exp]="label(b) === 'Expirada'"
-            >
-              {{ label(b) }}
-            </span>
-          </div>
-
-          <div class="brk-card__times">
-            <span><i class="bi bi-play-fill"></i> {{ fmt(b.horaInicio) }}</span>
-            <span>
-              <i class="bi bi-stop-fill"></i> {{ b.horaFim ? fmt(b.horaFim) : 'Em aberto' }}
-            </span>
-          </div>
-
-          @if (b.motivo) {
-            <p class="brk-card__motivo">{{ b.motivo }}</p>
+    <!-- Filtros -->
+    <div class="brk__filters">
+      <div class="brk__filters-bar">
+        <button
+          type="button"
+          class="btn"
+          [class.is-open]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <i class="bi bi-funnel"></i> Filtros
+          @if (activeFilterCount()) {
+            <span class="brk__filters-count">{{ activeFilterCount() }}</span>
           }
+          <i
+            class="bi"
+            [class.bi-chevron-down]="!filtersOpen()"
+            [class.bi-chevron-up]="filtersOpen()"
+          ></i>
+        </button>
 
-          <div class="brk-card__actions">
-            @if (podeDesativar(b)) {
-              <button
-                type="button"
-                class="btn btn--ghost"
-                [disabled]="saving()"
-                (click)="desativar(b)"
-              >
-                <i class="bi bi-toggle-off"></i> Desativar
-              </button>
-            }
-            <!-- @if (podeAtivar(b)) {
-              <button type="button" class="btn btn--ok" [disabled]="saving()" (click)="ativar(b)">
-                <i class="bi bi-toggle-on"></i> Ativar
-              </button>
-            } -->
-            @if (expirada(b)) {
-              <span class="brk-card__note"><i class="bi bi-clock-history"></i> Encerrada</span>
-            }
+        @if (hasFilter()) {
+          <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+            <i class="bi bi-x-lg"></i> Limpar
+          </button>
+        }
+      </div>
+
+      @if (filtersOpen()) {
+        <div class="brk__filters-grid">
+          <div class="ff">
+            <label class="ff__label" for="flt-motivo">Motivo</label>
+            <input
+              id="flt-motivo"
+              type="text"
+              class="ff__control"
+              placeholder="Contém…"
+              [ngModel]="filters().motivo"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('motivo', $event)"
+            />
+          </div>
+
+          <div class="ff">
+            <label class="ff__label" for="flt-sit">Situação</label>
+            <select
+              id="flt-sit"
+              class="ff__control"
+              [ngModel]="filters().situacao"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('situacao', $event)"
+            >
+              <option value="all">Todas</option>
+              <option value="ativa">Ativa</option>
+              <option value="agendada">Agendada</option>
+              <option value="expirada">Expirada</option>
+              <option value="inativa">Inativa</option>
+            </select>
+          </div>
+
+          <div class="ff">
+            <label class="ff__label" for="flt-user">Usuário</label>
+            <input
+              id="flt-user"
+              type="text"
+              class="ff__control"
+              placeholder="Contém…"
+              [ngModel]="filters().usuario"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('usuario', $event)"
+            />
+          </div>
+
+          <div class="ff">
+            <label class="ff__label" for="flt-de">Início de</label>
+            <input
+              id="flt-de"
+              type="date"
+              class="ff__control"
+              [ngModel]="filters().de"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('de', $event)"
+            />
+          </div>
+
+          <div class="ff">
+            <label class="ff__label" for="flt-ate">Início até</label>
+            <input
+              id="flt-ate"
+              type="date"
+              class="ff__control"
+              [ngModel]="filters().ate"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('ate', $event)"
+            />
           </div>
         </div>
       }
     </div>
+
+    @if (filtradas().length === 0) {
+      <div class="empty">
+        <i class="bi bi-funnel"></i>
+        <p>Nenhuma parada corresponde aos filtros.</p>
+        <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+          <i class="bi bi-x-lg"></i> Limpar filtros
+        </button>
+      </div>
+    } @else {
+      <div class="brk__grid">
+        @for (b of paginadas(); track trackById($index, b)) {
+          <div class="brk-card" [class.is-off]="!ativa(b)">
+            <div class="brk-card__top">
+              <span class="brk-card__icon"><i class="bi bi-pause-circle"></i></span>
+              <span
+                class="badge"
+                [class.badge--on]="ativa(b)"
+                [class.badge--sched]="label(b) === 'Agendada'"
+                [class.badge--exp]="label(b) === 'Expirada'"
+              >
+                {{ label(b) }}
+              </span>
+            </div>
+
+            <div class="brk-card__times">
+              <span><i class="bi bi-play-fill"></i> {{ fmt(b.horaInicio) }}</span>
+              <span>
+                <i class="bi bi-stop-fill"></i> {{ b.horaFim ? fmt(b.horaFim) : 'Em aberto' }}
+              </span>
+            </div>
+
+            <span class="brk-card__user">
+              <i class="bi bi-person"></i> {{ userName(b.userId) }}
+            </span>
+
+            @if (b.motivo) {
+              <p class="brk-card__motivo">{{ b.motivo }}</p>
+            }
+
+            <div class="brk-card__actions">
+              @if (podeDesativar(b)) {
+                <button
+                  type="button"
+                  class="btn btn--ghost"
+                  [disabled]="saving()"
+                  (click)="desativar(b)"
+                >
+                  <i class="bi bi-toggle-off"></i> Desativar
+                </button>
+              }
+              <!-- @if (podeAtivar(b)) {
+                <button type="button" class="btn btn--ok" [disabled]="saving()" (click)="ativar(b)">
+                  <i class="bi bi-toggle-on"></i> Ativar
+                </button>
+              } -->
+              @if (expirada(b)) {
+                <span class="brk-card__note"><i class="bi bi-clock-history"></i> Encerrada</span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Paginação -->
+      @if (totalPages() > 1) {
+        <div class="brk__pager">
+          <button
+            type="button"
+            class="btn btn--ghost"
+            [disabled]="page() === 1"
+            (click)="paginaAnterior()"
+          >
+            <i class="bi bi-chevron-left"></i> Anterior
+          </button>
+
+          <span class="brk__pager-info">
+            Página {{ page() }} de {{ totalPages() }}
+            <small>({{ filtradas().length }} paradas)</small>
+          </span>
+
+          <button
+            type="button"
+            class="btn btn--ghost"
+            [disabled]="page() === totalPages()"
+            (click)="proximaPagina()"
+          >
+            Próxima <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      }
+    }
   }
 </section>

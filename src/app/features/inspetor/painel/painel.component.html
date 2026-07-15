@@ -578,7 +578,16 @@
         }
 
         <div class="mt-4">
-          <button class="btn btn-primary w-100" (click)="enviar()">
+          <button
+            class="btn btn-primary w-100"
+            [disabled]="!podeEnviar()"
+            [title]="
+              podeEnviar()
+                ? ''
+                : 'Preencha todos os parâmetros ativos (não pausados) antes de enviar.'
+            "
+            (click)="enviar()"
+          >
             <i class="bi bi-send me-2"></i>Enviar Inspeção
           </button>
         </div>

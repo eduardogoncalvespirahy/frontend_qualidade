@@ -17,7 +17,6 @@ import { FormTimeComponent } from './modals/form-time/form-time.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
 import { BreakFormComponent } from '../../../../../core/components/break-form/break-form.component';
 
-
 type Step = 'location' | 'section' | 'form' | 'break' | 'time';
 
 interface Filters {

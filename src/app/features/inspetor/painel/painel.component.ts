@@ -859,6 +859,40 @@ export class PainelComponent implements OnInit {
     }, 0);
   });
 
+  /**
+   * Answers ativos (status === 1) que ainda não têm valor informado.
+   * Máquina pausada é ignorada da exigência (input travado, nunca seria respondida).
+   */
+  readonly missingActiveAnswers = computed<Answer[]>(() => {
+    const activeAnswers = this.answers().filter((a) => a.status === 1);
+    const machines = this.machines();
+
+    if (machines.length > 0) {
+      const machineValues = this.machineParamValues();
+      return activeAnswers.filter((a) =>
+        machines.some((m) => {
+          if (this.isPaused(m.id)) return false;
+          return !(machineValues[`${m.id}_${a.id}`] ?? '').trim();
+        }),
+      );
+    }
+
+    const values = this.paramValues();
+    return activeAnswers.filter((a) => !(values[a.id] ?? '').trim());
+  });
+
+  /** Existe pelo menos um alvo não-pausado pra responder? (evita liberar envio vazio). */
+  readonly hasFillableTarget = computed(() => {
+    const machines = this.machines();
+    if (machines.length > 0) return machines.some((m) => !this.isPaused(m.id));
+    return this.answers().some((a) => a.status === 1);
+  });
+
+  /** Só permite enviar quando há algo pra responder e tudo não-pausado está completo. */
+  readonly podeEnviar = computed(
+    () => this.hasFillableTarget() && this.missingActiveAnswers().length === 0,
+  );
+
   isPaused(machineId: string): boolean {
     return this.pausedMachineIds().has(machineId);
   }
@@ -1089,7 +1123,24 @@ export class PainelComponent implements OnInit {
     { categoria: null, answers: this.orderedAnswers() },
   ]);
 
+  /** machineParamValues() sem as entradas de máquinas em pausa — nunca vai pro modal nem pro banco. */
+  private machineRespostasSemPausa(): Record<string, string> {
+    const values = this.machineParamValues();
+    const out: Record<string, string> = {};
+    for (const [chave, valor] of Object.entries(values)) {
+      const sep = chave.indexOf('_');
+      const machineId = sep >= 0 ? chave.slice(0, sep) : chave;
+      if (!this.isPaused(machineId)) out[chave] = valor;
+    }
+    return out;
+  }
+
   protected async enviar(): Promise<void> {
+    if (!this.podeEnviar()) {
+      this.error.set('Preencha todos os parâmetros ativos (não pausados) antes de enviar.');
+      return;
+    }
+
     let ref: ComponentModalRef<ModalEnvioComponent, boolean> | undefined;
 
     ref = this.modalService.openComponent(ModalEnvioComponent, {
@@ -1101,8 +1152,8 @@ export class PainelComponent implements OnInit {
         formNome: this.selectedForm()?.nome ?? '',
         agrupados: this.agrupados(),
         respostas: this.paramValues(),
-        machines: this.machines(),
-        machineRespostas: this.machineParamValues(),
+        machines: this.machines().filter((m) => !this.isPaused(m.id)),
+        machineRespostas: this.machineRespostasSemPausa(),
       },
       // Sem botões no rodapé: as ações ficam no próprio componente,
       // onde o "Confirmar" só habilita com inspetor + assinatura + 1 resultado.
@@ -1246,6 +1297,9 @@ export class PainelComponent implements OnInit {
         if (sep < 0) continue;
         const machineId = chave.slice(0, sep);
         const answerId = chave.slice(sep + 1);
+
+        if (this.isPaused(machineId)) continue; // segurança extra: nunca grava máquina em pausa
+
 
         if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
 

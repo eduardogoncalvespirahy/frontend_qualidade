@@ -416,6 +416,13 @@
   margin-left: 2px;
 }
 
+/* Variante compacta para uso dentro da tabela de máquinas */
+.btn-parada--sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* badge de status */
 .badge {
   font-size: 11px;

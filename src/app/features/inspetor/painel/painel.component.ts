@@ -52,9 +52,9 @@ import { FormTimeService } from '../../../core/services/form-time.service';
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
 import { BreakFormComponent } from '../../../core/components/break-form/break-form.component';
+import { BreakMachineComponent } from '../../../core/components/break-machine/break-machine.component';
 
-
-type Step = 'location' | 'section' | 'form' | 'parameters' | 'break';
+type Step = 'location' | 'section' | 'form' | 'parameters' | 'break' | 'break-machine';
 
 /** Campos filtráveis derivados das interfaces (sem o id). */
 interface Filters {
@@ -72,7 +72,13 @@ interface Filters {
 @Component({
   selector: 'app-painel',
   standalone: true,
-  imports: [CommonModule, FormsModule, ScrollTopComponent, BreakFormComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ScrollTopComponent,
+    BreakFormComponent,
+    BreakMachineComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './painel.component.html',
   styleUrl: './painel.component.css',
@@ -120,6 +126,8 @@ export class PainelComponent implements OnInit {
   readonly selectedLocation = signal<Location | null>(null);
   readonly selectedSection = signal<Section | null>(null);
   readonly selectedForm = signal<Form | null>(null);
+  /** máquina cujas paradas serão geridas (etapa break-machine). */
+  readonly selectedMachine = signal<Machine | null>(null);
 
   // ───────── feedback ─────────
   readonly loading = signal(false);
@@ -329,6 +337,7 @@ export class PainelComponent implements OnInit {
     form: 'Formulários',
     parameters: 'Parâmetros',
     break: 'Paradas',
+    'break-machine': 'Paradas da máquina',
   };
   private readonly descriptions: Record<Step, string> = {
     location: 'Selecione um local para começar.',
@@ -336,6 +345,7 @@ export class PainelComponent implements OnInit {
     form: 'Escolha o formulário a ser preenchido.',
     parameters: 'Informe os valores de cada parâmetro e salve.',
     break: 'Gerencie as paradas deste formulário.',
+    'break-machine': 'Gerencie as paradas desta máquina.',
   };
 
   readonly pageTitle = computed(() => this.titles[this.step()]);
@@ -474,6 +484,17 @@ export class PainelComponent implements OnInit {
         next: (res) => this.allFormBreaks.set(this.unwrap<BreakForm>(res)),
         error: () => this.allFormBreaks.set([]),
       });
+  }
+
+  /**
+   * Recarrega as paradas de máquina do formulário atual — usado ao voltar da
+   * etapa de paradas de máquina, para refletir o bloqueio dos inputs (máquinas
+   * em pausa) sem recarregar todos os parâmetros.
+   */
+  private refreshMachineBreaks(): void {
+    this.fetchMachineBreaks()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((breaks) => this.breaks.set(breaks));
   }
 
   // ── carga do formulário selecionado (answers + machines + breaks + results) ──
@@ -697,6 +718,17 @@ export class PainelComponent implements OnInit {
     this.step.set('break');
   }
 
+  /** Abre a gestão de paradas de uma máquina (dentro da etapa de parâmetros). */
+  openMachineBreaks(machine: Machine): void {
+    if (!this.isLocationAllowed(this.selectedLocation())) {
+      this.error.set('Você não tem acesso a este local.');
+      return;
+    }
+    this.clearFeedback();
+    this.selectedMachine.set(machine);
+    this.step.set('break-machine');
+  }
+
   // ============================================================
   //  RETROCEDER / NAVEGAR PELA TRILHA
   // ============================================================
@@ -709,6 +741,11 @@ export class PainelComponent implements OnInit {
         break;
       case 'break':
         this.goToForms();
+        break;
+      case 'break-machine':
+        // volta aos parâmetros do formulário e atualiza as máquinas bloqueadas
+        this.step.set('parameters');
+        this.refreshMachineBreaks();
         break;
       case 'form':
         this.goToSections();
@@ -1305,7 +1342,11 @@ export class PainelComponent implements OnInit {
     return map;
   });
 
-  formStatusColor(formId: string): 'green' | 'yellow' | 'red' | '' {
+  formStatusColor(formId: string): 'green' | 'yellow' | 'red' | 'gray' | '' {
+    // Parado tem prioridade: card cinza, independente do tempo de execução
+    // e mesmo sem FormTime configurado.
+    if (this.isFormPausedById(formId)) return 'gray';
+
     const ft = this.formTimeMap().get(formId);
     if (!ft) return ''; // sem FormTime configurado → sem indicador
 

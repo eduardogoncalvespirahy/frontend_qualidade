@@ -17,7 +17,7 @@ import { AuthService } from '../../../../../core/services/auth.service';
 import { FormComponent } from './modals/form/form.component';
 import { DetailComponent } from './modals/detail/detail.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
-import { BreakMachineComponent } from './modals/break-machine/break-machine.component';
+import { BreakMachineComponent } from '../../../../../core/components/break-machine/break-machine.component';
 
 type Step = 'location' | 'section' | 'form' | 'machine' | 'break';
 

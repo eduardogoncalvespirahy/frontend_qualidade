@@ -1,6 +1,7 @@
 export interface BreakForm {
   id: string;
   formId: string;
+  userId: string;  
   horaInicio: Date;
   horaFim: Date | null;
   motivo: string;
@@ -11,6 +12,7 @@ export interface BreakForm {
 
 export interface CreateBreakForm {
   formId: string;
+  userId: string;  
   horaInicio: Date;
   horaFim?: Date | null;
   motivo?: string;
@@ -19,6 +21,7 @@ export interface CreateBreakForm {
 
 export interface UpdateBreakForm {
   formId?: string;
+  userId?: string;  
   horaInicio: Date;
   horaFim?: Date | null;
   motivo?: string;

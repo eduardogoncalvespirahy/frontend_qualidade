@@ -20,6 +20,7 @@ import {
   statusLabel,
   validateBreakTimes,
 } from '../../helpers/break-rules.helper';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-break-form',
@@ -31,6 +32,7 @@ import {
 })
 export class BreakFormComponent implements OnInit {
   private readonly service = inject(BreakFormService);
+  private readonly auth = inject(AuthService);  
   private readonly destroyRef = inject(DestroyRef);
 
   /** Formulário dono das paradas. */
@@ -126,6 +128,7 @@ export class BreakFormComponent implements OnInit {
     this.service
       .create({
         formId: this.formId(),
+        userId: this.auth.userId()!,        
         horaInicio: this.toServerDate(ini) as unknown as Date,
         horaFim: fim ? (this.toServerDate(fim) as unknown as Date) : undefined,
         motivo: v.motivo.trim() || undefined,
@@ -166,6 +169,7 @@ export class BreakFormComponent implements OnInit {
     this.service
       .update(b.id, {
         formId: b.formId,
+        userId: this.auth.userId()!,
         horaInicio: this.toServerDate(this.parseServerDate(b.horaInicio)) as unknown as Date,
         horaFim: horaFim
           ? (this.toServerDate(horaFim) as unknown as Date)

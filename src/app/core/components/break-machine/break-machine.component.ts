@@ -10,8 +10,8 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BreakMachineService } from '../../../../../../../core/services/break-machine.service';
-import { BreakMachine } from '../../../../../../../core/models/break-machine.model';
+import { BreakMachineService } from '../../services/break-machine.service';
+import { BreakMachine } from '../../models/break-machine.model';
 import {
   canActivate,
   canDeactivate,
@@ -19,7 +19,8 @@ import {
   isExpired,
   statusLabel,
   validateBreakTimes,
-} from '../../../../../../../core/helpers/break-rules.helper';
+} from '../../helpers/break-rules.helper';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-break-machine',
@@ -31,6 +32,7 @@ import {
 })
 export class BreakMachineComponent implements OnInit {
   private readonly service = inject(BreakMachineService);
+  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Máquina dona das paradas. */
@@ -126,6 +128,7 @@ export class BreakMachineComponent implements OnInit {
     this.service
       .create({
         machineId: this.machineId(),
+        userId: this.auth.userId()!,
         horaInicio: this.toServerDate(ini),
         horaFim: fim ? this.toServerDate(fim) : undefined,
         motivo: v.motivo.trim(),
@@ -139,9 +142,9 @@ export class BreakMachineComponent implements OnInit {
           this.novo.set({ horaInicio: this.toLocalInput(new Date()), horaFim: '', motivo: '' });
           this.load();
         },
-        error: () => {
+        error: (err) => {
           this.saving.set(false);
-          this.error.set('Erro ao criar a parada.');
+          this.error.set(`Erro ao criar a parada. - ${err.error.message}`);
         },
       });
   }
@@ -167,6 +170,7 @@ export class BreakMachineComponent implements OnInit {
   this.service
     .update(b.id, {
       machineId: b.machineId,
+      userId: this.auth.userId()!,
       horaInicio: this.toServerDate(this.parseServerDate(b.horaInicio)),
       horaFim: horaFim
         ? this.toServerDate(horaFim)
@@ -220,8 +224,6 @@ export class BreakMachineComponent implements OnInit {
     const t = new Date(s);
     return isNaN(t.getTime()) ? '—' : this.dtFmt.format(t);
   }
-
-
 
   toggleForm(): void {
     this.clearFeedback();

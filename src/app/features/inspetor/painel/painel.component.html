@@ -72,6 +72,9 @@
             @if (step() === 'break') {
               <i class="bi bi-pause-circle"></i>
               <span class="chip__label">Paradas</span>
+            } @else if (step() === 'break-machine') {
+              <i class="bi bi-pause-circle"></i>
+              <span class="chip__label">Paradas · {{ selectedMachine()?.nome }}</span>
             } @else {
               <i class="bi bi-pencil-square"></i>
               <span class="chip__label">Parâmetros</span>
@@ -95,7 +98,7 @@
   }
 
   <!-- Filtros por campo (não aparece nas etapas de parâmetros/paradas) -->
-  @if (step() !== 'parameters' && step() !== 'break' && !loading()) {
+  @if (step() !== 'parameters' && step() !== 'break' && step() !== 'break-machine' && !loading()) {
     <div class="filters">
       <div class="filters__bar">
         <button
@@ -336,6 +339,7 @@
         @if (filteredForms().length) {
           <div class="grid">
             @for (form of filteredForms(); track trackById($index, form)) {
+              @let statusColor = formStatusColor(form.id);
               <div class="card-wrap">
                 <button
                   type="button"
@@ -344,13 +348,15 @@
                   [disabled]="isFormPausedById(form.id)"
                   (click)="selectForm(form)"
                   [style.border-left]="
-                    formStatusColor(form.id) === 'green'
+                    statusColor === 'green'
                       ? '4px solid #22c55e'
-                      : formStatusColor(form.id) === 'yellow'
+                      : statusColor === 'yellow'
                         ? '4px solid #f59e0b'
-                        : formStatusColor(form.id) === 'red'
+                        : statusColor === 'red'
                           ? '4px solid #ef4444'
-                          : ''
+                          : statusColor === 'gray'
+                            ? '4px solid #94a3b8'
+                            : ''
                   "
                 >
                   <div class="card__top">
@@ -413,10 +419,17 @@
         }
       }
 
-      <!-- ───── PARADAS ───── -->
+      <!-- ───── PARADAS (formulário) ───── -->
       @case ('break') {
         @if (selectedForm(); as f) {
           <app-break-form [formId]="f.id" />
+        }
+      }
+
+      <!-- ───── PARADAS (máquina) ───── -->
+      @case ('break-machine') {
+        @if (selectedMachine(); as m) {
+          <app-break-machine [machineId]="m.id" />
         }
       }
 
@@ -456,12 +469,23 @@
                 @for (m of machines(); track m.id) {
                   <tr [class.table-warning]="isPaused(m.id)">
                     <td class="fw-semibold text-dark">
-                      {{ m.nome }}
-                      @if (isPaused(m.id)) {
-                        <span class="badge bg-warning text-dark ms-2">
-                          <i class="bi bi-pause-circle me-1"></i>Em pausa
+                      <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span>
+                          {{ m.nome }}
+                          @if (isPaused(m.id)) {
+                            <span class="badge bg-warning text-dark ms-2">
+                              <i class="bi bi-pause-circle me-1"></i>Em pausa
+                            </span>
+                          }
                         </span>
-                      }
+                        <button
+                          type="button"
+                          class="btn-parada btn-parada--sm"
+                          (click)="openMachineBreaks(m)"
+                        >
+                          <i class="bi bi-pause-circle"></i> Paradas
+                        </button>
+                      </div>
                     </td>
                     @for (a of orderedAnswers(); track a.id) {
                       <td class="p-1">

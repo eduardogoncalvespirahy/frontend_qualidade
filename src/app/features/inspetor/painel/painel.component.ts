@@ -1300,7 +1300,6 @@ export class PainelComponent implements OnInit {
 
         if (this.isPaused(machineId)) continue; // segurança extra: nunca grava máquina em pausa
 
-
         if (!this.dentroDoLimite(answerId, valor)) algumForaDoLimite = true;
 
         resultOps.push(
@@ -1346,10 +1345,17 @@ export class PainelComponent implements OnInit {
     }
 
     // UM único status para o NOVO controle: 1 = normalizado, 2 = correção.
-    const statusOp = this.controlStatusService.create({
-      controlId: control.id,
-      statusId: algumForaDoLimite ? '2' : '1',
-    });
+    const statusOp = this.controlStatusService
+      .create({
+        controlId: control.id,
+        statusId: algumForaDoLimite ? '2' : '1',
+      })
+      .pipe(
+        catchError((err) => {
+          console.error('Erro ao criar status do controle anterior:', err);
+          return of(null);
+        }),
+      );
 
     const ops: Observable<unknown>[] = [statusOp, ...resultOps];
 

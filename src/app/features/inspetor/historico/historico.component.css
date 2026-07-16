@@ -1,18 +1,32 @@
 :host {
+  /* ---- cor de marca (um valor só; --accent-ink vira alias) ---- */
+  --accent: #0d6efd; /* era rgb(13, 110, 253) — mesmo valor de --accent-ink */
+  --accent-ink: var(--accent);
+  --accent-soft: #cce2fb;
+
   --ink: #0f172a;
   --muted: #64748b;
   --line: #e2e8f0;
   --surface: #f8fafc;
   --card: #ffffff;
-  --accent: rgb(13, 110, 253);
-  --accent-soft: #cce2fb;
-  --accent-ink: #0d6efd;
-  --on: #16a34a;
-  --on-soft: #dcfce7;
+
   --danger: #dc2626;
   --danger-soft: #fee2e2;
+
+  /* ---- tokens de status dos chips (antes hardcoded nos seletores) ---- */
+  --ok: #065f46;
+  --ok-soft: #d1fae5;
+  --ok-line: #6ee7b7;
+  --err: #991b1b;
+  --err-soft: var(--danger-soft); /* era #fee2e2, idêntico */
+  --err-line: #fca5a5;
+  --pending: #475569;
+  --pending-soft: #f1f5f9;
+  --pending-line: #cbd5e1;
+
   --radius: 16px;
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --focus-ring: 0 0 0 3px var(--accent-soft);
 
   display: block;
   color: var(--ink);
@@ -238,8 +252,20 @@
 .ff__control:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
   background: #fff;
+}
+
+/* Foco visível para todos os controles interativos (acessibilidade) */
+.painel__reload:focus-visible,
+.filters__toggle:focus-visible,
+.filters__clear:focus-visible,
+.btn:focus-visible,
+.pager__btn:focus-visible,
+.tl-card__head--toggle:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 /* Timeline */
@@ -302,6 +328,19 @@
   flex-wrap: wrap;
 }
 
+/* Cabeçalho clicável (role="button") */
+.tl-card__head--toggle {
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.tl-card__head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
 .tl-card__title {
   margin: 0;
   font-size: 16px;
@@ -340,49 +379,23 @@
   text-decoration: none;
 }
 
-.tl-chip--muted {
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.tl-chip--file {
-  color: var(--accent-ink);
-  border-color: var(--accent-soft);
-  background: var(--accent-soft);
-}
-
-a.tl-chip--file:hover {
-  filter: brightness(0.96);
-}
-
 /* Status: normalizado = verde, correção = vermelho, pendente = cinza */
 .tl-chip--ok {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #6ee7b7;
+  background: var(--ok-soft);
+  color: var(--ok);
+  border-color: var(--ok-line);
 }
 
 .tl-chip--err {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fca5a5;
+  background: var(--err-soft);
+  color: var(--err);
+  border-color: var(--err-line);
 }
 
 .tl-chip--pending {
-  background: #f1f5f9;
-  color: #475569;
-  border-color: #cbd5e1;
-}
-
-.tl-obs {
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  background: var(--surface);
-  border-radius: 10px;
-  font-size: 13.5px;
-  color: var(--ink);
-  line-height: 1.5;
-  white-space: pre-wrap;
+  background: var(--pending-soft);
+  color: var(--pending);
+  border-color: var(--pending-line);
 }
 
 .tl-card__foot {

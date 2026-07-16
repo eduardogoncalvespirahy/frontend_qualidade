@@ -22,6 +22,7 @@ import { AnswerResult } from '../../../core/models/answer-result.model';
 import { MachineAnswerResult } from '../../../core/models/machine-answer-result.model';
 import { LimitAnswer } from '../../../core/models/limit-answer.model';
 import { RepairerAnswerResult } from '../../../core/models/repairerAnswerResult.model';
+import { RepairerMachineAnswerResult } from '../../../core/models/repairerMachineAnswerResult.model';
 import { PaginatedResult } from '../../../core/models/paginated.model';
 import { File } from '../../../core/models/file.model';
 
@@ -40,6 +41,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
 import { SignatureFileService } from '../../../core/services/signature-file.service';
 import { RepairerAnswerResultService } from '../../../core/services/repairerAnswerResult.service';
+import { RepairerMachineAnswerResultService } from '../../../core/services/repairerMachineAnswerResult.service';
 import { ModalService } from '../../../core/services/modal.service';
 
 import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
@@ -102,12 +104,19 @@ interface MachineData {
   answers: { id: string; nome: string }[];
   cells: Record<string, string>; // chave: machineId_answerId
   cellLimits: Record<string, string | null>; // chave: machineId_answerId → limitsAnswerId
+  cellResultIds: Record<string, string | null>; // chave: machineId_answerId → machineAnswerResultId (atual)
 }
 
 interface VersaoResposta {
   dataCriacao: string;
   valores: Record<string, string>;
   answerResultIds: string[]; // IDs deste lote (para resolver o reparador)
+}
+
+interface VersaoMaquina {
+  dataCriacao: string;
+  valores: Record<string, string>; // chave: machineId_answerId
+  machineAnswerResultIds: string[]; // IDs deste lote (para resolver o reparador)
 }
 
 @Component({
@@ -134,6 +143,7 @@ export class HistoricoComponent implements OnInit {
   private readonly controlStatusService = inject(ControlStatusService);
   private readonly signatureFileService = inject(SignatureFileService);
   private readonly repairerService = inject(RepairerAnswerResultService);
+  private readonly repairerMachineService = inject(RepairerMachineAnswerResultService);
   private readonly modalService = inject(ModalService);
 
   readonly controls = signal<Control[]>([]);
@@ -146,11 +156,15 @@ export class HistoricoComponent implements OnInit {
   readonly locations = signal<Location[]>([]);
 
   readonly repairerByAnswerResultId = signal<Record<string, string>>({}); // answerResultId → userId
+  readonly repairerByMachineAnswerResultId = signal<Record<string, string>>({}); // machineAnswerResultId → userId
+  private readonly repairerObsByAnswerResultId = signal<Record<string, string>>({}); // answerResultId → observação
+  private readonly repairerObsByMachineAnswerResultId = signal<Record<string, string>>({}); // machineAnswerResultId → observação
   readonly expandedId = signal<string | null>(null);
   readonly expandedLoading = signal<string | null>(null);
   readonly expandedData = signal<Record<string, ParamRow[]>>({});
   readonly expandedHistory = signal<Record<string, VersaoResposta[]>>({});
   readonly expandedMachineData = signal<Record<string, MachineData>>({});
+  readonly expandedMachineHistory = signal<Record<string, VersaoMaquina[]>>({});
 
   /**
    * controlId → nome do ÚLTIMO operador/reparador inserido (mais recente).
@@ -158,6 +172,8 @@ export class HistoricoComponent implements OnInit {
    * que possua reparador vinculado.
    */
   readonly operatorByControl = signal<Record<string, string | null>>({});
+  /** controlId → observação do ÚLTIMO reparador inserido. */
+  readonly operatorObsByControl = signal<Record<string, string | null>>({});
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -171,6 +187,12 @@ export class HistoricoComponent implements OnInit {
 
   // ───────── reparador da correção (opcional) ─────────
   readonly repairerQuery = signal<string>('');
+  /** Observação do reparo (opcional), gravada no registro do reparador. */
+  readonly repairerObs = signal<string>('');
+
+  updateRepairerObs(value: string): void {
+    this.repairerObs.set(value);
+  }
 
   readonly repairerResolved = computed<UserProfile | null>(() =>
     this.resolveRepairer(this.repairerQuery()),
@@ -446,6 +468,42 @@ export class HistoricoComponent implements OnInit {
     return { dataCriacao: String(raw), valores, answerResultIds };
   }
 
+  // ── mesmas regras de agrupamento, mas para machine_answer_result ──
+  private agruparVersoesMachine(
+    records: (MachineAnswerResult & Record<string, unknown>)[],
+  ): VersaoMaquina[] {
+    if (!records.length) return [];
+    const versoes: VersaoMaquina[] = [];
+    let lote: typeof records = [];
+    let prevMs = this.getDataCriacao(records[0]);
+
+    for (const r of records) {
+      const ms = this.getDataCriacao(r);
+      if (lote.length && ms - prevMs > 10_000) {
+        versoes.push(this.loteParaVersaoMachine(lote));
+        lote = [];
+      }
+      lote.push(r);
+      prevMs = ms;
+    }
+    if (lote.length) versoes.push(this.loteParaVersaoMachine(lote));
+    return versoes;
+  }
+
+  private loteParaVersaoMachine(
+    lote: (MachineAnswerResult & Record<string, unknown>)[],
+  ): VersaoMaquina {
+    const valores: Record<string, string> = {};
+    const machineAnswerResultIds: string[] = [];
+    for (const r of lote) {
+      valores[`${r.machineId}_${r.answerId}`] = r.resposta;
+      const id = (r as { id?: string }).id;
+      if (id) machineAnswerResultIds.push(id);
+    }
+    const raw = lote[0]['dataCriacao'] ?? lote[0]['data_criacao'] ?? lote[0]['createdAt'] ?? '';
+    return { dataCriacao: String(raw), valores, machineAnswerResultIds };
+  }
+
   // ───────── expandir detalhes ─────────
   toggleDetails(row: HistoryRow): void {
     if (this.expandedId() === row.id) {
@@ -495,7 +553,10 @@ export class HistoricoComponent implements OnInit {
 
         this.expandedLoading.set(null);
       },
-      error: (err) =>{  console.error(err);  this.expandedLoading.set(null)},
+      error: (err) => {
+        console.error(err);
+        this.expandedLoading.set(null);
+      },
     });
   }
 
@@ -513,10 +574,12 @@ export class HistoricoComponent implements OnInit {
     const maquinas = machineIds.map((id) => ({ id, nome: nameById.get(id) ?? id }));
     const cells: Record<string, string> = {};
     const cellLimits: Record<string, string | null> = {};
+    const cellResultIds: Record<string, string | null> = {};
     for (const r of ordenados) {
       const key = `${r.machineId}_${r.answerId}`;
       cells[key] = r.resposta;
       cellLimits[key] = (r as { limitsAnswerId?: string | null }).limitsAnswerId ?? null;
+      cellResultIds[key] = (r as { id?: string }).id ?? null;
     }
 
     this.expandedMachineData.update((d) => ({
@@ -526,8 +589,24 @@ export class HistoricoComponent implements OnInit {
         answers: answers.map((a) => ({ id: a.id, nome: a.nome })),
         cells,
         cellLimits,
+        cellResultIds,
       },
     }));
+
+    // histórico de correções (lotes por proximidade de tempo), como no modo normal
+    const versoes = this.agruparVersoesMachine(
+      ordenados as unknown as (MachineAnswerResult & Record<string, unknown>)[],
+    );
+    this.expandedMachineHistory.update((d) => ({ ...d, [controlId]: versoes }));
+
+    // ── operador = ÚLTIMO reparador (machine_answer_result mais recente) ──
+    const opM = this.resolverUltimoOperador(
+      ordenados,
+      this.repairerByMachineAnswerResultId(),
+      this.repairerObsByMachineAnswerResultId(),
+    );
+    this.operatorByControl.update((m) => ({ ...m, [controlId]: opM?.nome ?? null }));
+    this.operatorObsByControl.update((m) => ({ ...m, [controlId]: opM?.obs ?? null }));
   }
 
   private montarModoNormal(controlId: string, answers: Answer[], results: AnswerResult[]): void {
@@ -563,26 +642,35 @@ export class HistoricoComponent implements OnInit {
     this.expandedHistory.update((d) => ({ ...d, [controlId]: versoes }));
 
     // ── operador = ÚLTIMO reparador inserido (answer_result mais recente) ──
-    this.operatorByControl.update((m) => ({
-      ...m,
-      [controlId]: this.resolverUltimoOperador(ordenados),
-    }));
+    const opN = this.resolverUltimoOperador(
+      ordenados,
+      this.repairerByAnswerResultId(),
+      this.repairerObsByAnswerResultId(),
+    );
+    this.operatorByControl.update((m) => ({ ...m, [controlId]: opN?.nome ?? null }));
+    this.operatorObsByControl.update((m) => ({ ...m, [controlId]: opN?.obs ?? null }));
   }
 
   /**
-   * Percorre os answer_results do MAIS RECENTE ao mais antigo e devolve o nome
-   * do primeiro que tiver reparador vinculado — ou seja, o ÚLTIMO operador
-   * inserido (não o primeiro criado).
+   * Percorre os results do MAIS RECENTE ao mais antigo e devolve o nome + a
+   * observação do primeiro que tiver reparador vinculado — ou seja, o ÚLTIMO
+   * operador inserido. Recebe os mapas adequados (normal ou de máquina).
    */
   private resolverUltimoOperador(
-    ordenadosAsc: { id?: string }[] | (AnswerResult & { id?: string })[],
-  ): string | null {
-    const repMap = this.repairerByAnswerResultId();
+    ordenadosAsc: { id?: string }[],
+    repMap: Record<string, string>,
+    obsMap: Record<string, string>,
+  ): { nome: string; obs: string | null } | null {
     const userById = this.userByIdMap();
     for (let i = ordenadosAsc.length - 1; i >= 0; i--) {
       const id = (ordenadosAsc[i] as { id?: string }).id;
       const uid = id ? repMap[id] : undefined;
-      if (uid) return userById.get(uid)?.userUsername ?? uid;
+      if (uid) {
+        return {
+          nome: userById.get(uid)?.userUsername ?? uid,
+          obs: id && obsMap[id] ? obsMap[id] : null,
+        };
+      }
     }
     return null;
   }
@@ -625,6 +713,7 @@ export class HistoricoComponent implements OnInit {
     this.editId.set(row.id);
     this.editObs.set(row.observacao ?? '');
     this.repairerQuery.set('');
+    this.repairerObs.set('');
 
     const vals: Record<string, string> = {};
     const md = this.expandedMachineData()[row.id];
@@ -643,6 +732,7 @@ export class HistoricoComponent implements OnInit {
     this.editValues.set({});
     this.editObs.set('');
     this.repairerQuery.set('');
+    this.repairerObs.set('');
   }
 
   updateEditValue(key: string, value: string): void {
@@ -685,9 +775,11 @@ export class HistoricoComponent implements OnInit {
 
     const repairerId = this.repairerResolved()?.userId ?? null;
     const repairerNome = this.repairerResolved()?.userUsername ?? repairerId;
+    const repairerObsVal = this.repairerObs().trim();
 
     const fieldOps: Observable<unknown>[] = [];
     const changedNormal: Record<string, string> = {};
+    const changedMachine: Record<string, string> = {};
     let camposMudaram = false;
     let novoStatusId: string | null = null;
 
@@ -708,14 +800,21 @@ export class HistoricoComponent implements OnInit {
 
           if (novo && novo !== atual) {
             camposMudaram = true;
+            changedMachine[key] = novo;
             fieldOps.push(
-              this.machineAnswerResultService.create({
-                machineId,
-                answerId,
-                controlId: row.id,
-                resposta: novo,
-                limitsAnswerId: md.cellLimits?.[key] ?? null,
-              }),
+              this.machineAnswerResultService
+                .create({
+                  machineId,
+                  answerId,
+                  controlId: row.id,
+                  resposta: novo,
+                  limitsAnswerId: md.cellLimits?.[key] ?? null,
+                })
+                .pipe(
+                  switchMap((created) =>
+                    this.linkRepairerMachine(created, repairerId, repairerObsVal),
+                  ),
+                ),
             );
           }
         }
@@ -738,7 +837,9 @@ export class HistoricoComponent implements OnInit {
                   resposta: novo,
                   limitsAnswerId: p.limitsAnswerId ?? null,
                 })
-                .pipe(switchMap((created) => this.linkRepairer(created, repairerId))),
+                .pipe(
+                  switchMap((created) => this.linkRepairer(created, repairerId, repairerObsVal)),
+                ),
             );
           }
         }
@@ -810,7 +911,7 @@ export class HistoricoComponent implements OnInit {
       return;
     }
 
-    const houveReparador = !!repairerId && camposMudaram && !this.expandedMachineData()[row.id];
+    const houveReparador = !!repairerId && camposMudaram;
 
     forkJoin(ops).subscribe({
       next: () => {
@@ -823,9 +924,13 @@ export class HistoricoComponent implements OnInit {
         if (Object.keys(changedNormal).length && !this.expandedMachineData()[row.id]) {
           this.anexarVersao(row.id, changedNormal);
         }
+        if (Object.keys(changedMachine).length && this.expandedMachineData()[row.id]) {
+          this.anexarVersaoMachine(row.id, changedMachine);
+        }
         // Reflete imediatamente o ÚLTIMO operador (esta correção é a mais recente).
         if (houveReparador) {
           this.operatorByControl.update((m) => ({ ...m, [row.id]: repairerNome }));
+          this.operatorObsByControl.update((m) => ({ ...m, [row.id]: repairerObsVal || null }));
         }
         if (novoStatusId) this.atualizarStatusLocal(row.id);
         this.savingEdit.set(false);
@@ -838,20 +943,62 @@ export class HistoricoComponent implements OnInit {
     });
   }
 
-  private linkRepairer(created: AnswerResult, repairerId: string | null): Observable<AnswerResult> {
+  private linkRepairer(
+    created: AnswerResult,
+    repairerId: string | null,
+    observacao = '',
+  ): Observable<AnswerResult> {
     const answerResultId = (created as { id?: string })?.id;
     if (!repairerId || !answerResultId) return of(created);
-    return this.repairerService.create({ answerResultId, userId: repairerId }).pipe(
-      map(() => {
-        // mantém o mapa local coerente para futuras resoluções de operador
-        this.repairerByAnswerResultId.update((m) => ({ ...m, [answerResultId]: repairerId }));
-        return created;
-      }),
-      catchError((err) => {
-        console.error('Falha ao vincular o reparador à correção:', err);
-        return of(created);
-      }),
-    );
+    const obs = observacao.trim() || undefined;
+    return this.repairerService
+      .create({ answerResultId, userId: repairerId, observacao: obs })
+      .pipe(
+        map(() => {
+          // mantém os mapas locais coerentes para futuras resoluções de operador
+          this.repairerByAnswerResultId.update((m) => ({ ...m, [answerResultId]: repairerId }));
+          if (obs) {
+            this.repairerObsByAnswerResultId.update((m) => ({ ...m, [answerResultId]: obs }));
+          }
+          return created;
+        }),
+        catchError((err) => {
+          console.error('Falha ao vincular o reparador à correção:', err);
+          return of(created);
+        }),
+      );
+  }
+
+  private linkRepairerMachine(
+    created: MachineAnswerResult,
+    repairerId: string | null,
+    observacao = '',
+  ): Observable<MachineAnswerResult> {
+    const machineAnswerResultId = (created as { id?: string })?.id;
+    if (!repairerId || !machineAnswerResultId) return of(created);
+    const obs = observacao.trim() || undefined;
+    return this.repairerMachineService
+      .create({ machineAnswerResultId, userId: repairerId, observacao: obs })
+      .pipe(
+        map(() => {
+          // mantém os mapas locais coerentes para futuras resoluções de operador (máquina)
+          this.repairerByMachineAnswerResultId.update((m) => ({
+            ...m,
+            [machineAnswerResultId]: repairerId,
+          }));
+          if (obs) {
+            this.repairerObsByMachineAnswerResultId.update((m) => ({
+              ...m,
+              [machineAnswerResultId]: obs,
+            }));
+          }
+          return created;
+        }),
+        catchError((err) => {
+          console.error('Falha ao vincular o reparador (máquina) à correção:', err);
+          return of(created);
+        }),
+      );
   }
 
   private async pedirAssinatura(): Promise<string | null> {
@@ -883,6 +1030,22 @@ export class HistoricoComponent implements OnInit {
       answerResultIds,
     };
     this.expandedHistory.update((h) => ({
+      ...h,
+      [controlId]: [...(h[controlId] ?? []), nova],
+    }));
+  }
+
+  private anexarVersaoMachine(
+    controlId: string,
+    valores: Record<string, string>,
+    machineAnswerResultIds: string[] = [],
+  ): void {
+    const nova: VersaoMaquina = {
+      dataCriacao: new Date().toISOString(),
+      valores: { ...valores },
+      machineAnswerResultIds,
+    };
+    this.expandedMachineHistory.update((h) => ({
       ...h,
       [controlId]: [...(h[controlId] ?? []), nova],
     }));
@@ -1168,7 +1331,11 @@ export class HistoricoComponent implements OnInit {
     this.expandedData.set({});
     this.expandedHistory.set({});
     this.expandedMachineData.set({});
+    this.expandedMachineHistory.set({});
     this.operatorByControl.set({});
+    this.operatorObsByControl.set({});
+    this.repairerObsByAnswerResultId.set({});
+    this.repairerObsByMachineAnswerResultId.set({});
     this.correcoesVisible.set({});
     this.cancelarEdicao();
 
@@ -1209,6 +1376,9 @@ export class HistoricoComponent implements OnInit {
       repairers: this.fetchAllPages<RepairerAnswerResult>((l, p) =>
         this.repairerService.getAll(l, p),
       ).pipe(failLog('reparadores')),
+      repairersMachine: this.fetchAllPages<RepairerMachineAnswerResult>((l, p) =>
+        this.repairerMachineService.getAll(l, p),
+      ).pipe(failLog('reparadores de máquina')),
     }).subscribe({
       next: ({
         controls,
@@ -1221,6 +1391,7 @@ export class HistoricoComponent implements OnInit {
         locations,
         limits,
         repairers,
+        repairersMachine,
       }) => {
         if (controls == null) {
           this.error.set('Não foi possível carregar o histórico.');
@@ -1241,12 +1412,32 @@ export class HistoricoComponent implements OnInit {
         this.limitsByAnswer.set(limitMap);
 
         const repMap: Record<string, string> = {};
+        const repObsMap: Record<string, string> = {};
         for (const rep of this.unwrap<RepairerAnswerResult>(repairers)) {
           const arId = (rep as { answerResultId?: string }).answerResultId ?? '';
           const uid = (rep as { userId?: string }).userId ?? '';
-          if (arId && uid) repMap[arId] = uid;
+          const obs = (rep as { observacao?: string }).observacao ?? '';
+          if (arId && uid) {
+            repMap[arId] = uid;
+            if (obs) repObsMap[arId] = obs;
+          }
         }
         this.repairerByAnswerResultId.set(repMap);
+        this.repairerObsByAnswerResultId.set(repObsMap);
+
+        const repMachineMap: Record<string, string> = {};
+        const repMachineObsMap: Record<string, string> = {};
+        for (const rep of this.unwrap<RepairerMachineAnswerResult>(repairersMachine)) {
+          const arId = (rep as { machineAnswerResultId?: string }).machineAnswerResultId ?? '';
+          const uid = (rep as { userId?: string }).userId ?? '';
+          const obs = (rep as { observacao?: string }).observacao ?? '';
+          if (arId && uid) {
+            repMachineMap[arId] = uid;
+            if (obs) repMachineObsMap[arId] = obs;
+          }
+        }
+        this.repairerByMachineAnswerResultId.set(repMachineMap);
+        this.repairerObsByMachineAnswerResultId.set(repMachineObsMap);
 
         this.loading.set(false);
 
@@ -1293,8 +1484,46 @@ export class HistoricoComponent implements OnInit {
     return null;
   }
 
+  /** Observação do reparador de uma versão (do mesmo registro que resolveu o nome). */
+  obsReparadorDaVersao(answerResultIds: string[]): string | null {
+    const repMap = this.repairerByAnswerResultId();
+    const obsMap = this.repairerObsByAnswerResultId();
+    for (let i = answerResultIds.length - 1; i >= 0; i--) {
+      const id = answerResultIds[i];
+      if (repMap[id]) return obsMap[id] ?? null;
+    }
+    return null;
+  }
+
+  /** Operador/reparador de uma versão de MÁQUINA = o ÚLTIMO inserido no lote. */
+  reparadorDaVersaoMachine(machineAnswerResultIds: string[]): string | null {
+    const repMap = this.repairerByMachineAnswerResultId();
+    const userById = this.userByIdMap();
+    for (let i = machineAnswerResultIds.length - 1; i >= 0; i--) {
+      const userId = repMap[machineAnswerResultIds[i]];
+      if (userId) return userById.get(userId)?.userUsername ?? userId;
+    }
+    return null;
+  }
+
+  /** Observação do reparador de uma versão de MÁQUINA. */
+  obsReparadorDaVersaoMachine(machineAnswerResultIds: string[]): string | null {
+    const repMap = this.repairerByMachineAnswerResultId();
+    const obsMap = this.repairerObsByMachineAnswerResultId();
+    for (let i = machineAnswerResultIds.length - 1; i >= 0; i--) {
+      const id = machineAnswerResultIds[i];
+      if (repMap[id]) return obsMap[id] ?? null;
+    }
+    return null;
+  }
+
   /** Operador/reparador do controle = o ÚLTIMO inserido (mais recente). */
   reparadorDoControle(controlId: string): string | null {
     return this.operatorByControl()[controlId] ?? null;
+  }
+
+  /** Observação do reparador do controle (mais recente). */
+  obsReparadorDoControle(controlId: string): string | null {
+    return this.operatorObsByControl()[controlId] ?? null;
   }
 }

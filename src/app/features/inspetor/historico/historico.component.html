@@ -360,17 +360,18 @@
                   <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
                 }
 
-                <!-- Reparador da correção -->
-                @if (!expandedMachineData()[r.id]) {
-                  @if (reparadorDoControle(r.id); as rep) {
-                    <div class="mt-2">
-                      <span
-                        class="badge bg-info-subtle border border-info-subtle text-info-emphasis"
-                      >
-                        <i class="bi bi-person-gear me-1"></i> Reparado por: {{ rep }}
+                <!-- Reparador da correção (normal e máquina) -->
+                @if (reparadorDoControle(r.id); as rep) {
+                  <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-info-subtle border border-info-subtle text-info-emphasis">
+                      <i class="bi bi-person-gear me-1"></i> Reparado por: {{ rep }}
+                    </span>
+                    @if (obsReparadorDoControle(r.id); as obs) {
+                      <span class="text-muted small">
+                        <i class="bi bi-chat-left-text"></i> {{ obs }}
                       </span>
-                    </div>
-                  }
+                    }
+                  </div>
                 }
 
                 <!-- Histórico de versões (modo normal) -->
@@ -397,6 +398,11 @@
                                   class="badge bg-info-subtle border border-info-subtle text-info-emphasis"
                                 >
                                   <i class="bi bi-person-gear me-1"></i> {{ rep }}
+                                </span>
+                              }
+                              @if (obsReparadorDaVersao(v.answerResultIds); as obs) {
+                                <span class="text-muted">
+                                  <i class="bi bi-chat-left-text"></i> {{ obs }}
                                 </span>
                               }
                             </div>
@@ -430,8 +436,73 @@
                   }
                 }
 
-                <!-- Reparador da correção (opcional) — apenas no modo normal -->
-                @if (editing && canCampos && !expandedMachineData()[r.id]) {
+                <!-- Histórico de versões (modo máquina) -->
+                @if (expandedMachineData()[r.id]; as md) {
+                  @let versoesM = expandedMachineHistory()[r.id] ?? [];
+                  @if (versoesM.length > 1) {
+                    <details class="mt-3">
+                      <summary class="text-muted small" style="cursor: pointer">
+                        <i class="bi bi-clock-history"></i>
+                        Histórico de correções ({{ versoesM.length - 1 }})
+                      </summary>
+                      <div class="mt-2 d-flex flex-column gap-2">
+                        @for (v of versoesM.slice(0, -1); track $index) {
+                          <div class="border rounded p-2 bg-light">
+                            <div
+                              class="d-flex align-items-center gap-2 flex-wrap"
+                              style="font-size: 0.72rem"
+                            >
+                              <span class="text-muted">
+                                <i class="bi bi-calendar2-event"></i> {{ dataHora(v.dataCriacao) }}
+                              </span>
+                              @if (reparadorDaVersaoMachine(v.machineAnswerResultIds); as rep) {
+                                <span
+                                  class="badge bg-info-subtle border border-info-subtle text-info-emphasis"
+                                >
+                                  <i class="bi bi-person-gear me-1"></i> {{ rep }}
+                                </span>
+                              }
+                              @if (obsReparadorDaVersaoMachine(v.machineAnswerResultIds); as obs) {
+                                <span class="text-muted">
+                                  <i class="bi bi-chat-left-text"></i> {{ obs }}
+                                </span>
+                              }
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-1">
+                              @for (m of md.maquinas; track m.id) {
+                                @for (a of md.answers; track a.id) {
+                                  @let ck = m.id + '_' + a.id;
+                                  @if (v.valores[ck]; as val) {
+                                    @let hOk = temLimiteAtivo(a.id) && dentroDoLimite(a.id, val);
+                                    @let hErr = temLimiteAtivo(a.id) && !dentroDoLimite(a.id, val);
+                                    <span
+                                      class="border rounded px-2 py-1"
+                                      style="font-size: 0.8rem"
+                                      [class.border-success]="hOk"
+                                      [class.bg-success-subtle]="hOk"
+                                      [class.border-danger]="hErr"
+                                      [class.bg-danger-subtle]="hErr"
+                                    >
+                                      <span class="text-muted">{{ m.nome }} / {{ a.nome }}:</span>
+                                      <strong
+                                        [class.text-success]="hOk"
+                                        [class.text-danger]="hErr"
+                                        >{{ val }}</strong
+                                      >
+                                    </span>
+                                  }
+                                }
+                              }
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    </details>
+                  }
+                }
+
+                <!-- Reparador da correção (opcional) — normal e máquina -->
+                @if (editing && canCampos) {
                   <div class="mt-3">
                     <label class="text-muted small d-block mb-1" [attr.for]="'rep-' + r.id">
                       <i class="bi bi-person-gear"></i> Operador envolvido (opcional)
@@ -458,6 +529,22 @@
                         <small class="text-success">
                           <i class="bi bi-check-circle"></i> {{ rep.userUsername }}
                         </small>
+
+                        <label
+                          class="text-muted small d-block mt-2 mb-1"
+                          [attr.for]="'rep-obs-' + r.id"
+                        >
+                          <i class="bi bi-chat-left-text"></i> Observação do reparo (opcional)
+                        </label>
+                        <textarea
+                          [id]="'rep-obs-' + r.id"
+                          class="form-control form-control-sm"
+                          rows="2"
+                          placeholder="O que foi feito no reparo…"
+                          [ngModel]="repairerObs()"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="updateRepairerObs($event)"
+                        ></textarea>
                       } @else {
                         <small class="text-danger">
                           <i class="bi bi-exclamation-circle"></i> Usuário não encontrado
@@ -471,7 +558,7 @@
                 @if (editing && canObs) {
                   <div class="mt-3">
                     <label class="text-muted small d-block mb-1" [attr.for]="'obs-' + r.id">
-                      <i class="bi bi-chat-left-text"></i> Observação
+                      <i class="bi bi-chat-left-text"></i> Observação do envio
                     </label>
                     <textarea
                       [id]="'obs-' + r.id"

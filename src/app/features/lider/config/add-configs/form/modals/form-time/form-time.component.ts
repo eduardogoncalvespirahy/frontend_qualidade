@@ -95,6 +95,28 @@ export class FormTimeComponent implements OnInit {
     () => !this.erroExecucao() && !this.erroTolerancia() && !this.erroAntecedencia(),
   );
 
+  /**
+   * Prévia do bloqueio de reenvio: logo após um envio, o formulário fica
+   * travado até esse tempo passar (TB = Tempo de Execução − Antecedência).
+   * Existe pra deixar claro, na hora de configurar, o efeito prático desses
+   * dois campos — sem isso o líder só vê "execução" e "antecedência" soltos.
+   */
+  readonly tempoBloqueio = computed<string | null>(() => {
+    const exec = this.parseTime(this.tempoExecucao());
+    if (!exec || this.isZeroTime(exec)) return null;
+    const ant = this.parseTime(this.tempoAntecedencia()) || '00:00:00';
+    const blockS = Math.max(0, this.toSeconds(exec) - this.toSeconds(ant));
+    return this.hms(Math.floor(blockS / 3600), Math.floor((blockS % 3600) / 60), blockS % 60);
+  });
+
+  /** Antecedência ≥ execução → o bloqueio nunca acontece (fica 00:00:00). */
+  readonly antecedenciaAnulaBloqueio = computed(() => {
+    const exec = this.parseTime(this.tempoExecucao());
+    const ant = this.parseTime(this.tempoAntecedencia());
+    if (!exec || !ant) return false;
+    return this.toSeconds(ant) >= this.toSeconds(exec);
+  });
+
   /** Só habilita salvar com formulário válido, alterado e nada em andamento. */
   readonly podeSalvar = computed(
     () => this.formValido() && this.dirty() && !this.loading() && !this.saving(),
@@ -309,6 +331,12 @@ export class FormTimeComponent implements OnInit {
   private hms(h: number, m: number, s: number): string {
     const p = (n: number) => String(Math.max(0, Math.trunc(n))).padStart(2, '0');
     return `${p(h)}:${p(m)}:${p(s)}`;
+  }
+
+  /** "HH:MM:SS" → total em segundos. */
+  private toSeconds(hms: string): number {
+    const [h, m, s] = hms.split(':').map(Number);
+    return h * 3600 + m * 60 + s;
   }
 
   /** true quando o tempo é 00:00:00 (ou vazio/invalid). */

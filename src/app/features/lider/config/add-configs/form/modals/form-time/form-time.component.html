@@ -63,6 +63,54 @@
       </div>
     }
 
+    <div class="ft__explainer">
+      <h3 class="ft__explainer-title"><i class="bi bi-info-circle"></i> Como esses tempos funcionam</h3>
+      <ul class="ft__explainer-list">
+        <li>
+          <strong>Tempo de execução</strong> — intervalo esperado entre um envio e o próximo deste
+          formulário. É a base de tudo: o card do inspetor fica verde enquanto está tranquilo, e
+          amarelo quando já passou de 75% desse tempo.
+        </li>
+        <li>
+          <strong>Tempo de tolerância</strong> — prazo extra aceito depois do tempo de execução,
+          antes de marcar como atrasado de vez. Nesse intervalo o card fica laranja; só depois
+          dele é que fica vermelho.
+        </li>
+        <li>
+          <strong>Antecedência do alerta</strong> — janela no fim do ciclo em que reenviar
+          adiantado já é considerado normal (não é penalizado como "fora de hora").
+        </li>
+        <li>
+          <strong>Bloqueio de reenvio</strong> (tempo de execução − antecedência) — logo após um
+          envio, o formulário fica travado para reenvio por esse tempo, liberando de novo só
+          depois. Existe pra impedir que, quando um valor sai fora do padrão, o inspetor simplesmente
+          lance um formulário novo em vez de corrigir o valor no histórico.
+        </li>
+      </ul>
+
+      @if (tempoBloqueio(); as tb) {
+        <div class="ft__preview" [class.ft__preview--warn]="antecedenciaAnulaBloqueio()">
+          <i
+            class="bi"
+            [class.bi-shield-lock]="!antecedenciaAnulaBloqueio()"
+            [class.bi-exclamation-triangle]="antecedenciaAnulaBloqueio()"
+          ></i>
+          @if (antecedenciaAnulaBloqueio()) {
+            <span>
+              A antecedência está maior ou igual ao tempo de execução — com isso o reenvio nunca
+              fica bloqueado. Reduza a antecedência ou aumente o tempo de execução se quiser que o
+              bloqueio realmente valha.
+            </span>
+          } @else {
+            <span>
+              Com os valores atuais, o reenvio deste formulário fica bloqueado por
+              <strong>{{ tb }}</strong> logo após cada envio.
+            </span>
+          }
+        </div>
+      }
+    </div>
+
     <div class="ft__form">
       <!-- Execução -->
       <div class="ff">

@@ -693,6 +693,11 @@ export class PainelComponent implements OnInit {
   }
 
   selectForm(form: Form): void {
+    // Blindagem: não permite abrir um formulário bloqueado (TB) pra reenvio.
+    if (this.isFormBlockedForResend(form.id)) {
+      this.error.set(`Este formulário libera para reenvio às ${this.formUnblockLabel(form.id)}.`);
+      return;
+    }
     this.clearFeedback();
     this.resetFilters();
     // limpa o estado do formulário anterior antes de carregar o novo
@@ -1402,10 +1407,44 @@ export class PainelComponent implements OnInit {
     return map;
   });
 
-  formStatusColor(formId: string): 'green' | 'yellow' | 'red' | 'gray' | '' {
-    // Parado tem prioridade: card cinza, independente do tempo de execução
-    // e mesmo sem FormTime configurado.
+  /** Converte "HH:MM:SS" pra milissegundos. */
+  private toMs(hms: string): number {
+    const [h, m, s] = hms.split(':').map(Number);
+    return ((h * 60 + m) * 60 + s) * 1000;
+  }
+
+  /** formId → timestamp em que o reenvio volta a ser permitido (TB = TE - TAN após o último envio). */
+  readonly formUnblockAt = computed<Map<string, number>>(() => {
+    const map = new Map<string, number>();
+    for (const ft of this.formTimes()) {
+      const stats = this.statsPorForm(ft.formId);
+      if (!stats.ultimo) continue; // nunca enviou → nada a bloquear
+      const execMs = this.toMs(ft.tempoExecucao);
+      const anMs = this.toMs(ft.tempoAntecedencia);
+      const blockMs = Math.max(0, execMs - anMs); // TB
+      map.set(ft.formId, stats.ultimo.getTime() + blockMs);
+    }
+    return map;
+  });
+
+  /** Este formulário ainda está no período de bloqueio (TB) desde o último envio? */
+  isFormBlockedForResend(formId: string): boolean {
+    const until = this.formUnblockAt().get(formId);
+    return !!until && Date.now() < until;
+  }
+
+  /** Horário (HH:mm) em que o reenvio deste formulário libera. */
+  formUnblockLabel(formId: string): string {
+    const until = this.formUnblockAt().get(formId);
+    if (!until) return '';
+    return new Date(until).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  formStatusColor(formId: string): 'green' | 'yellow' | 'orange' | 'red' | 'gray' | '' {
+    // Parado e bloqueado (TB) têm prioridade: card cinza, independente do tempo
+    // de execução e mesmo sem FormTime configurado.
     if (this.isFormPausedById(formId)) return 'gray';
+    if (this.isFormBlockedForResend(formId)) return 'gray';
 
     const ft = this.formTimeMap().get(formId);
     if (!ft) return ''; // sem FormTime configurado → sem indicador
@@ -1413,17 +1452,13 @@ export class PainelComponent implements OnInit {
     const stats = this.statsPorForm(formId);
     if (!stats.ultimo) return 'red'; // nunca enviou → atrasado
 
-    // Converte "HH:MM:SS" para milissegundos
-    const toMs = (hms: string): number => {
-      const [h, m, s] = hms.split(':').map(Number);
-      return ((h * 60 + m) * 60 + s) * 1000;
-    };
-
-    const execMs = toMs(ft.tempoExecucao);
+    const execMs = this.toMs(ft.tempoExecucao);
+    const tolMs = this.toMs(ft.tempoTolerancia);
     const elapsed = Date.now() - stats.ultimo.getTime();
 
-    if (elapsed >= execMs) return 'red'; // atrasado
-    if (elapsed >= execMs * 0.75) return 'yellow'; // últimos 25%
+    if (elapsed >= execMs + tolMs) return 'red'; // TAT >= TT → atrasado de vez
+    if (elapsed >= execMs) return 'orange'; // passou do TE, ainda dentro da tolerância
+    if (elapsed >= execMs * 0.75) return 'yellow'; // últimos 25% do TE
     return 'green'; // tranquilo
   }
 }

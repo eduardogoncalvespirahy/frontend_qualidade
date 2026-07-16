@@ -344,19 +344,21 @@
                 <button
                   type="button"
                   class="card"
-                  [class.is-paused]="isFormPausedById(form.id)"
-                  [disabled]="isFormPausedById(form.id)"
+                  [class.is-paused]="isFormPausedById(form.id) || isFormBlockedForResend(form.id)"
+                  [disabled]="isFormPausedById(form.id) || isFormBlockedForResend(form.id)"
                   (click)="selectForm(form)"
                   [style.border-left]="
                     statusColor === 'green'
                       ? '4px solid #22c55e'
                       : statusColor === 'yellow'
                         ? '4px solid #f59e0b'
-                        : statusColor === 'red'
-                          ? '4px solid #ef4444'
-                          : statusColor === 'gray'
-                            ? '4px solid #94a3b8'
-                            : ''
+                        : statusColor === 'orange'
+                          ? '4px solid #f97316'
+                          : statusColor === 'red'
+                            ? '4px solid #ef4444'
+                            : statusColor === 'gray'
+                              ? '4px solid #94a3b8'
+                              : ''
                   "
                 >
                   <div class="card__top">
@@ -368,6 +370,10 @@
                       @if (isFormPausedById(form.id)) {
                         <span class="badge badge--warn">
                           <i class="bi bi-pause-circle me-1"></i>Pausado
+                        </span>
+                      } @else if (isFormBlockedForResend(form.id)) {
+                        <span class="badge badge--warn">
+                          <i class="bi bi-lock me-1"></i>Bloqueado até {{ formUnblockLabel(form.id) }}
                         </span>
                       }
                     </div>
@@ -395,18 +401,32 @@
                   </div>
 
                   <span class="card__go">
-                    {{ isFormPausedById(form.id) ? 'Em pausa' : 'Preencher' }}
+                    @if (isFormPausedById(form.id)) {
+                      Em pausa
+                    } @else if (isFormBlockedForResend(form.id)) {
+                      Bloqueado até {{ formUnblockLabel(form.id) }}
+                    } @else {
+                      Preencher
+                    }
                     <i
                       class="bi"
                       [class.bi-pause-fill]="isFormPausedById(form.id)"
-                      [class.bi-arrow-right]="!isFormPausedById(form.id)"
+                      [class.bi-lock-fill]="!isFormPausedById(form.id) && isFormBlockedForResend(form.id)"
+                      [class.bi-arrow-right]="!isFormPausedById(form.id) && !isFormBlockedForResend(form.id)"
                     ></i>
                   </span>
                 </button>
 
                 <!-- Ações fora do <button> do card (funciona mesmo pausado) -->
+                <!-- Desabilitado durante o bloqueio de TB: não há pausa pra desfazer, o bloqueio expira sozinho. -->
                 <div class="card-wrap__actions">
-                  <button type="button" class="btn-parada" (click)="openBreaks(form)">
+                  <button
+                    type="button"
+                    class="btn-parada"
+                    [disabled]="isFormBlockedForResend(form.id)"
+                    [title]="isFormBlockedForResend(form.id) ? 'Bloqueado até ' + formUnblockLabel(form.id) : ''"
+                    (click)="openBreaks(form)"
+                  >
                     <i class="bi bi-pause-circle"></i> Paradas
                     @if (isFormPausedById(form.id)) {
                       <span class="badge badge--warn">Pausado</span>

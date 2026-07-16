@@ -340,99 +340,89 @@
           <div class="grid">
             @for (form of filteredForms(); track trackById($index, form)) {
               @let statusColor = formStatusColor(form.id);
-              <div class="card-wrap">
-                <button
-                  type="button"
-                  class="card"
-                  [class.is-paused]="isFormPausedById(form.id) || isFormBlockedForResend(form.id)"
-                  [disabled]="isFormPausedById(form.id) || isFormBlockedForResend(form.id)"
-                  (click)="selectForm(form)"
-                  [style.border-left]="
-                    statusColor === 'green'
-                      ? '4px solid #22c55e'
-                      : statusColor === 'yellow'
-                        ? '4px solid #f59e0b'
-                        : statusColor === 'orange'
-                          ? '4px solid #f97316'
-                          : statusColor === 'red'
-                            ? '4px solid #ef4444'
-                            : statusColor === 'gray'
-                              ? '4px solid #94a3b8'
-                              : ''
-                  "
-                >
-                  <div class="card__top">
-                    <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
-                    <div class="d-flex gap-2">
-                      <span class="badge" [class.badge--on]="isAtivo(form.status)">
-                        {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
-                      </span>
-                      @if (isFormPausedById(form.id)) {
-                        <span class="badge badge--warn">
-                          <i class="bi bi-pause-circle me-1"></i>Pausado
-                        </span>
-                      } @else if (isFormBlockedForResend(form.id)) {
-                        <span class="badge badge--warn">
-                          <i class="bi bi-lock me-1"></i>Bloqueado até {{ formUnblockLabel(form.id) }}
-                        </span>
-                      }
-                    </div>
-                  </div>
-
-                  <h3 class="card__title">{{ form.nome }}</h3>
-                  <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
-
-                  <div
-                    class="d-flex justify-content-between align-items-end mt-auto pt-2"
-                    style="font-size: 12px; color: #64748b"
-                  >
-                    <span
-                      ><i class="bi bi-send me-1"></i
-                      >{{ statsPorForm(form.id).count }} envio(s)</span
-                    >
-                    @if (statsPorForm(form.id).ultimo) {
-                      <span>
-                        <i class="bi bi-clock-history me-1"></i>
-                        {{ statsPorForm(form.id).ultimo | date: 'dd/MM/yy HH:mm' }}
-                      </span>
-                    } @else {
-                      <span><i class="bi bi-dash"></i> Sem envios</span>
-                    }
-                  </div>
-
-                  <span class="card__go">
+              <div
+                class="card"
+                [class.is-paused]="isFormPausedById(form.id) || isFormBlockedForResend(form.id)"
+                (click)="selectForm(form)"
+                [style.border-left]="
+                  statusColor === 'green'
+                    ? '4px solid #22c55e'
+                    : statusColor === 'yellow'
+                      ? '4px solid #f59e0b'
+                      : statusColor === 'orange'
+                        ? '4px solid #f97316'
+                        : statusColor === 'red'
+                          ? '4px solid #ef4444'
+                          : statusColor === 'gray'
+                            ? '4px solid #94a3b8'
+                            : ''
+                "
+              >
+                <div class="card__top">
+                  <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
+                  <div class="card__top-right">
+                    <span class="badge" [class.badge--on]="isAtivo(form.status)">
+                      {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
+                    </span>
                     @if (isFormPausedById(form.id)) {
-                      Em pausa
+                      <span class="badge badge--warn">
+                        <i class="bi bi-pause-circle me-1"></i>Pausado
+                      </span>
                     } @else if (isFormBlockedForResend(form.id)) {
-                      Bloqueado até {{ formUnblockLabel(form.id) }}
-                    } @else {
-                      Preencher
+                      <span class="badge badge--warn">
+                        <i class="bi bi-lock me-1"></i>Bloqueado até {{ formUnblockLabel(form.id) }}
+                      </span>
                     }
-                    <i
-                      class="bi"
-                      [class.bi-pause-fill]="isFormPausedById(form.id)"
-                      [class.bi-lock-fill]="!isFormPausedById(form.id) && isFormBlockedForResend(form.id)"
-                      [class.bi-arrow-right]="!isFormPausedById(form.id) && !isFormBlockedForResend(form.id)"
-                    ></i>
-                  </span>
-                </button>
-
-                <!-- Ações fora do <button> do card (funciona mesmo pausado) -->
-                <!-- Desabilitado durante o bloqueio de TB: não há pausa pra desfazer, o bloqueio expira sozinho. -->
-                <div class="card-wrap__actions">
-                  <button
-                    type="button"
-                    class="btn-parada"
-                    [disabled]="isFormBlockedForResend(form.id)"
-                    [title]="isFormBlockedForResend(form.id) ? 'Bloqueado até ' + formUnblockLabel(form.id) : ''"
-                    (click)="openBreaks(form)"
-                  >
-                    <i class="bi bi-pause-circle"></i> Paradas
-                    @if (isFormPausedById(form.id)) {
-                      <span class="badge badge--warn">Pausado</span>
-                    }
-                  </button>
+                    <button
+                      type="button"
+                      class="card__del"
+                      title="Paradas"
+                      (click)="$event.stopPropagation(); openBreaks(form)"
+                    >
+                      <i class="bi bi-pause-circle"></i>
+                    </button>
+                  </div>
                 </div>
+
+                <h3 class="card__title">{{ form.nome }}</h3>
+                <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
+
+                <div
+                  class="d-flex justify-content-between align-items-end mt-auto pt-2"
+                  style="font-size: 12px; color: #64748b"
+                >
+                  <span
+                    ><i class="bi bi-send me-1"></i>{{ statsPorForm(form.id).count }} envio(s)</span
+                  >
+                  @if (statsPorForm(form.id).ultimo) {
+                    <span>
+                      <i class="bi bi-clock-history me-1"></i>
+                      {{ statsPorForm(form.id).ultimo | date: 'dd/MM/yy HH:mm' }}
+                    </span>
+                  } @else {
+                    <span><i class="bi bi-dash"></i> Sem envios</span>
+                  }
+                </div>
+
+                <span class="card__go">
+                  @if (isFormPausedById(form.id)) {
+                    Em pausa
+                  } @else if (isFormBlockedForResend(form.id)) {
+                    Bloqueado até {{ formUnblockLabel(form.id) }}
+                  } @else {
+                    Preencher
+                  }
+                  <i
+                    class="bi"
+                    [class.bi-pause-fill]="isFormPausedById(form.id)"
+                    [class.bi-lock-fill]="
+                      !isFormPausedById(form.id) && isFormBlockedForResend(form.id)
+                    "
+                    [class.bi-arrow-right]="
+                      !isFormPausedById(form.id) && !isFormBlockedForResend(form.id)
+                    "
+                  ></i>
+                </span>
               </div>
             }
           </div>

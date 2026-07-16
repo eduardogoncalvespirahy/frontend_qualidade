@@ -292,22 +292,6 @@
   gap: 18px;
 }
 
-/* Wrapper: card (button) + ações fora do button (ex.: Paradas) */
-.card-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-}
-.card-wrap .card {
-  flex: 1 1 auto;
-  height: 100%;
-}
-.card-wrap__actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .card {
   display: flex;
   flex-direction: column;
@@ -393,7 +377,31 @@
   transition: transform 0.18s ease;
 }
 
-/* Botão "Paradas" (fora do card, sempre clicável — inclusive pausado) */
+/* ───────── Ações no card (Paradas) — padrão do formulário do líder ───────── */
+.card__top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.card__del {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.card__del:hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+/* Botão "Paradas" compacto — usado na tabela de máquinas (etapa de parâmetros) */
 .btn-parada {
   display: inline-flex;
   align-items: center;
@@ -415,8 +423,6 @@
 .btn-parada .badge {
   margin-left: 2px;
 }
-
-/* Variante compacta para uso dentro da tabela de máquinas */
 .btn-parada--sm {
   padding: 5px 10px;
   font-size: 12px;

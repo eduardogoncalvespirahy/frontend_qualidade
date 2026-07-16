@@ -63,53 +63,18 @@
       </div>
     }
 
-    <div class="ft__explainer">
-      <h3 class="ft__explainer-title"><i class="bi bi-info-circle"></i> Como esses tempos funcionam</h3>
-      <ul class="ft__explainer-list">
-        <li>
-          <strong>Tempo de execução</strong> — intervalo esperado entre um envio e o próximo deste
-          formulário. É a base de tudo: o card do inspetor fica verde enquanto está tranquilo, e
-          amarelo quando já passou de 75% desse tempo.
-        </li>
-        <li>
-          <strong>Tempo de tolerância</strong> — prazo extra aceito depois do tempo de execução,
-          antes de marcar como atrasado de vez. Nesse intervalo o card fica laranja; só depois
-          dele é que fica vermelho.
-        </li>
-        <li>
-          <strong>Antecedência do alerta</strong> — janela no fim do ciclo em que reenviar
-          adiantado já é considerado normal (não é penalizado como "fora de hora").
-        </li>
-        <li>
-          <strong>Bloqueio de reenvio</strong> (tempo de execução − antecedência) — logo após um
-          envio, o formulário fica travado para reenvio por esse tempo, liberando de novo só
-          depois. Existe pra impedir que, quando um valor sai fora do padrão, o inspetor simplesmente
-          lance um formulário novo em vez de corrigir o valor no histórico.
-        </li>
-      </ul>
-
-      @if (tempoBloqueio(); as tb) {
-        <div class="ft__preview" [class.ft__preview--warn]="antecedenciaAnulaBloqueio()">
-          <i
-            class="bi"
-            [class.bi-shield-lock]="!antecedenciaAnulaBloqueio()"
-            [class.bi-exclamation-triangle]="antecedenciaAnulaBloqueio()"
-          ></i>
-          @if (antecedenciaAnulaBloqueio()) {
-            <span>
-              A antecedência está maior ou igual ao tempo de execução — com isso o reenvio nunca
-              fica bloqueado. Reduza a antecedência ou aumente o tempo de execução se quiser que o
-              bloqueio realmente valha.
-            </span>
-          } @else {
-            <span>
-              Com os valores atuais, o reenvio deste formulário fica bloqueado por
-              <strong>{{ tb }}</strong> logo após cada envio.
-            </span>
-          }
-        </div>
-      }
-    </div>
+    @if (tempoBloqueio(); as tb) {
+      <div class="ft__preview">
+        <i
+          class="bi bi-shield-lock"
+          title="Bloqueio de reenvio — (tempo de execução − antecedência) — logo após um envio, o formulário fica travado para reenvio por esse tempo, liberando de novo só depois. Existe pra impedir que, quando um valor sai fora do padrão, o inspetor simplesmente lance um formulário novo em vez de corrigir o valor no histórico."
+        ></i>
+        <span>
+          Com os valores atuais, o reenvio deste formulário fica bloqueado por
+          <strong>{{ tb }}</strong> logo após cada envio.
+        </span>
+      </div>
+    }
 
     <div class="ft__form">
       <!-- Execução -->
@@ -122,6 +87,7 @@
           type="time"
           step="1"
           class="ff__control"
+          title="Tempo de execução — intervalo esperado entre um envio e o próximo deste formulário. É a base de tudo: o card do inspetor fica verde enquanto está tranquilo, e amarelo quando já passou de 75% desse tempo."
           [class.is-invalid]="mostraErro('exec') && erroExecucao()"
           [attr.aria-invalid]="mostraErro('exec') && !!erroExecucao()"
           [attr.aria-describedby]="mostraErro('exec') && erroExecucao() ? 'err-exec' : null"
@@ -135,20 +101,22 @@
             <i class="bi bi-exclamation-circle"></i> {{ erroExecucao() }}
           </span>
         } @else {
-          <span class="ff__hint">Tempo previsto entre uma execução e outra.</span>
+          <span class="ff__hint"
+            >Tempo previsto entre uma execução e outra. Deve ser maior que 00:00:00.</span
+          >
         }
       </div>
 
-      <!-- Tolerância -->
+      <!-- Tolerância (opcional) -->
       <div class="ff">
-        <label class="ff__label" for="tempoTolerancia">
-          Tempo de tolerância <span class="ff__required">*</span>
-        </label>
+        <label class="ff__label" for="tempoTolerancia">Tempo de tolerância</label>
         <input
           id="tempoTolerancia"
           type="time"
           step="1"
           class="ff__control"
+          [disabled]="!execOk()"
+          title="Tempo de tolerância — prazo extra aceito depois do tempo de execução, antes de marcar como atrasado de vez. Nesse intervalo o card fica laranja; só depois dele é que fica vermelho."
           [class.is-invalid]="mostraErro('tol') && erroTolerancia()"
           [attr.aria-invalid]="mostraErro('tol') && !!erroTolerancia()"
           [attr.aria-describedby]="mostraErro('tol') && erroTolerancia() ? 'err-tol' : null"
@@ -161,12 +129,14 @@
           <span id="err-tol" class="ff__error">
             <i class="bi bi-exclamation-circle"></i> {{ erroTolerancia() }}
           </span>
+        } @else if (!execOk()) {
+          <span class="ff__hint">Preencha o tempo de execução primeiro.</span>
         } @else {
-          <span class="ff__hint">Tempo adicional aceito antes da geração do alerta.</span>
+          <span class="ff__hint">Opcional. Menor que a execução — pode ficar 00:00:00.</span>
         }
       </div>
 
-      <!-- Antecedência -->
+      <!-- Antecedência (opcional) -->
       <div class="ff">
         <label class="ff__label" for="tempoAntecedencia">Antecedência do alerta</label>
         <input
@@ -174,6 +144,8 @@
           type="time"
           step="1"
           class="ff__control"
+          [disabled]="!execOk()"
+          title="Tempo de antecedência — janela no fim do ciclo em que reenviar adiantado já é considerado normal (não é penalizado como 'fora de hora')."
           [class.is-invalid]="mostraErro('ant') && erroAntecedencia()"
           [attr.aria-invalid]="mostraErro('ant') && !!erroAntecedencia()"
           [attr.aria-describedby]="mostraErro('ant') && erroAntecedencia() ? 'err-ant' : null"
@@ -186,10 +158,10 @@
           <span id="err-ant" class="ff__error">
             <i class="bi bi-exclamation-circle"></i> {{ erroAntecedencia() }}
           </span>
+        } @else if (!execOk()) {
+          <span class="ff__hint">Preencha o tempo de execução primeiro.</span>
         } @else {
-          <span class="ff__hint"
-            >Quanto tempo antes o sistema deverá avisar (padrão 00:05:00).</span
-          >
+          <span class="ff__hint">Opcional. Menor que a execução — pode ficar 00:00:00.</span>
         }
       </div>
 

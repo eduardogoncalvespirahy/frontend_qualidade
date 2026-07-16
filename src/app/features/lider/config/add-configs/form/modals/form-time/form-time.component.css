@@ -125,42 +125,6 @@
   color: var(--accent);
 }
 
-/* Explicação de como TE/TT/Antecedência/Bloqueio se relacionam */
-.ft__explainer {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-.ft__explainer-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink);
-}
-.ft__explainer-title i {
-  color: var(--accent);
-}
-.ft__explainer-list {
-  margin: 0;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-.ft__explainer-list strong {
-  color: var(--ink);
-}
-
 .ft__preview {
   display: flex;
   align-items: center;
@@ -175,12 +139,6 @@
 .ft__preview i {
   font-size: 16px;
   color: var(--accent);
-}
-.ft__preview--warn {
-  background: var(--warn-soft);
-}
-.ft__preview--warn i {
-  color: var(--warn);
 }
 
 /* Formulário */
@@ -235,6 +193,12 @@
 }
 .ff__control.is-invalid:focus {
   box-shadow: 0 0 0 4px var(--danger-soft);
+}
+/* Campo travado enquanto a execução não é válida */
+.ff__control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f1f5f9;
 }
 .ff__hint {
   font-size: 12px;

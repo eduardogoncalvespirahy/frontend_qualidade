@@ -698,6 +698,13 @@ export class PainelComponent implements OnInit {
       this.error.set(`Este formulário libera para reenvio às ${this.formUnblockLabel(form.id)}.`);
       return;
     }
+
+    // Blindagem: não permite abrir um formulário pausado pra reenvio.
+    if (this.isFormPausedById(form.id)) {
+      this.error.set(`Este formulário libera para reenvio apos ser liberado da pausa`);
+      return;
+    }
+
     this.clearFeedback();
     this.resetFilters();
     // limpa o estado do formulário anterior antes de carregar o novo
@@ -713,6 +720,12 @@ export class PainelComponent implements OnInit {
 
   /** Abre a gestão de paradas do formulário (mesma lógica do líder). */
   openBreaks(form: Form): void {
+    // Blindagem: não permite abrir um formulário bloqueado (TB) pra reenvio.
+    if (this.isFormBlockedForResend(form.id)) {
+      this.error.set(`Este formulário libera para parada às ${this.formUnblockLabel(form.id)}.`);
+      return;
+    }
+
     // Blindagem: não permite gerir paradas de um local fora das permissões.
     if (!this.isLocationAllowed(this.selectedLocation())) {
       this.error.set('Você não tem acesso a este local.');

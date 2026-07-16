@@ -58,6 +58,14 @@ export class FormTimeComponent implements OnInit {
   });
   private readonly submitTentado = signal(false);
 
+  // ───────── valores em segundos (fonte única de verdade p/ validações) ─────────
+  private readonly execSeg = computed(() => this.segundos(this.tempoExecucao()));
+  private readonly tolSeg = computed(() => this.segundos(this.tempoTolerancia()));
+  private readonly antSeg = computed(() => this.segundos(this.tempoAntecedencia()));
+
+  /** Execução válida (> 0): pré-requisito para liberar tolerância/antecedência. */
+  readonly execOk = computed(() => this.execSeg() > 0);
+
   // ───────── derivados ─────────
   readonly possuiConfiguracao = computed(() => this.formTime() !== null);
 
@@ -70,24 +78,27 @@ export class FormTimeComponent implements OnInit {
     );
   });
 
-  // execução e tolerância são NOT NULL no banco → obrigatórios e > 00:00:00
+  // Execução: NOT NULL no banco → obrigatória e > 00:00:00.
   readonly erroExecucao = computed(() => {
-    const v = this.tempoExecucao().trim();
-    if (!v) return 'Informe o tempo de execução.';
-    if (this.isZeroTime(v)) return 'O tempo de execução deve ser maior que 00:00:00.';
+    if (!this.tempoExecucao().trim()) return 'Informe o tempo de execução.';
+    if (this.execSeg() <= 0) return 'O tempo de execução deve ser maior que 00:00:00.';
     return null;
   });
+
+  // Tolerância: opcional (pode ficar 00:00:00); só não pode ser >= execução.
+  // Vazio → 0s, e 0 nunca é >= execução (que é > 0), então zerado é sempre válido.
   readonly erroTolerancia = computed(() => {
-    const v = this.tempoTolerancia().trim();
-    if (!v) return 'Informe o tempo de tolerância.';
-    if (this.isZeroTime(v)) return 'A tolerância deve ser maior que 00:00:00.';
+    if (!this.execOk()) return null; // travada até haver execução válida
+    if (this.tolSeg() >= this.execSeg())
+      return 'A tolerância deve ser menor que o tempo de execução.';
     return null;
   });
-  // antecedência é opcional; se informada, não pode ser zero
+
+  // Antecedência: mesma regra da tolerância.
   readonly erroAntecedencia = computed(() => {
-    const v = this.tempoAntecedencia().trim();
-    if (!v) return null;
-    if (this.isZeroTime(v)) return 'A antecedência deve ser maior que 00:00:00.';
+    if (!this.execOk()) return null;
+    if (this.antSeg() >= this.execSeg())
+      return 'A antecedência deve ser menor que o tempo de execução.';
     return null;
   });
 
@@ -98,23 +109,13 @@ export class FormTimeComponent implements OnInit {
   /**
    * Prévia do bloqueio de reenvio: logo após um envio, o formulário fica
    * travado até esse tempo passar (TB = Tempo de Execução − Antecedência).
-   * Existe pra deixar claro, na hora de configurar, o efeito prático desses
-   * dois campos — sem isso o líder só vê "execução" e "antecedência" soltos.
+   * Com antecedência zerada, o bloqueio é o próprio tempo de execução.
    */
   readonly tempoBloqueio = computed<string | null>(() => {
-    const exec = this.parseTime(this.tempoExecucao());
-    if (!exec || this.isZeroTime(exec)) return null;
-    const ant = this.parseTime(this.tempoAntecedencia()) || '00:00:00';
-    const blockS = Math.max(0, this.toSeconds(exec) - this.toSeconds(ant));
+    const exec = this.execSeg();
+    if (exec <= 0) return null;
+    const blockS = Math.max(0, exec - this.antSeg());
     return this.hms(Math.floor(blockS / 3600), Math.floor((blockS % 3600) / 60), blockS % 60);
-  });
-
-  /** Antecedência ≥ execução → o bloqueio nunca acontece (fica 00:00:00). */
-  readonly antecedenciaAnulaBloqueio = computed(() => {
-    const exec = this.parseTime(this.tempoExecucao());
-    const ant = this.parseTime(this.tempoAntecedencia());
-    if (!exec || !ant) return false;
-    return this.toSeconds(ant) >= this.toSeconds(exec);
   });
 
   /** Só habilita salvar com formulário válido, alterado e nada em andamento. */
@@ -179,7 +180,7 @@ export class FormTimeComponent implements OnInit {
     this.submitTentado.set(true);
 
     if (!this.formValido()) {
-      this.error.set('Preencha os campos obrigatórios.');
+      this.error.set('Corrija os campos destacados antes de salvar.');
       return;
     }
     if (!this.dirty()) return; // nada mudou
@@ -293,16 +294,17 @@ export class FormTimeComponent implements OnInit {
     return undefined;
   }
 
+  /**
+   * Monta o payload. Execução vai como informada; tolerância e antecedência são
+   * opcionais e, quando não preenchidas, seguem zeradas ("00:00:00").
+   */
   private buildPayload(): CreateFormTime {
-    const payload: CreateFormTime = {
+    return {
       formId: this.formId(),
       tempoExecucao: this.parseTime(this.tempoExecucao()),
-      tempoTolerancia: this.parseTime(this.tempoTolerancia()),
+      tempoTolerancia: this.parseTime(this.tempoTolerancia()) || '00:00:00',
+      tempoAntecedencia: this.parseTime(this.tempoAntecedencia()) || '00:00:00',
     };
-    // antecedência é opcional: vazio → omite e o banco aplica o default
-    const ant = this.parseTime(this.tempoAntecedencia());
-    if (ant) payload.tempoAntecedencia = ant;
-    return payload;
   }
 
   private resetInteracao(): void {
@@ -339,9 +341,10 @@ export class FormTimeComponent implements OnInit {
     return h * 3600 + m * 60 + s;
   }
 
-  /** true quando o tempo é 00:00:00 (ou vazio/invalid). */
-  private isZeroTime(value: string): boolean {
-    return this.parseTime(value) === '00:00:00';
+  /** Valor bruto do campo → segundos (0 quando vazio/invalid). Base das validações. */
+  private segundos(value: string): number {
+    const t = this.parseTime(value);
+    return t ? this.toSeconds(t) : 0;
   }
 
   private clearFeedback(): void {

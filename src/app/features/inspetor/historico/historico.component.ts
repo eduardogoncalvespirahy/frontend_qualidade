@@ -21,6 +21,7 @@ import { Location } from '../../../core/models/location.model';
 import { AnswerResult } from '../../../core/models/answer-result.model';
 import { MachineAnswerResult } from '../../../core/models/machine-answer-result.model';
 import { LimitAnswer } from '../../../core/models/limit-answer.model';
+import { FormTime } from '../../../core/models/form-time.model';
 import { RepairerAnswerResult } from '../../../core/models/repairerAnswerResult.model';
 import { RepairerMachineAnswerResult } from '../../../core/models/repairerMachineAnswerResult.model';
 import { PaginatedResult } from '../../../core/models/paginated.model';
@@ -37,6 +38,7 @@ import { LocationService } from '../../../core/services/location.service';
 import { AnswerResultService } from '../../../core/services/answer-result.service';
 import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
 import { LimitAnswerService } from '../../../core/services/limit-answer.service';
+import { FormTimeService } from '../../../core/services/form-time.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { ControlStatusService } from '../../../core/services/control-status.service';
 import { SignatureFileService } from '../../../core/services/signature-file.service';
@@ -141,6 +143,7 @@ export class HistoricoComponent implements OnInit {
   private readonly limitService = inject(LimitAnswerService);
   private readonly auth = inject(AuthService);
   private readonly controlStatusService = inject(ControlStatusService);
+  private readonly formTimeService = inject(FormTimeService);
   private readonly signatureFileService = inject(SignatureFileService);
   private readonly repairerService = inject(RepairerAnswerResultService);
   private readonly repairerMachineService = inject(RepairerMachineAnswerResultService);
@@ -178,6 +181,9 @@ export class HistoricoComponent implements OnInit {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly controlStatuses = signal<Record<string, string[]>>({});
+
+  /** formId → tempo de execução em segundos (0/ausente = sem configuração de tempo). */
+  private readonly execSegByForm = signal<Map<string, number>>(new Map());
 
   // ───────── edição por status ─────────
   readonly editId = signal<string | null>(null);
@@ -1337,6 +1343,7 @@ export class HistoricoComponent implements OnInit {
     this.repairerObsByAnswerResultId.set({});
     this.repairerObsByMachineAnswerResultId.set({});
     this.correcoesVisible.set({});
+    this.execSegByForm.set(new Map());
     this.cancelarEdicao();
 
     const failLog = (label: string) =>
@@ -1379,6 +1386,9 @@ export class HistoricoComponent implements OnInit {
       repairersMachine: this.fetchAllPages<RepairerMachineAnswerResult>((l, p) =>
         this.repairerMachineService.getAll(l, p),
       ).pipe(failLog('reparadores de máquina')),
+      formTimes: this.fetchAllPages<FormTime>((l, p) => this.formTimeService.getAll(l, p)).pipe(
+        failLog('tempos de formulário'),
+      ),
     }).subscribe({
       next: ({
         controls,
@@ -1392,6 +1402,7 @@ export class HistoricoComponent implements OnInit {
         limits,
         repairers,
         repairersMachine,
+        formTimes,
       }) => {
         if (controls == null) {
           this.error.set('Não foi possível carregar o histórico.');
@@ -1439,6 +1450,15 @@ export class HistoricoComponent implements OnInit {
         this.repairerByMachineAnswerResultId.set(repMachineMap);
         this.repairerObsByMachineAnswerResultId.set(repMachineObsMap);
 
+        // formId → segundos de execução (base do "final do tempo" do formulário)
+        const ftMap = new Map<string, number>();
+        for (const ft of this.unwrap<FormTime>(formTimes)) {
+          const fid = (ft as { formId?: string }).formId ?? '';
+          const seg = this.execSegundosDe(ft);
+          if (fid && seg > 0) ftMap.set(fid, seg);
+        }
+        this.execSegByForm.set(ftMap);
+
         this.loading.set(false);
 
         // Status apenas dos controles VISÍVEIS, com concorrência limitada
@@ -1464,6 +1484,8 @@ export class HistoricoComponent implements OnInit {
             const map: Record<string, string[]> = {};
             for (const it of list) map[it.id] = it.nomes;
             this.controlStatuses.set(map);
+            // Com status carregados, verifica formulários cujo tempo venceu.
+            this.escalarCorrecoesVencidas();
           });
       },
       error: () => {
@@ -1471,6 +1493,80 @@ export class HistoricoComponent implements OnInit {
         this.error.set('Não foi possível carregar o histórico.');
       },
     });
+  }
+
+  // ============================================================
+  //  BLOQUEIO POR TEMPO (como no painel)
+  //  Ao final do tempo de execução de cada formulário, pega o ÚLTIMO envio;
+  //  se ele ainda estiver EM CORREÇÃO (status tipo 2), escala para
+  //  PENDENTE (status 3). Roda uma vez por carga, após os status chegarem.
+  // ============================================================
+  private escalarCorrecoesVencidas(): void {
+    const execByForm = this.execSegByForm();
+    if (execByForm.size === 0) return;
+
+    const agora = Date.now();
+
+    // Último envio (mais recente) de cada formulário, entre os controles visíveis.
+    const ultimoPorForm = new Map<string, Control>();
+    for (const c of this.controls()) {
+      if (!this.isFormAllowed(c.formId)) continue;
+      const atual = ultimoPorForm.get(c.formId);
+      if (!atual || this.tsControle(c) > this.tsControle(atual)) {
+        ultimoPorForm.set(c.formId, c);
+      }
+    }
+
+    const paraAtualizar: string[] = [];
+    for (const [formId, control] of ultimoPorForm) {
+      const execSeg = execByForm.get(formId) ?? 0;
+      if (execSeg <= 0) continue; // sem tempo configurado → ignora
+      const fimCiclo = this.tsControle(control) + execSeg * 1000;
+      if (agora < fimCiclo) continue; // o tempo do formulário ainda não acabou
+      if (this.statusTipo(control.id) !== 2) continue; // só escala quem está em correção
+      paraAtualizar.push(control.id);
+    }
+
+    if (!paraAtualizar.length) return;
+
+    from(paraAtualizar)
+      .pipe(
+        mergeMap(
+          (controlId) =>
+            this.controlStatusService.update(controlId, '3').pipe(
+              map(() => controlId),
+              catchError((err) => {
+                console.error('Erro ao atualizar status do controle:', err);
+                return of(null);
+              }),
+            ),
+          4,
+        ),
+        toArray(),
+      )
+      .subscribe((ids) => {
+        // Reflete localmente os que foram atualizados com sucesso.
+        for (const id of ids) if (id) this.atualizarStatusLocal(id as string);
+      });
+  }
+
+  /** Instante (ms) do envio a partir da emissão (fallback: criação). */
+  private tsControle(c: Control): number {
+    const r = c as unknown as Record<string, unknown>;
+    const raw =
+      r['dataEmissao'] ?? r['data_emissao'] ?? r['dataCriacao'] ?? r['data_criacao'] ?? null;
+    if (!raw) return 0;
+    const t = new Date(raw as string).getTime();
+    return isNaN(t) ? 0 : t;
+  }
+
+  /** Tempo de execução do FormTime em segundos (tolera camelCase/snake). */
+  private execSegundosDe(ft: FormTime): number {
+    const r = ft as unknown as Record<string, unknown>;
+    const raw = r['tempoExecucao'] ?? r['tempo_execucao'] ?? '';
+    const m = String(raw).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return 0;
+    return Number(m[1]) * 3600 + Number(m[2]) * 60 + (m[3] ? Number(m[3]) : 0);
   }
 
   /** Operador/reparador de uma versão específica = o ÚLTIMO inserido no lote. */

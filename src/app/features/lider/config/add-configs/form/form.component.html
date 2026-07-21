@@ -301,18 +301,140 @@
 
       <!-- FORMULÁRIOS (CRUD) -->
       @case ('form') {
-        <div class="grid">
+        <!-- Grupos -->
+        <div class="groups">
+          <div class="groups__row">
+            <button
+              type="button"
+              class="gchip"
+              [class.is-active]="activeGroup() === ''"
+              (click)="activeGroup.set('')"
+            >
+              <i class="bi bi-grid"></i> Todos
+            </button>
+
+            @for (g of formGroups(); track g.id) {
+              <span class="gchip-wrap">
+                <button
+                  type="button"
+                  class="gchip"
+                  [class.is-active]="activeGroup() === g.id"
+                  (click)="activeGroup.set(g.id)"
+                >
+                  <i class="bi bi-collection"></i> {{ g.nome }}
+                  <span class="gchip__count">{{ countInGroup(g.id) }}</span>
+                </button>
+                @if (activeGroup() === g.id) {
+                  <button
+                    type="button"
+                    class="gchip__del"
+                    title="Excluir grupo"
+                    (click)="excluirGrupo(g.id)"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                }
+              </span>
+            }
+
+            <button
+              type="button"
+              class="gchip"
+              [class.is-active]="activeGroup() === 'none'"
+              (click)="activeGroup.set('none')"
+            >
+              <i class="bi bi-dash-circle"></i> Sem grupo
+            </button>
+
+            <button type="button" class="gchip gchip--new" (click)="toggleNewGroup()">
+              <i class="bi bi-plus-lg"></i> Novo grupo
+            </button>
+          </div>
+
+          @if (newGroupOpen()) {
+            <div class="groups__new">
+              <input
+                type="text"
+                class="ff__control"
+                placeholder="Nome do grupo (ex.: Estoques, Pacotes, Eletrônicas)"
+                [ngModel]="newGroupNome()"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="newGroupNome.set($event)"
+                (keyup.enter)="criarGrupo()"
+              />
+              <button
+                type="button"
+                class="btn btn--primary"
+                [disabled]="!newGroupNome().trim()"
+                (click)="criarGrupo()"
+              >
+                <i class="bi bi-check-lg"></i> Criar
+              </button>
+              <button type="button" class="btn btn--ghost" (click)="toggleNewGroup()">
+                Cancelar
+              </button>
+            </div>
+          }
+
+          <!-- Dica de reordenação (só com um grupo específico ativo) -->
+          @if (canReorder()) {
+            <p class="groups__hint">
+              <i class="bi bi-arrow-down-up"></i>
+              Use as setas nos cards para ordenar os formulários deste grupo.
+              @if (reordering()) {
+                <span class="groups__saving"
+                  ><i class="bi bi-arrow-repeat spin"></i> salvando…</span
+                >
+              }
+            </p>
+          }
+        </div>
+
+        <div class="grid" [class.grid--ordered]="canReorder()">
           <button type="button" class="card card--add" (click)="novoForm()">
             <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
             <h3 class="card__title">Novo formulário</h3>
-            <p class="card__desc">Cadastrar um formulário nesta seção.</p>
+            <p class="card__desc">
+              @if (activeGroup() && activeGroup() !== 'none') {
+                Será criado nesta seção (atribua o grupo depois de salvar).
+              } @else {
+                Cadastrar um formulário nesta seção.
+              }
+            </p>
           </button>
 
-          @for (fm of filteredForms(); track trackById($index, fm)) {
-            <div class="card" (click)="editarForm(fm)">
+          @for (fm of displayedForms(); track trackById($index, fm)) {
+            <div class="card form-card" [class.card--ordered]="canReorder()" (click)="editarForm(fm)">
               <div class="card__top">
                 <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
                 <div class="card__top-right">
+                  <!-- Controles de ordem (só com grupo específico ativo) -->
+                  @if (canReorder()) {
+                    <div class="ordem" (click)="$event.stopPropagation()">
+                      <span class="ordem__pos" title="Posição no grupo">{{ $index + 1 }}º</span>
+                      <div class="ordem__btns">
+                        <button
+                          type="button"
+                          class="ordem__btn"
+                          title="Mover para cima"
+                          [disabled]="reordering() || isFirstNoGrupo(fm.id)"
+                          (click)="moverCima(fm)"
+                        >
+                          <i class="bi bi-chevron-up"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="ordem__btn"
+                          title="Mover para baixo"
+                          [disabled]="reordering() || isLastNoGrupo(fm.id)"
+                          (click)="moverBaixo(fm)"
+                        >
+                          <i class="bi bi-chevron-down"></i>
+                        </button>
+                      </div>
+                    </div>
+                  }
+
                   <span class="badge" [class.badge--on]="isAtivo(fm.status)">{{
                     isAtivo(fm.status) ? 'Ativo' : 'Inativo'
                   }}</span>
@@ -345,20 +467,42 @@
               </div>
               <h3 class="card__title">{{ fm.nome }}</h3>
               <p class="card__desc">{{ fm.descricao || 'Sem descrição' }}</p>
+
+              <div class="form-card__group" (click)="$event.stopPropagation()">
+                <label class="form-card__group-label">
+                  <i class="bi bi-collection"></i> Grupo
+                </label>
+                <select
+                  class="ff__control"
+                  [ngModel]="groupIdOf(fm.id)"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="setFormGroup(fm, $event)"
+                >
+                  <option value="">Sem grupo</option>
+                  @for (g of formGroups(); track g.id) {
+                    <option [value]="g.id">{{ g.nome }}</option>
+                  }
+                </select>
+              </div>
+
               <span class="card__go">Editar <i class="bi bi-pencil"></i></span>
             </div>
           }
         </div>
 
-        @if (filteredForms().length === 0) {
+        @if (displayedForms().length === 0) {
           <div class="empty">
             <i class="bi bi-inbox"></i>
             <p>
-              {{
-                hasFilter()
-                  ? 'Nenhum formulário corresponde aos filtros.'
-                  : 'Nenhum formulário nesta seção.'
-              }}
+              @if (hasFilter()) {
+                Nenhum formulário corresponde aos filtros.
+              } @else if (activeGroup() && activeGroup() !== 'none') {
+                Nenhum formulário neste grupo ainda.
+              } @else if (activeGroup() === 'none') {
+                Nenhum formulário sem grupo.
+              } @else {
+                Nenhum formulário nesta seção.
+              }
             </p>
             @if (hasFilter()) {
               <button type="button" class="btn btn--ghost" (click)="resetFilters()">

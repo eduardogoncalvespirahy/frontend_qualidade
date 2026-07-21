@@ -285,6 +285,81 @@
   border-color: var(--accent);
 }
 
+/* ───────── Grupos de formulários (acordeão) ───────── */
+.form-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.form-group-section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.form-group-section__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.form-group-section__head:hover {
+  background: var(--surface);
+}
+.form-group-section__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.form-group-section__title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.form-group-section__count {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.form-group-section__chevron {
+  color: var(--muted);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.form-group-section .grid {
+  padding: 0 20px 20px;
+}
+.form-groups__label {
+  display: block;
+  margin: 4px 2px -2px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
 /* ───────── Grade de cards ───────── */
 .grid {
   display: grid;
@@ -741,6 +816,63 @@
     flex-wrap: wrap;
   }
 }
+.formpanel__group + .formpanel__group {
+  border-top: 1px solid var(--line);
+}
+.formpanel__group-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.formpanel__group-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.formpanel__group-heading {
+  min-width: 0;
+}
+.formpanel__group-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.formpanel__group-desc {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.formpanel__group-count {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .formpanel__group-head {
+    padding: 14px 16px;
+  }
+  .formpanel__group-count {
+    margin-left: 0;
+  }
+}
+
 
 @media (prefers-reduced-motion: reduce) {
   *,

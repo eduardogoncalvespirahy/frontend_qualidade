@@ -554,3 +554,232 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ───────── Grupos de formulários ───────── */
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.groups__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.gchip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.gchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.gchip:hover {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.gchip.is-active {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+.gchip--new {
+  border-style: dashed;
+  color: var(--accent-ink);
+}
+.gchip__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  font-size: 11px;
+  font-weight: 700;
+}
+.gchip__del {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--danger-soft);
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 12px;
+  transition: opacity 0.15s ease;
+}
+.gchip__del:hover {
+  opacity: 0.8;
+}
+
+.groups__new {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.groups__new .ff__control {
+  flex: 1 1 220px;
+}
+
+/* dica de reordenação */
+.groups__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--accent-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.groups__hint i {
+  color: var(--accent-ink);
+}
+.groups__saving {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* botão primário (criação de grupo) */
+.btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn--primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* seletor de grupo no card de formulário */
+.form-card {
+  cursor: pointer;
+}
+.form-card__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+}
+.form-card__group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ───────── Ordem dos formulários no grupo ───────── */
+
+/* Com um grupo específico ativo, a grade vira uma coluna:
+   a leitura top-to-bottom deixa a ordenação intuitiva. */
+.grid--ordered {
+  grid-template-columns: 1fr;
+  max-width: 720px;
+  gap: 12px;
+}
+/* card em modo ordenado não "salta" no hover (evita sensação de arraste) */
+.grid--ordered .card--ordered:hover {
+  transform: none;
+}
+
+.ordem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ordem__pos {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ordem__btns {
+  display: inline-flex;
+  gap: 4px;
+}
+.ordem__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.ordem__btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--surface);
+}
+.ordem__btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.ordem__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* spinner do "salvando…" */
+.spin {
+  display: inline-block;
+  animation: ordem-spin 0.8s linear infinite;
+}
+@keyframes ordem-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 560px) {
+  .grid--ordered {
+    max-width: 100%;
+  }
+  .ordem__pos {
+    min-width: 26px;
+    height: 22px;
+  }
+}

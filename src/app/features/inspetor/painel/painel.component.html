@@ -337,92 +337,46 @@
       <!-- ───── FORMULÁRIOS ───── -->
       @case ('form') {
         @if (filteredForms().length) {
-          <div class="grid">
-            @for (form of filteredForms(); track trackById($index, form)) {
-              @let statusColor = formStatusColor(form.id);
-              <div
-                class="card"
-                [class.is-paused]="isFormPausedById(form.id) || isFormBlockedForResend(form.id)"
-                (click)="selectForm(form)"
-                [style.border-left]="
-                  statusColor === 'green'
-                    ? '4px solid #22c55e'
-                    : statusColor === 'yellow'
-                      ? '4px solid #f59e0b'
-                      : statusColor === 'orange'
-                        ? '4px solid #f97316'
-                        : statusColor === 'red'
-                          ? '4px solid #ef4444'
-                          : statusColor === 'gray'
-                            ? '4px solid #94a3b8'
-                            : ''
-                "
-              >
-                <div class="card__top">
-                  <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
-                  <div class="card__top-right">
-                    <span class="badge" [class.badge--on]="isAtivo(form.status)">
-                      {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
-                    </span>
-                    @if (isFormPausedById(form.id)) {
-                      <span class="badge badge--warn">
-                        <i class="bi bi-pause-circle me-1"></i>Pausado
-                      </span>
-                    } @else if (isFormBlockedForResend(form.id)) {
-                      <span class="badge badge--warn">
-                        <i class="bi bi-lock me-1"></i>Bloqueado até {{ formUnblockLabel(form.id) }}
-                      </span>
-                    }
-                    <button
-                      type="button"
-                      class="card__del"
-                      title="Paradas"
-                      (click)="$event.stopPropagation(); openBreaks(form)"
-                    >
-                      <i class="bi bi-pause-circle"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <h3 class="card__title">{{ form.nome }}</h3>
-                <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
-
-                <div
-                  class="d-flex justify-content-between align-items-end mt-auto pt-2"
-                  style="font-size: 12px; color: #64748b"
+          <div class="form-groups">
+            <!-- Grupos (acordeão — recolhido por padrão) -->
+            @for (bloco of groupedForms(); track bloco.grupo.id) {
+              <section class="form-group-section">
+                <button
+                  type="button"
+                  class="form-group-section__head"
+                  (click)="toggleGroupExpanded(bloco.grupo.id)"
                 >
-                  <span
-                    ><i class="bi bi-send me-1"></i>{{ statsPorForm(form.id).count }} envio(s)</span
-                  >
-                  @if (statsPorForm(form.id).ultimo) {
-                    <span>
-                      <i class="bi bi-clock-history me-1"></i>
-                      {{ statsPorForm(form.id).ultimo | date: 'dd/MM/yy HH:mm' }}
-                    </span>
-                  } @else {
-                    <span><i class="bi bi-dash"></i> Sem envios</span>
-                  }
-                </div>
-
-                <span class="card__go">
-                  @if (isFormPausedById(form.id)) {
-                    Em pausa
-                  } @else if (isFormBlockedForResend(form.id)) {
-                    Bloqueado até {{ formUnblockLabel(form.id) }}
-                  } @else {
-                    Preencher
-                  }
+                  <span class="form-group-section__icon"><i class="bi bi-collection"></i></span>
+                  <span class="form-group-section__title">{{ bloco.grupo.nome }}</span>
+                  <span class="form-group-section__count">{{ bloco.forms.length }}</span>
                   <i
-                    class="bi"
-                    [class.bi-pause-fill]="isFormPausedById(form.id)"
-                    [class.bi-lock-fill]="
-                      !isFormPausedById(form.id) && isFormBlockedForResend(form.id)
-                    "
-                    [class.bi-arrow-right]="
-                      !isFormPausedById(form.id) && !isFormBlockedForResend(form.id)
-                    "
+                    class="bi form-group-section__chevron"
+                    [class.bi-chevron-down]="!isGroupExpanded(bloco.grupo.id)"
+                    [class.bi-chevron-up]="isGroupExpanded(bloco.grupo.id)"
                   ></i>
-                </span>
+                </button>
+
+                @if (isGroupExpanded(bloco.grupo.id)) {
+                  <div class="grid">
+                    @for (form of bloco.forms; track trackById($index, form)) {
+                      <ng-container
+                        *ngTemplateOutlet="formCard; context: { form: form }"
+                      ></ng-container>
+                    }
+                  </div>
+                }
+              </section>
+            }
+
+            <!-- Sem grupo -->
+            @if (ungroupedForms().length) {
+              @if (groupedForms().length) {
+                <span class="form-groups__label">Sem grupo</span>
+              }
+              <div class="grid">
+                @for (form of ungroupedForms(); track trackById($index, form)) {
+                  <ng-container *ngTemplateOutlet="formCard; context: { form: form }"></ng-container>
+                }
               </div>
             }
           </div>
@@ -520,46 +474,65 @@
           <!-- MODO LISTA: formulário sem máquinas (bloco atual) -->
         } @else {
           @if (answers().length) {
-            <div class="formpanel">
-              <div class="formpanel__fields">
-                @for (a of orderedAnswers(); track trackById($index, a)) {
-                  <div class="field">
-                    <label class="field__label" [for]="'p-' + a.id">
-                      {{ a.nome }}
-                      @if (!isAtivo(a.status)) {
-                        <span class="badge field__badge">Inativo</span>
-                      }
-                      @if (isChanged(a.id)) {
-                        <span class="badge badge--change">alterado</span>
-                      }
-                    </label>
-                    @if (a.descricao) {
-                      <span class="field__hint">{{ a.descricao }}</span>
-                    }
+                        <div class="formpanel">
+              @for (grupo of groupedAnswers(); track grupo.categoria?.id ?? grupo.label) {
+  <section class="formpanel__group">
+    <header class="formpanel__group-head">
+      <span class="formpanel__group-icon"><i class="bi bi-tags"></i></span>
+      <div class="formpanel__group-heading">
+        <h4 class="formpanel__group-title">{{ grupo.label }}</h4>
+        @if (grupo.categoria?.descricao) {
+          <p class="formpanel__group-desc">{{ grupo.categoria?.descricao }}</p>
+        }
+    
 
-                    @if (currentValue(a.id) !== null) {
-                      <span class="field__current">
-                        <i class="bi bi-clock-history"></i>
-                        Valor atual: <strong>{{ currentValue(a.id) }}</strong>
-                      </span>
-                    } @else {
-                      <span class="field__current field__current--empty">
-                        <i class="bi bi-dash-circle"></i> Sem valor registrado
-                      </span>
-                    }
+                    </div>
+                    <span class="formpanel__group-count">
+                      {{ grupo.answers.length }} parâmetro{{ grupo.answers.length === 1 ? '' : 's' }}
+                    </span>
+                  </header>
 
-                    <input
-                      class="field__input"
-                      [id]="'p-' + a.id"
-                      [type]="inputType(a.categoryId)"
-                      [ngModel]="paramValues()[a.id] ?? ''"
-                      [ngModelOptions]="{ standalone: true }"
-                      (ngModelChange)="updateParam(a.id, $event)"
-                      placeholder="Informe o valor"
-                    />
+                  <div class="formpanel__fields">
+                    @for (a of grupo.answers; track trackById($index, a)) {
+                      <div class="field">
+                        <label class="field__label" [for]="'p-' + a.id">
+                          {{ a.nome }}
+                          @if (!isAtivo(a.status)) {
+                            <span class="badge field__badge">Inativo</span>
+                          }
+                          @if (isChanged(a.id)) {
+                            <span class="badge badge--change">alterado</span>
+                          }
+                        </label>
+                        @if (a.descricao) {
+                          <span class="field__hint">{{ a.descricao }}</span>
+                        }
+
+                        @if (currentValue(a.id) !== null) {
+                          <span class="field__current">
+                            <i class="bi bi-clock-history"></i>
+                            Valor atual: <strong>{{ currentValue(a.id) }}</strong>
+                          </span>
+                        } @else {
+                          <span class="field__current field__current--empty">
+                            <i class="bi bi-dash-circle"></i> Sem valor registrado
+                          </span>
+                        }
+
+                        <input
+                          class="field__input"
+                          [id]="'p-' + a.id"
+                          [type]="inputType(a.categoryId)"
+                          [ngModel]="paramValues()[a.id] ?? ''"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="updateParam(a.id, $event)"
+                          placeholder="Informe o valor"
+                        />
+                      </div>
+                    }
                   </div>
-                }
-              </div>
+                </section>
+              }
 
               <!-- <div class="formpanel__footer">
                 <span class="formpanel__count">
@@ -579,6 +552,7 @@
                 </button>
               </div> -->
             </div>
+
           } @else {
             <div class="empty">
               <i class="bi bi-inbox"></i>
@@ -604,5 +578,90 @@
       }
     }
   }
+
+  <!-- Card de formulário (reutilizado pelos grupos e pela lista "sem grupo") -->
+  <ng-template #formCard let-form="form">
+    @let statusColor = formStatusColor(form.id);
+    <div
+      class="card"
+      [class.is-paused]="isFormPausedById(form.id) || isFormBlockedForResend(form.id)"
+      (click)="selectForm(form)"
+      [style.border-left]="
+        statusColor === 'green'
+          ? '4px solid #22c55e'
+          : statusColor === 'yellow'
+            ? '4px solid #f59e0b'
+            : statusColor === 'orange'
+              ? '4px solid #f97316'
+              : statusColor === 'red'
+                ? '4px solid #ef4444'
+                : statusColor === 'gray'
+                  ? '4px solid #94a3b8'
+                  : ''
+      "
+    >
+      <div class="card__top">
+        <span class="card__icon"><i class="bi bi-card-checklist"></i></span>
+        <div class="card__top-right">
+          <span class="badge" [class.badge--on]="isAtivo(form.status)">
+            {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
+          </span>
+          @if (isFormPausedById(form.id)) {
+            <span class="badge badge--warn">
+              <i class="bi bi-pause-circle me-1"></i>Pausado
+            </span>
+          } @else if (isFormBlockedForResend(form.id)) {
+            <span class="badge badge--warn">
+              <i class="bi bi-lock me-1"></i>Bloqueado até {{ formUnblockLabel(form.id) }}
+            </span>
+          }
+          <button
+            type="button"
+            class="card__del"
+            title="Paradas"
+            (click)="$event.stopPropagation(); openBreaks(form)"
+          >
+            <i class="bi bi-pause-circle"></i>
+          </button>
+        </div>
+      </div>
+
+      <h3 class="card__title">{{ form.nome }}</h3>
+      <p class="card__desc">{{ form.descricao || 'Sem descrição' }}</p>
+
+      <div
+        class="d-flex justify-content-between align-items-end mt-auto pt-2"
+        style="font-size: 12px; color: #64748b"
+      >
+        <span><i class="bi bi-send me-1"></i>{{ statsPorForm(form.id).count }} envio(s)</span>
+        @if (statsPorForm(form.id).ultimo) {
+          <span>
+            <i class="bi bi-clock-history me-1"></i>
+            {{ statsPorForm(form.id).ultimo | date: 'dd/MM/yy HH:mm' }}
+          </span>
+        } @else {
+          <span><i class="bi bi-dash"></i> Sem envios</span>
+        }
+      </div>
+
+      <span class="card__go">
+        @if (isFormPausedById(form.id)) {
+          Em pausa
+        } @else if (isFormBlockedForResend(form.id)) {
+          Bloqueado até {{ formUnblockLabel(form.id) }}
+        } @else {
+          Preencher
+        }
+        <i
+          class="bi"
+          [class.bi-pause-fill]="isFormPausedById(form.id)"
+          [class.bi-lock-fill]="!isFormPausedById(form.id) && isFormBlockedForResend(form.id)"
+          [class.bi-arrow-right]="
+            !isFormPausedById(form.id) && !isFormBlockedForResend(form.id)
+          "
+        ></i>
+      </span>
+    </div>
+  </ng-template>
 </section>
 <app-scroll-top></app-scroll-top>

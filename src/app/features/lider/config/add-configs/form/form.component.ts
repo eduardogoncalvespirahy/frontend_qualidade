@@ -6,12 +6,17 @@ import { Location } from '../../../../../core/models/location.model';
 import { Section } from '../../../../../core/models/section.model';
 import { Form } from '../../../../../core/models/form.model';
 import { FormTime } from '../../../../../core/models/form-time.model';
+import { FormGroups } from '../../../../../core/models/form-group.model';
+import { FormGroupItems } from '../../../../../core/models/form-group-items.model';
 import { LocationService } from '../../../../../core/services/location.service';
 import { SectionService } from '../../../../../core/services/section.service';
 import { FormService } from '../../../../../core/services/form.service';
 import { FormTimeService } from '../../../../../core/services/form-time.service';
+import { FormGroupsService } from '../../../../../core/services/form-group.service';
+import { FormGroupItemsService } from '../../../../../core/services/form-groups-items.service';
 import { ModalService } from '../../../../../core/services/modal.service';
 import { AuthService } from '../../../../../core/services/auth.service';
+import { forkJoin } from 'rxjs';
 import { FormularioFormComponent } from './modals/form/form.component';
 import { FormTimeComponent } from './modals/form-time/form-time.component';
 import { ScrollTopComponent } from '../../../../scroll-top/scroll-top.component';
@@ -42,6 +47,8 @@ export class FormComponent implements OnInit {
   private readonly sectionService = inject(SectionService);
   private readonly formService = inject(FormService);
   private readonly formTimeService = inject(FormTimeService);
+  private readonly formGroupsService = inject(FormGroupsService);
+  private readonly formGroupItemsService = inject(FormGroupItemsService);
   private readonly modalService = inject(ModalService);
   private readonly auth = inject(AuthService);
 
@@ -59,6 +66,72 @@ export class FormComponent implements OnInit {
 
   /** formId → FormTime existente (só para o indicador de "tempo configurado" no card). */
   readonly formTimeByFormId = signal<Record<string, FormTime>>({});
+
+  // ───────── grupos de formulários ─────────
+  readonly formGroups = signal<FormGroups[]>([]);
+  readonly groupItems = signal<FormGroupItems[]>([]); // vínculos formulário↔grupo da seção
+  readonly activeGroup = signal<string>(''); // '' = todos | 'none' = sem grupo | id do grupo
+  readonly newGroupOpen = signal(false);
+  readonly newGroupNome = signal('');
+  readonly reordering = signal(false);
+
+  /** formId -> vínculo do grupo (1 grupo por formulário). */
+  readonly groupItemByForm = computed(() => {
+    const m = new Map<string, FormGroupItems>();
+    for (const it of this.groupItems()) {
+      if (!m.has(it.formId)) m.set(it.formId, it);
+    }
+    return m;
+  });
+
+  /**
+   * Vínculos do grupo ATIVO ordenados por `ordem` (base da reordenação).
+   * Vazio quando não há um grupo específico selecionado.
+   */
+  readonly activeGroupOrder = computed<FormGroupItems[]>(() => {
+    const ag = this.activeGroup();
+    if (!ag || ag === 'none') return [];
+    return this.groupItems()
+      .filter((i) => i.formGroupId === ag)
+      .sort((a, b) => a.ordem - b.ordem);
+  });
+
+  /** É possível reordenar? (um grupo específico está ativo). */
+  readonly canReorder = computed(() => {
+    const ag = this.activeGroup();
+    return !!ag && ag !== 'none';
+  });
+
+  /** Formulários visíveis = filtrados + recorte pelo grupo ativo. */
+  readonly displayedForms = computed(() => {
+    const ag = this.activeGroup();
+    const map = this.groupItemByForm();
+    const base = this.filteredForms().filter((fm) => {
+      if (ag === '') return true;
+      const gid = map.get(fm.id)?.formGroupId ?? '';
+      return ag === 'none' ? gid === '' : gid === ag;
+    });
+
+    // Num grupo específico, respeita a ordem definida (campo `ordem`).
+    if (ag && ag !== 'none') {
+      base.sort((a, b) => (map.get(a.id)?.ordem ?? 0) - (map.get(b.id)?.ordem ?? 0));
+    }
+    return base;
+  });
+
+  /** Id do grupo de um formulário (ou '' quando sem grupo). */
+  groupIdOf(formId: string): string {
+    return this.groupItemByForm().get(formId)?.formGroupId ?? '';
+  }
+
+  /** Quantidade de formulários num grupo. */
+  countInGroup(groupId: string): number {
+    return this.groupItems().filter((i) => i.formGroupId === groupId).length;
+  }
+
+  private nextOrdem(groupId: string): number {
+    return this.countInGroup(groupId);
+  }
 
   // ───────── permissões de local (credentialLocation) ─────────
   /** Nomes dos locais liberados para a credencial logada. */
@@ -262,6 +335,31 @@ export class FormComponent implements OnInit {
     });
   }
 
+  /** Grupos da seção selecionada. */
+  private loadGroups(): void {
+    const sectionId = this.selectedSection()?.id;
+    this.formGroupsService.getAll(1000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<FormGroups>(res);
+        this.formGroups.set(all.filter((g) => g.sectionId === sectionId));
+        this.loadGroupItems();
+      },
+      error: () => this.error.set('Não foi possível carregar os grupos.'),
+    });
+  }
+
+  /** Vínculos formulário↔grupo restritos aos grupos desta seção. */
+  private loadGroupItems(): void {
+    const groupIds = new Set(this.formGroups().map((g) => g.id));
+    this.formGroupItemsService.getAll(2000, 1).subscribe({
+      next: (res) => {
+        const all = this.unwrap<FormGroupItems>(res);
+        this.groupItems.set(all.filter((it) => groupIds.has(it.formGroupId)));
+      },
+      error: () => this.groupItems.set([]),
+    });
+  }
+
   // ============================================================
   //  NAVEGAÇÃO
   // ============================================================
@@ -285,6 +383,7 @@ export class FormComponent implements OnInit {
     this.selectedSection.set(sec);
     this.step.set('form');
     this.loadForms();
+    this.loadGroups();
   }
 
   /** Abre a gestão de paradas do formulário. */
@@ -328,6 +427,7 @@ export class FormComponent implements OnInit {
     this.selectedForm.set(null);
     this.sections.set([]);
     this.forms.set([]);
+    this.clearGroups();
     this.step.set('location');
   }
 
@@ -338,6 +438,7 @@ export class FormComponent implements OnInit {
     this.selectedSection.set(null);
     this.selectedForm.set(null);
     this.forms.set([]);
+    this.clearGroups();
     this.step.set('section');
   }
 
@@ -425,6 +526,160 @@ export class FormComponent implements OnInit {
   }
 
   // ============================================================
+  //  GRUPOS DE FORMULÁRIOS
+  // ============================================================
+
+  toggleNewGroup(): void {
+    this.newGroupOpen.update((v) => !v);
+    this.newGroupNome.set('');
+  }
+
+  /** Cria um grupo vinculado à seção atual. */
+  criarGrupo(): void {
+    const nome = this.newGroupNome().trim();
+    const sectionId = this.selectedSection()?.id;
+    if (!nome || !sectionId) return;
+
+    this.formGroupsService.create({ sectionId, nome, status: 1 }).subscribe({
+      next: () => {
+        this.success.set('Grupo criado com sucesso.');
+        this.newGroupOpen.set(false);
+        this.newGroupNome.set('');
+        this.loadGroups();
+      },
+      error: () => this.error.set('Erro ao criar o grupo.'),
+    });
+  }
+
+  excluirGrupo(groupId: string): void {
+    this.formGroupsService.delete(groupId).subscribe({
+      next: () => {
+        if (this.activeGroup() === groupId) this.activeGroup.set('');
+        this.success.set('Grupo removido.');
+        this.loadGroups();
+      },
+      error: () => this.error.set('Erro ao remover o grupo.'),
+    });
+  }
+
+  /**
+   * Relaciona/realoca um formulário a um grupo (ou remove o vínculo).
+   * Como a chave do vínculo é (formGroupId, formId), trocar de grupo
+   * significa apagar o vínculo antigo e criar um novo.
+   */
+  setFormGroup(form: Form, groupId: string): void {
+    const current = this.groupItemByForm().get(form.id) ?? null;
+    const target = groupId || '';
+    const curGroup = current?.formGroupId ?? '';
+    if (curGroup === target) return;
+
+    const reload = () => this.loadGroupItems();
+    const createLink = () =>
+      this.formGroupItemsService
+        .create({ formGroupId: target, formId: form.id, ordem: this.nextOrdem(target) })
+        .subscribe({ next: reload, error: () => this.error.set('Erro ao relacionar ao grupo.') });
+
+    if (!target) {
+      // "Sem grupo" → remove o vínculo existente
+      if (current) {
+        this.formGroupItemsService
+          .delete(current.formGroupId, form.id)
+          .subscribe({ next: reload, error: () => this.error.set('Erro ao remover do grupo.') });
+      }
+      return;
+    }
+
+    if (current) {
+      this.formGroupItemsService
+        .delete(current.formGroupId, form.id)
+        .subscribe({ next: createLink, error: createLink });
+    } else {
+      createLink();
+    }
+  }
+
+  // ============================================================
+  //  ORDEM DOS FORMULÁRIOS NO GRUPO
+  // ============================================================
+
+  /** É o primeiro item na ordem do grupo ativo? */
+  isFirstNoGrupo(formId: string): boolean {
+    const o = this.activeGroupOrder();
+    return o.length > 0 && o[0].formId === formId;
+  }
+
+  /** É o último item na ordem do grupo ativo? */
+  isLastNoGrupo(formId: string): boolean {
+    const o = this.activeGroupOrder();
+    return o.length > 0 && o[o.length - 1].formId === formId;
+  }
+
+  moverCima(form: Form): void {
+    this.moverItem(form, -1);
+  }
+
+  moverBaixo(form: Form): void {
+    this.moverItem(form, 1);
+  }
+
+  /**
+   * Move um formulário na ordem do grupo ativo e persiste.
+   * Reindexa `ordem` sequencialmente (0..n-1); só envia ao backend os
+   * vínculos cujo `ordem` mudou. Aplica a mudança localmente de forma
+   * otimista e reverte em caso de erro.
+   */
+  private moverItem(form: Form, dir: -1 | 1): void {
+    if (this.reordering()) return;
+
+    const ag = this.activeGroup();
+    if (!ag || ag === 'none') return;
+
+    const ordered = this.activeGroupOrder();
+    const idx = ordered.findIndex((i) => i.formId === form.id);
+    const alvo = idx + dir;
+    if (idx < 0 || alvo < 0 || alvo >= ordered.length) return;
+
+    // move no array e reindexa por posição
+    const arr = ordered.slice();
+    [arr[idx], arr[alvo]] = [arr[alvo], arr[idx]];
+
+    const updates = arr
+      .map((item, pos) => ({ item, ordem: pos }))
+      .filter((u) => u.item.ordem !== u.ordem);
+    if (!updates.length) return;
+
+    // atualização otimista local
+    this.clearFeedback();
+    this.groupItems.update((list) =>
+      list.map((it) => {
+        const u = updates.find(
+          (x) => x.item.formGroupId === it.formGroupId && x.item.formId === it.formId,
+        );
+        return u ? { ...it, ordem: u.ordem } : it;
+      }),
+    );
+
+    // persiste apenas os que mudaram
+    this.reordering.set(true);
+    forkJoin(
+      updates.map((u) =>
+        this.formGroupItemsService.update(ag, u.item.formId, {
+          formGroupId: ag,
+          formId: u.item.formId,
+          ordem: u.ordem,
+        }),
+      ),
+    ).subscribe({
+      next: () => this.reordering.set(false),
+      error: () => {
+        this.reordering.set(false);
+        this.error.set('Erro ao reordenar. Recarregando a ordem…');
+        this.loadGroupItems(); // reverte para o estado do servidor
+      },
+    });
+  }
+
+  // ============================================================
   //  HELPERS
   // ============================================================
 
@@ -475,5 +730,13 @@ export class FormComponent implements OnInit {
   private clearFeedback(): void {
     this.error.set(null);
     this.success.set(null);
+  }
+  /** Zera o estado dos grupos (ao sair da seção atual). */
+  private clearGroups(): void {
+    this.formGroups.set([]);
+    this.groupItems.set([]);
+    this.activeGroup.set('');
+    this.newGroupOpen.set(false);
+    this.newGroupNome.set('');
   }
 }

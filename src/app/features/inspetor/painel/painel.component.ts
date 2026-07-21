@@ -26,7 +26,13 @@ import { Control } from '../../../core/models/control.model';
 import { AnswerGroups } from '../../../core/models/answer-group.model';
 import { AnswerGroupItems } from '../../../core/models/answer-group-items.model';
 import { FormTime } from '../../../core/models/form-time.model';
+import { CategorieAnswer } from '../../../core/models/categorieAnswer.model';
+import { FormGroups } from '../../../core/models/form-group.model';
+import { FormGroupItems } from '../../../core/models/form-group-items.model';
 
+import { CategorieAnswerService } from '../../../core/services/categorieAnswer.service';
+import { FormGroupsService } from '../../../core/services/form-group.service';
+import { FormGroupItemsService } from '../../../core/services/form-groups-items.service';
 import { MachineService } from '../../../core/services/machine.service';
 import { LocationService } from '../../../core/services/location.service';
 import { SectionService } from '../../../core/services/section.service';
@@ -101,6 +107,9 @@ export class PainelComponent implements OnInit {
   private readonly controlStatusService = inject(ControlStatusService);
   private readonly signatureFileService = inject(SignatureFileService);
   private readonly limitsService = inject(LimitAnswerService);
+  private readonly categorieAnswerService = inject(CategorieAnswerService);
+  private readonly formGroupsService = inject(FormGroupsService);
+  private readonly formGroupItemsService = inject(FormGroupItemsService);
   private readonly machineAnswerResultService = inject(MachineAnswerResultService);
   private readonly modalService = inject(ModalService);
   private readonly exporter = inject(FileExportService);
@@ -121,6 +130,12 @@ export class PainelComponent implements OnInit {
   readonly breaks = signal<BreakMachine[]>([]);
   readonly allFormBreaks = signal<BreakForm[]>([]);
   readonly controls = signal<Control[]>([]);
+  readonly categories = signal<CategorieAnswer[]>([]);
+  readonly formGroups = signal<FormGroups[]>([]);
+  readonly formGroupItems = signal<FormGroupItems[]>([]);
+  /** ids de grupo atualmente expandidos (acordeão) — recolhido por padrão. */
+  readonly expandedGroups = signal<Set<string>>(new Set());
+
 
   // ───────── seleções ─────────
   readonly selectedLocation = signal<Location | null>(null);
@@ -217,6 +232,38 @@ export class PainelComponent implements OnInit {
       return (a.nome ?? '').localeCompare(b.nome ?? ''); // desempate estável
     });
   });
+    /**
+   * Parâmetros do modo lista (sem máquina) agrupados por categoria (AnswerGroups),
+   * preservando a ordem de orderedAnswers(). Sem grupo cai em "Outros parâmetros".
+   */
+    readonly groupedAnswers = computed<
+    { categoria: CategorieAnswer | null; label: string; answers: Answer[] }[]
+  >(() => {
+    
+    console.log('categorias carregadas:', this.categories());
+    console.log('categoryId de cada parâmetro:', this.orderedAnswers().map((a) => ({ nome: a.nome, categoryId: a.categoryId })));
+
+    const catById = new Map(this.categories().map((c) => [String(c.id), c]));
+    const indexByKey = new Map<string, number>();
+    const result: { categoria: CategorieAnswer | null; label: string; answers: Answer[] }[] = [];
+
+    for (const a of this.orderedAnswers()) {
+      const categoria = a.categoryId ? (catById.get(String(a.categoryId)) ?? null) : null;
+      const label = categoria?.nome ?? (a.categoryId ? `Categoria ${a.categoryId}` : 'Sem categoria');
+      const key = categoria?.id ?? label;
+
+      let idx = indexByKey.get(key);
+      if (idx === undefined) {
+        idx = result.length;
+        indexByKey.set(key, idx);
+        result.push({ categoria, label, answers: [] });
+      }
+      result[idx].answers.push(a);
+    }
+    return result;
+  });
+
+
 
   // ───────── filtros de busca (por campo das interfaces) ─────────
   readonly filtersOpen = signal(false);
@@ -307,6 +354,52 @@ export class PainelComponent implements OnInit {
     );
   });
 
+  // ───────── grupos de formulários (exibição em acordeão) ─────────
+
+  /** formId -> vínculo do grupo (1 grupo por formulário). */
+  private readonly groupItemByForm = computed(() => {
+    const m = new Map<string, FormGroupItems>();
+    for (const it of this.formGroupItems()) {
+      if (!m.has(it.formId)) m.set(it.formId, it);
+    }
+    return m;
+  });
+
+  /** Formulários (já filtrados) organizados por grupo, na ordem definida. */
+  readonly groupedForms = computed<{ grupo: FormGroups; forms: Form[] }[]>(() => {
+    const byForm = this.groupItemByForm();
+    const forms = this.filteredForms();
+
+    return this.formGroups()
+      .map((g) => {
+        const inGroup = forms
+          .filter((fm) => byForm.get(fm.id)?.formGroupId === g.id)
+          .sort((a, b) => (byForm.get(a.id)?.ordem ?? 0) - (byForm.get(b.id)?.ordem ?? 0));
+        return { grupo: g, forms: inGroup };
+      })
+      .filter((bloco) => bloco.forms.length > 0);
+  });
+
+  /** Formulários (já filtrados) que não pertencem a nenhum grupo. */
+  readonly ungroupedForms = computed<Form[]>(() => {
+    const byForm = this.groupItemByForm();
+    return this.filteredForms().filter((fm) => !byForm.has(fm.id));
+  });
+
+  /** Um grupo está expandido? Com filtro ativo, mostra tudo (facilita achar o resultado). */
+  isGroupExpanded(groupId: string): boolean {
+    return this.hasFilter() || this.expandedGroups().has(groupId);
+  }
+
+  toggleGroupExpanded(groupId: string): void {
+    this.expandedGroups.update((set) => {
+      const next = new Set(set);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
+
   // ── opções de IDs (selects de filtro) ──
   private distinct(values: (string | null | undefined)[]): string[] {
     return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
@@ -382,9 +475,20 @@ export class PainelComponent implements OnInit {
     return map;
   });
 
-  ngOnInit(): void {
+    ngOnInit(): void {
     this.loadLocations();
+    this.loadCategories();
   }
+  private loadCategories(): void {
+    this.categorieAnswerService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.categories.set(this.unwrap<CategorieAnswer>(res)),
+        error: () => this.categories.set([]),
+      });
+  }
+
 
   // ============================================================
   //  CARREGAMENTO
@@ -443,6 +547,38 @@ export class PainelComponent implements OnInit {
       });
 
     this.loadFormMeta();
+    this.loadFormGroups();
+  }
+
+  /** Grupos da seção selecionada (só leitura — quem organiza é o líder em Config). */
+  private loadFormGroups(): void {
+    const sectionId = this.selectedSection()?.id;
+    this.formGroupsService
+      .getAll(1000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          const all = this.unwrap<FormGroups>(res);
+          this.formGroups.set(all.filter((g) => g.sectionId === sectionId));
+          this.loadFormGroupItems();
+        },
+        error: () => this.formGroups.set([]),
+      });
+  }
+
+  /** Vínculos formulário↔grupo restritos aos grupos desta seção. */
+  private loadFormGroupItems(): void {
+    const groupIds = new Set(this.formGroups().map((g) => g.id));
+    this.formGroupItemsService
+      .getAll(2000, 1)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          const all = this.unwrap<FormGroupItems>(res);
+          this.formGroupItems.set(all.filter((it) => groupIds.has(it.formGroupId)));
+        },
+        error: () => this.formGroupItems.set([]),
+      });
   }
 
   /** Metadados usados nos cards de formulário: pausas em andamento e envios. */
@@ -783,6 +919,7 @@ export class PainelComponent implements OnInit {
     this.sections.set([]);
     this.forms.set([]);
     this.resetFormState();
+    this.clearFormGroups();
     this.step.set('location');
   }
 
@@ -794,6 +931,7 @@ export class PainelComponent implements OnInit {
     this.selectedForm.set(null);
     this.forms.set([]);
     this.resetFormState();
+    this.clearFormGroups();
     this.step.set('section');
   }
 
@@ -818,6 +956,13 @@ export class PainelComponent implements OnInit {
     this.machineParamValues.set({});
     this.existingResults.set({});
     this.hasDraft.set(false);
+  }
+
+  /** Zera os grupos de formulário (ao sair da seção atual). */
+  private clearFormGroups(): void {
+    this.formGroups.set([]);
+    this.formGroupItems.set([]);
+    this.expandedGroups.set(new Set());
   }
 
   // ============================================================

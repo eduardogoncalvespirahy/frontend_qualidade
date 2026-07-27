@@ -51,6 +51,20 @@ export class ModalEnvioComponent {
   readonly machines = input<Machine[]>([]);
   readonly machineRespostas = input<Record<string, string>>({});
 
+  /** Answers da tabela pivô (por máquina) — exclui categoria 5/6, que são globais ao formulário. */
+  protected readonly machineTableAnswers = computed<Answer[]>(() =>
+    this.agrupados()
+      .flatMap((g) => g.answers)
+      .filter((a) => Number(a.categoryId) !== 5 && Number(a.categoryId) !== 6),
+  );
+
+  /** Answers globais ao formulário (produção/categoria 5 e Total Produzido/categoria 6). */
+  protected readonly globalAnswers = computed<Answer[]>(() =>
+    this.agrupados()
+      .flatMap((g) => g.answers)
+      .filter((a) => Number(a.categoryId) === 5 || Number(a.categoryId) === 6),
+  );
+
   // Campos preenchidos dentro do modal
   protected readonly observacao = signal('');
   protected readonly matricula = signal('');

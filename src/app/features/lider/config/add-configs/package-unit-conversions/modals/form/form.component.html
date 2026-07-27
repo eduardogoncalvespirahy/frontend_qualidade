@@ -1,0 +1,83 @@
+<div class="d-flex flex-column gap-3">
+  <p class="text-muted mb-0 small">
+    {{ mode() === 'new' ? 'Configure uma nova conversão de unidade.' : 'Atualize a conversão de unidade.' }}
+  </p>
+
+  <div>
+    <label for="inputUnitId" class="form-label">Unidade de Entrada *</label>
+    <select
+      id="inputUnitId"
+      name="inputUnitId"
+      class="form-select"
+      [(ngModel)]="inputUnitId"
+      required
+    >
+      <option value="">Selecione uma unidade</option>
+      @for (unit of inputUnits(); track unit.id) {
+        <option [value]="unit.id">{{ unit.nome }}</option>
+      }
+    </select>
+  </div>
+
+  <div>
+    <label for="packageTypeId" class="form-label">Tipo de Pacote *</label>
+    <select
+      id="packageTypeId"
+      name="packageTypeId"
+      class="form-select"
+      [(ngModel)]="packageTypeId"
+      required
+    >
+      <option value="">Selecione um tipo</option>
+      @for (type of packageTypes(); track type.id) {
+        <option [value]="type.id">{{ type.nome }}</option>
+      }
+    </select>
+  </div>
+
+  <div>
+    <label for="ordem" class="form-label">Ordem na Cascata *</label>
+    <select
+      id="ordem"
+      name="ordem"
+      class="form-select"
+      [(ngModel)]="ordem"
+      required
+    >
+      <option value="">Selecione a ordem</option>
+      <option value="1">1º Nível (origem)</option>
+      <option value="2">2º Nível (intermediário)</option>
+      <option value="3">3º Nível (destino - sacos)</option>
+    </select>
+  </div>
+
+  <div>
+    <label for="quantidadePorSaco" class="form-label">Quantidade por Saco *</label>
+    <input
+      id="quantidadePorSaco"
+      name="quantidadePorSaco"
+      type="number"
+      class="form-control"
+      [(ngModel)]="quantidadePorSaco"
+      placeholder="Ex: 6, 2, 1"
+      min="0"
+      step="0.01"
+      required
+    />
+    <div class="form-text">Quantas unidades cabe em um saco no próximo nível.</div>
+  </div>
+
+  <div>
+    <label class="form-label">Status</label>
+    <div class="form-check form-switch">
+      <input
+        id="status"
+        name="status"
+        type="checkbox"
+        class="form-check-input"
+        [(ngModel)]="status"
+      />
+      <label class="form-check-label" for="status">{{ status ? 'Ativo' : 'Inativo' }}</label>
+    </div>
+  </div>
+</div>

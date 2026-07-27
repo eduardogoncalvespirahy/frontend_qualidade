@@ -375,7 +375,9 @@
               }
               <div class="grid">
                 @for (form of ungroupedForms(); track trackById($index, form)) {
-                  <ng-container *ngTemplateOutlet="formCard; context: { form: form }"></ng-container>
+                  <ng-container
+                    *ngTemplateOutlet="formCard; context: { form: form }"
+                  ></ng-container>
                 }
               </div>
             }
@@ -424,7 +426,7 @@
                   <th class="text-muted fw-semibold" style="min-width: 140px">
                     {{ selectedForm()?.nome }}
                   </th>
-                  @for (a of orderedAnswers(); track a.id) {
+                  @for (a of tableAnswers(); track a.id) {
                     <th class="text-center small" style="min-width: 110px">{{ a.nome }}</th>
                   }
                 </tr>
@@ -451,7 +453,7 @@
                         </button>
                       </div>
                     </td>
-                    @for (a of orderedAnswers(); track a.id) {
+                    @for (a of tableAnswers(); track a.id) {
                       <td class="p-1">
                         <input
                           class="form-control form-control-sm text-center"
@@ -469,26 +471,72 @@
                 }
               </tbody>
             </table>
+            <!-- Inputs extras (categoria 5) -->
+            @for (a of extraInputAnswers(); track a.id) {
+              <div class="field">
+                <label class="field__label">{{ a.nome }}</label>
+
+                @if (hasConversion(a.id)) {
+                  <!-- Select: em qual estágio o valor foi recebido -->
+                  <select
+                    class="field__input"
+                    [ngModel]="conversionSelection()[a.id] ?? ''"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="selectConversionStage(a.id, $event)"
+                  >
+                    <option value="">Recebido como…</option>
+                    @for (stage of conversionOptionsFor(a.id); track stage.id) {
+                      <option [value]="stage.id">{{ packageTypeName(stage.packageTypeId) }}</option>
+                    }
+                  </select>
+
+                  <!-- Input: valor bruto, só habilita depois de escolher o estágio -->
+                  <input
+                    class="field__input"
+                    type="text"
+                    [ngModel]="conversionRawValues()[a.id] ?? ''"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="updateConversionRaw(a.id, $event)"
+                    placeholder="Valor informado"
+                    [disabled]="!conversionSelection()[a.id]"
+                  />
+
+                  <!-- Resultado (somente leitura) -->
+                  <span class="field__hint"
+                    >Convertido: {{ convertedValue(a.id) || '—' }} saco(s)</span
+                  >
+                } @else {
+                  <input
+                    class="field__input"
+                    [type]="inputType(a.categoryId)"
+                    [ngModel]="paramValues()[a.id] ?? ''"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="updateParam(a.id, $event)"
+                    placeholder="Informe o valor"
+                  />
+                }
+              </div>
+            }
           </div>
 
           <!-- MODO LISTA: formulário sem máquinas (bloco atual) -->
         } @else {
           @if (answers().length) {
-                        <div class="formpanel">
+            <div class="formpanel">
               @for (grupo of groupedAnswers(); track grupo.categoria?.id ?? grupo.label) {
-  <section class="formpanel__group">
-    <header class="formpanel__group-head">
-      <span class="formpanel__group-icon"><i class="bi bi-tags"></i></span>
-      <div class="formpanel__group-heading">
-        <h4 class="formpanel__group-title">{{ grupo.label }}</h4>
-        @if (grupo.categoria?.descricao) {
-          <p class="formpanel__group-desc">{{ grupo.categoria?.descricao }}</p>
-        }
-    
-
+                <section class="formpanel__group">
+                  <header class="formpanel__group-head">
+                    <span class="formpanel__group-icon"><i class="bi bi-tags"></i></span>
+                    <div class="formpanel__group-heading">
+                      <h4 class="formpanel__group-title">{{ grupo.label }}</h4>
+                      @if (grupo.categoria?.descricao) {
+                        <p class="formpanel__group-desc">{{ grupo.categoria?.descricao }}</p>
+                      }
                     </div>
                     <span class="formpanel__group-count">
-                      {{ grupo.answers.length }} parâmetro{{ grupo.answers.length === 1 ? '' : 's' }}
+                      {{ grupo.answers.length }} parâmetro{{
+                        grupo.answers.length === 1 ? '' : 's'
+                      }}
                     </span>
                   </header>
 
@@ -552,7 +600,6 @@
                 </button>
               </div> -->
             </div>
-
           } @else {
             <div class="empty">
               <i class="bi bi-inbox"></i>
@@ -607,9 +654,7 @@
             {{ isAtivo(form.status) ? 'Ativo' : 'Inativo' }}
           </span>
           @if (isFormPausedById(form.id)) {
-            <span class="badge badge--warn">
-              <i class="bi bi-pause-circle me-1"></i>Pausado
-            </span>
+            <span class="badge badge--warn"> <i class="bi bi-pause-circle me-1"></i>Pausado </span>
           } @else if (isFormBlockedForResend(form.id)) {
             <span class="badge badge--warn">
               <i class="bi bi-lock me-1"></i>Bloqueado até {{ formUnblockLabel(form.id) }}
@@ -656,9 +701,7 @@
           class="bi"
           [class.bi-pause-fill]="isFormPausedById(form.id)"
           [class.bi-lock-fill]="!isFormPausedById(form.id) && isFormBlockedForResend(form.id)"
-          [class.bi-arrow-right]="
-            !isFormPausedById(form.id) && !isFormBlockedForResend(form.id)
-          "
+          [class.bi-arrow-right]="!isFormPausedById(form.id) && !isFormBlockedForResend(form.id)"
         ></i>
       </span>
     </div>

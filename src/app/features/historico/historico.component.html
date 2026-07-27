@@ -253,112 +253,131 @@
                   <p class="tl-detail__loading">
                     <i class="bi bi-hourglass-split"></i> Carregando parâmetros…
                   </p>
-                } @else if (expandedMachineData()[r.id]; as md) {
-                  <!-- modo máquina: tabela pivô -->
-                  <div class="overflow-auto">
-                    <table class="table table-sm table-bordered mb-0">
-                      <thead class="table-light">
-                        <tr>
-                          <th class="text-muted small">Máquina</th>
-                          @for (a of md.answers; track a.id) {
-                            <th class="text-muted small">{{ a.nome }}</th>
-                          }
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (m of md.maquinas; track m.id) {
+                } @else {
+                  @let md = expandedMachineData()[r.id];
+                  @let params = expandedData()[r.id] ?? [];
+
+                  @if (md) {
+                    <!-- modo máquina: tabela pivô (nunca inclui categoria 5/6, são globais) -->
+                    <div class="overflow-auto">
+                      <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
                           <tr>
-                            <td class="fw-semibold small">{{ m.nome }}</td>
+                            <th class="text-muted small">Máquina</th>
                             @for (a of md.answers; track a.id) {
-                              @let cellKey = m.id + '_' + a.id;
-                              @let cellVal = md.cells[cellKey];
-                              @let temLimite = !!cellVal && temLimiteAtivo(a.id);
-                              @let ok = temLimite && dentroDoLimite(a.id, cellVal);
-                              @let err = temLimite && !dentroDoLimite(a.id, cellVal);
-                              <td class="text-center">
-                                @if (editing && canCampos) {
-                                  <input
-                                    type="text"
-                                    class="form-control form-control-sm"
-                                    style="min-width: 84px"
-                                    [ngModel]="editValues()[cellKey] ?? ''"
-                                    [ngModelOptions]="{ standalone: true }"
-                                    (ngModelChange)="updateEditValue(cellKey, $event)"
-                                  />
-                                } @else {
-                                  <span
-                                    class="badge border fw-semibold"
-                                    [class.text-bg-light]="!ok && !err"
-                                    [class.text-dark]="!ok && !err"
-                                    [class.bg-success-subtle]="ok"
-                                    [class.border-success]="ok"
-                                    [class.text-success]="ok"
-                                    [class.bg-danger-subtle]="err"
-                                    [class.border-danger]="err"
-                                    [class.text-danger]="err"
-                                  >
-                                    {{ cellVal || '—' }}
-                                  </span>
-                                }
-                              </td>
+                              <th class="text-muted small">{{ a.nome }}</th>
                             }
                           </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                } @else if (expandedData()[r.id]; as params) {
-                  @if (params.length === 0) {
-                    <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
-                  } @else {
-                    <!-- modo normal: cards -->
-                    <div class="d-flex flex-wrap gap-2 mt-2">
-                      @for (p of params; track p.answerId) {
-                        @let temLimite = p.resposta !== '—' && p.limitsAnswerId != null;
-                        @let ok = temLimite && dentroDoLimite(p.answerId, p.resposta);
-                        @let err = temLimite && !dentroDoLimite(p.answerId, p.resposta);
-                        <div
-                          class="border rounded p-2"
-                          style="min-width: 110px"
-                          [class.border-success]="ok"
-                          [class.bg-success-subtle]="ok"
-                          [class.border-danger]="err"
-                          [class.bg-danger-subtle]="err"
-                        >
-                          <div
-                            class="text-muted"
-                            style="
-                              font-size: 0.72rem;
-                              text-transform: uppercase;
-                              letter-spacing: 0.04em;
-                            "
-                          >
-                            {{ p.nome }}
-                          </div>
-                          @if (editing && canCampos) {
-                            <input
-                              type="text"
-                              class="form-control form-control-sm mt-1"
-                              [ngModel]="editValues()[p.answerId] ?? ''"
-                              [ngModelOptions]="{ standalone: true }"
-                              (ngModelChange)="updateEditValue(p.answerId, $event)"
-                            />
-                          } @else {
-                            <div
-                              class="fw-bold fs-5"
-                              [class.text-success]="ok"
-                              [class.text-danger]="err"
-                            >
-                              {{ p.resposta }}
-                            </div>
+                        </thead>
+                        <tbody>
+                          @for (m of md.maquinas; track m.id) {
+                            <tr>
+                              <td class="fw-semibold small">{{ m.nome }}</td>
+                              @for (a of md.answers; track a.id) {
+                                @let cellKey = m.id + '_' + a.id;
+                                @let cellVal = md.cells[cellKey];
+                                @let temLimite = !!cellVal && temLimiteAtivo(a.id);
+                                @let ok = temLimite && dentroDoLimite(a.id, cellVal);
+                                @let err = temLimite && !dentroDoLimite(a.id, cellVal);
+                                <td class="text-center">
+                                  @if (editing && canCampos) {
+                                    <input
+                                      type="text"
+                                      class="form-control form-control-sm"
+                                      style="min-width: 84px"
+                                      [ngModel]="editValues()[cellKey] ?? ''"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      (ngModelChange)="updateEditValue(cellKey, $event)"
+                                    />
+                                  } @else {
+                                    <span
+                                      class="badge border fw-semibold"
+                                      [class.text-bg-light]="!ok && !err"
+                                      [class.text-dark]="!ok && !err"
+                                      [class.bg-success-subtle]="ok"
+                                      [class.border-success]="ok"
+                                      [class.text-success]="ok"
+                                      [class.bg-danger-subtle]="err"
+                                      [class.border-danger]="err"
+                                      [class.text-danger]="err"
+                                    >
+                                      {{ cellVal || '—' }}
+                                    </span>
+                                  }
+                                </td>
+                              }
+                            </tr>
                           }
-                        </div>
-                      }
+                        </tbody>
+                      </table>
                     </div>
                   }
-                } @else {
-                  <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
+
+                  @if (params.length > 0) {
+                    <!-- modo normal (puro), ou categoria 5/6 (globais) de um form com máquinas -->
+                    <!-- categoria 5 (produção) primeiro, categoria 6 (calculado) numa linha abaixo -->
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                      @for (p of paramsProducao(params); track p.answerId) {
+                        <ng-container *ngTemplateOutlet="paramCard; context: { p, editing, canCampos }" />
+                      }
+                    </div>
+
+                    @if (paramsCalculados(params).length > 0) {
+                      <div class="d-flex flex-wrap gap-2 mt-2">
+                        @for (p of paramsCalculados(params); track p.answerId) {
+                          <ng-container *ngTemplateOutlet="paramCard; context: { p, editing, canCampos }" />
+                        }
+                      </div>
+                    }
+                  }
+
+                  @if (!md && params.length === 0) {
+                    <p class="tl-detail__empty">Nenhum parâmetro registrado.</p>
+                  }
                 }
+
+                <!-- Card de parâmetro (reutilizado por produção e calculado) -->
+                <ng-template #paramCard let-p="p" let-editing="editing" let-canCampos="canCampos">
+                  @let temLimite = p.resposta !== '—' && p.limitsAnswerId != null;
+                  @let ok = temLimite && dentroDoLimite(p.answerId, p.resposta);
+                  @let err = temLimite && !dentroDoLimite(p.answerId, p.resposta);
+                  @let calculado = p.categoryId === 6;
+                  <div
+                    class="border rounded p-2"
+                    style="min-width: 110px"
+                    [class.border-success]="ok"
+                    [class.bg-success-subtle]="ok"
+                    [class.border-danger]="err"
+                    [class.bg-danger-subtle]="err"
+                  >
+                    <div
+                      class="text-muted"
+                      style="
+                        font-size: 0.72rem;
+                        text-transform: uppercase;
+                        letter-spacing: 0.04em;
+                      "
+                    >
+                      {{ p.nome }}
+                      @if (calculado) {
+                        <i class="bi bi-calculator ms-1" title="Calculado automaticamente"></i>
+                      }
+                    </div>
+                    @if (editing && canCampos && !calculado) {
+                      <input
+                        type="text"
+                        class="form-control form-control-sm mt-1"
+                        [ngModel]="editValues()[p.answerId] ?? ''"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="updateEditValue(p.answerId, $event)"
+                      />
+                    } @else {
+                      <div class="fw-bold fs-5" [class.text-success]="ok" [class.text-danger]="err">
+                        {{ p.resposta }}
+                      </div>
+                    }
+                  </div>
+                </ng-template>
 
                 <!-- Reparador da correção (normal e máquina) -->
                 @if (reparadorDoControle(r.id); as rep) {
@@ -374,8 +393,8 @@
                   </div>
                 }
 
-                <!-- Histórico de versões (modo normal) -->
-                @if (!expandedMachineData()[r.id]) {
+                <!-- Histórico de versões (modo normal, ou globais de categoria 5/6) -->
+                @if ((expandedData()[r.id] ?? []).length > 0) {
                   @let versoes = expandedHistory()[r.id] ?? [];
                   @if (versoes.length > 1) {
                     <details class="mt-3">

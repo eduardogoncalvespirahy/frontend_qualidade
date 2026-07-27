@@ -45,11 +45,11 @@
       <div class="content-header">
         <div>
           <h2 class="content-title">
-            {{ pageTitles[activeSection()] }}
+            {{ currentSection()?.label }}
           </h2>
 
           <p class="content-description">
-            {{ pageDescriptions[activeSection()] }}
+            {{ currentSection()?.description }}
           </p>
         </div>
       </div>
@@ -71,7 +71,7 @@
           @case ('param') {
             <app-param />
           }
-          
+
           @case ('machine') {
             <app-machine />
           }
@@ -85,6 +85,24 @@
                 Você não tem permissão para acessar esta área.
               </div>
             }
+          }
+          @case ('packagetypes') {
+            <app-package-types />
+          }
+
+          @case ('unitinput') {
+            <app-input-units />
+          }
+
+          @case ('packageunitconversion') {
+            <app-package-unit-conversions />
+          }
+
+          @case ('answerconversion') {
+            <app-answer-conversions />
+          }
+          @case ('answercalculated') {
+            <app-answer-calculated />
           }
         }
       </div>

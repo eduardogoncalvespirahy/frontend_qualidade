@@ -1,0 +1,124 @@
+<div class="d-flex flex-column gap-3">
+  <p class="text-muted mb-0 small">
+    {{
+      mode() === 'new'
+        ? 'Encontre o formulário e configure o parâmetro que vai receber o total produzido calculado.'
+        : 'Atualize as referências de antes/depois deste parâmetro calculado.'
+    }}
+  </p>
+
+  <!-- Cascata: Local → Seção → Formulário -->
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label for="locationId" class="form-label">Local *</label>
+      <select
+        id="locationId"
+        name="locationId"
+        class="form-select"
+        [ngModel]="locationId"
+        (ngModelChange)="onLocationChange($event)"
+        [disabled]="mode() === 'edit'"
+        required
+      >
+        <option value="">Selecione…</option>
+        @for (loc of locations(); track loc.id) {
+          <option [value]="loc.id">{{ loc.nome }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="col-md-4">
+      <label for="sectionId" class="form-label">Seção *</label>
+      <select
+        id="sectionId"
+        name="sectionId"
+        class="form-select"
+        [ngModel]="sectionId"
+        (ngModelChange)="onSectionChange($event)"
+        [disabled]="mode() === 'edit' || !locationId"
+        required
+      >
+        <option value="">Selecione…</option>
+        @for (sec of filteredSections(); track sec.id) {
+          <option [value]="sec.id">{{ sec.nome }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="col-md-4">
+      <label for="formId" class="form-label">Formulário *</label>
+      <select
+        id="formId"
+        name="formId"
+        class="form-select"
+        [ngModel]="formId"
+        (ngModelChange)="onFormChange($event)"
+        [disabled]="mode() === 'edit' || !sectionId"
+        required
+      >
+        <option value="">Selecione…</option>
+        @for (f of filteredForms(); track f.id) {
+          <option [value]="f.id">{{ f.nome }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label for="answerId" class="form-label">Parâmetro Calculado (Total Produzido) *</label>
+    <select
+      id="answerId"
+      name="answerId"
+      class="form-select"
+      [(ngModel)]="answerId"
+      [disabled]="mode() === 'edit' || !formId"
+      required
+    >
+      <option value="">Selecione o parâmetro que vai receber o resultado</option>
+      @for (ans of categoria6Answers(); track ans.id) {
+        <option [value]="ans.id">{{ ans.nome }}</option>
+      }
+    </select>
+    @if (mode() === 'edit') {
+      <div class="form-text">O parâmetro calculado não pode ser trocado depois de criado.</div>
+    } @else if (formId && categoria6Answers().length === 0) {
+      <div class="form-text text-warning">
+        Este formulário não tem nenhum parâmetro de categoria 6 (Calculado) ainda.
+      </div>
+    }
+  </div>
+
+  <div>
+    <label for="antesAnswerId" class="form-label">Total do Antes *</label>
+    <select
+      id="antesAnswerId"
+      name="antesAnswerId"
+      class="form-select"
+      [(ngModel)]="antesAnswerId"
+      [disabled]="!formId"
+      required
+    >
+      <option value="">Selecione o parâmetro de estoque inicial</option>
+      @for (ans of answersDoFormulario(); track ans.id) {
+        <option [value]="ans.id">{{ ans.nome }}</option>
+      }
+    </select>
+  </div>
+
+  <div>
+    <label for="depoisAnswerId" class="form-label">Total do Depois *</label>
+    <select
+      id="depoisAnswerId"
+      name="depoisAnswerId"
+      class="form-select"
+      [(ngModel)]="depoisAnswerId"
+      [disabled]="!formId"
+      required
+    >
+      <option value="">Selecione o parâmetro de estoque final</option>
+      @for (ans of answersDoFormulario(); track ans.id) {
+        <option [value]="ans.id">{{ ans.nome }}</option>
+      }
+    </select>
+  </div>
+</div>

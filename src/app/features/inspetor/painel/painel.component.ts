@@ -29,6 +29,11 @@ import { FormTime } from '../../../core/models/form-time.model';
 import { CategorieAnswer } from '../../../core/models/categorieAnswer.model';
 import { FormGroups } from '../../../core/models/form-group.model';
 import { FormGroupItems } from '../../../core/models/form-group-items.model';
+import { InputUnits } from '../../../core/models/input-units.model';
+import { AnswerConversion } from '../../../core/models/answer-conversion.model';
+import { PackageTypes } from '../../../core/models/package-types.model';
+import { PackageUnitConversion } from '../../../core/models/package-unit-conversions.model';
+import { AnswerCalculated } from '../../../core/models/answer-calculated.model';
 
 import { CategorieAnswerService } from '../../../core/services/categorieAnswer.service';
 import { FormGroupsService } from '../../../core/services/form-group.service';
@@ -51,9 +56,13 @@ import { MachineAnswerResultService } from '../../../core/services/machine-answe
 import { ControlStatusService } from '../../../core/services/control-status.service';
 import { AnswerGroupsService } from '../../../core/services/answer-group.service';
 import { AnswerGroupItemsService } from '../../../core/services/answer-groups-items.service';
-// ⚠️ Ajuste o caminho conforme onde você colocou o serviço de exportação.
 import { FileExportService, ExportColumn } from '../../../core/services/file-export.service';
 import { FormTimeService } from '../../../core/services/form-time.service';
+import { InputUnitService } from '../../../core/services/input-unit.service';
+import { AnswerConversionService } from '../../../core/services/answer-conversion.service';
+import { PackageTypesService } from '../../../core/services/package-types.service';
+import { PackageUnitConversionService } from '../../../core/services/package-unit-conversion.service';
+import { AnswerCalculatedService } from '../../../core/services/answer-calculated.service';
 
 import { ModalEnvioComponent } from './modal-envio/modal-envio.component';
 import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
@@ -115,6 +124,11 @@ export class PainelComponent implements OnInit {
   private readonly exporter = inject(FileExportService);
   private readonly auth = inject(AuthService);
   private readonly formTimeService = inject(FormTimeService);
+  private readonly answerConversionService = inject(AnswerConversionService);
+  private readonly inputUnitService = inject(InputUnitService);
+  private readonly packageTypesService = inject(PackageTypesService);
+  private readonly packageUnitConversionService = inject(PackageUnitConversionService);
+  private readonly answerCalculatedService = inject(AnswerCalculatedService);
 
   // ───────── navegação ─────────
   readonly step = signal<Step>('location');
@@ -135,7 +149,6 @@ export class PainelComponent implements OnInit {
   readonly formGroupItems = signal<FormGroupItems[]>([]);
   /** ids de grupo atualmente expandidos (acordeão) — recolhido por padrão. */
   readonly expandedGroups = signal<Set<string>>(new Set());
-
 
   // ───────── seleções ─────────
   readonly selectedLocation = signal<Location | null>(null);
@@ -173,6 +186,119 @@ export class PainelComponent implements OnInit {
     this.draftSave$
       .pipe(debounceTime(400), takeUntilDestroyed())
       .subscribe(({ formId, values }) => this.draftService.save(formId, values));
+  }
+
+  // ───────── Dados de Conversão ─────────
+  readonly packageTypes = signal<PackageTypes[]>([]);
+  readonly inputUnits = signal<InputUnits[]>([]);
+  readonly packageUnitConversions = signal<PackageUnitConversion[]>([]);
+  readonly answerConversions = signal<AnswerConversion[]>([]);
+
+  /** answerId → conversões disponíveis para este answer */
+  readonly conversionsByAnswer = computed(() => {
+    const ansConv = this.answerConversions();
+    const map = new Map<string, PackageUnitConversion[]>();
+
+    for (const ac of ansConv) {
+      const conv = this.packageUnitConversions().find((c) => c.id === ac.conversionId);
+
+      if (conv) {
+        const answerId = ac.answerId;
+        if (!map.has(answerId)) map.set(answerId, []);
+        map.get(answerId)!.push(conv);
+      }
+    }
+    return map;
+  });
+
+  /** Um answer tem conversão de estoque configurada (categoria 5)? */
+  hasConversion(answerId: string): boolean {
+    return (this.conversionsByAnswer().get(answerId)?.length ?? 0) > 0;
+  }
+
+  /** Estágios de conversão de um answer, ordenados pela cascata (1º ao último). */
+  conversionOptionsFor(answerId: string): PackageUnitConversion[] {
+    return [...(this.conversionsByAnswer().get(answerId) ?? [])].sort(
+      (a, b) => (a.ordem ?? 0) - (b.ordem ?? 0),
+    );
+  }
+
+  packageTypeName(id: string): string {
+    return this.packageTypes().find((t) => t.id === id)?.nome ?? '';
+  }
+
+  /** answerId → id do PackageUnitConversion selecionado (estágio em que o valor foi informado). */
+  readonly conversionSelection = signal<Record<string, string>>({});
+  /** answerId → valor bruto informado pelo inspetor, antes da conversão para sacos. */
+  readonly conversionRawValues = signal<Record<string, string>>({});
+
+  /** Valor convertido para sacos (string), a partir do estágio selecionado e do valor bruto. */
+  convertedValue(answerId: string): string {
+    const conversionId = this.conversionSelection()[answerId];
+    const raw = parseFloat(String(this.conversionRawValues()[answerId] ?? '').replace(',', '.'));
+    if (!conversionId || Number.isNaN(raw)) return '';
+
+    const stages = this.conversionOptionsFor(answerId);
+    const selected = stages.find((s) => s.id === conversionId);
+    if (!selected) return '';
+
+    // multiplica os fatores da ordem selecionada até o fim da cascata (chega em sacos)
+    const divisor = stages
+  .filter((s) => s.inputUnitId === selected.inputUnitId && s.ordem >= selected.ordem)
+  .reduce((acc, s) => acc * Number(s.quantidadePorSaco), 1);
+
+
+    if (!divisor) return '';
+    return String(raw / divisor);
+  }
+
+  /** Recalcula o valor convertido e grava em paramValues (segue o fluxo normal de rascunho/validação). */
+  private recomputeConversion(answerId: string): void {
+    this.updateParam(answerId, this.convertedValue(answerId));
+  }
+
+  selectConversionStage(answerId: string, conversionId: string): void {
+    this.conversionSelection.update((m) => ({ ...m, [answerId]: conversionId }));
+    this.recomputeConversion(answerId);
+  }
+
+  updateConversionRaw(answerId: string, raw: string): void {
+    this.conversionRawValues.update((m) => ({ ...m, [answerId]: raw }));
+    this.recomputeConversion(answerId);
+  }
+
+  // ───────── Total Produzido (categoria 6 — só calculado no envio) ─────────
+  readonly answerCalculated = signal<AnswerCalculated[]>([]);
+
+  /** Answers de categoria 6 ("Total Produzido") do formulário atual. */
+  readonly calculatedAnswers = computed<Answer[]>(() =>
+    this.orderedAnswers().filter((a) => Number(a.categoryId) === 6),
+  );
+
+  /** Configuração (antes/depois) de um parâmetro calculado. */
+  calcConfigFor(answerId: string): AnswerCalculated | undefined {
+    return this.answerCalculated().find((ac) => ac.answerId === answerId);
+  }
+
+  /**
+   * Total Produzido = soma das conversões de produção (categoria 5 com
+   * conversão configurada) + Total do Depois − Total do Antes.
+   * Só é chamado no momento do envio (antes de abrir o modal).
+   */
+  totalProduzido(answerId: string): string {
+    const config = this.calcConfigFor(answerId);
+    if (!config) return '';
+
+    const values = this.paramValues();
+
+    const producao = this.extraInputAnswers()
+      .filter((a) => this.hasConversion(a.id))
+      .reduce((soma, a) => soma + (parseFloat(this.convertedValue(a.id).replace(',', '.')) || 0), 0);
+
+    const antes = parseFloat((values[config.antesAnswerId] ?? '').replace(',', '.')) || 0;
+    const depois = parseFloat((values[config.depoisAnswerId] ?? '').replace(',', '.')) || 0;
+
+    return String(producao + depois - antes);
   }
 
   // ───────── permissões de local (credentialLocation) ─────────
@@ -232,24 +358,28 @@ export class PainelComponent implements OnInit {
       return (a.nome ?? '').localeCompare(b.nome ?? ''); // desempate estável
     });
   });
-    /**
+  /**
    * Parâmetros do modo lista (sem máquina) agrupados por categoria (AnswerGroups),
    * preservando a ordem de orderedAnswers(). Sem grupo cai em "Outros parâmetros".
    */
-    readonly groupedAnswers = computed<
+  readonly groupedAnswers = computed<
     { categoria: CategorieAnswer | null; label: string; answers: Answer[] }[]
   >(() => {
-    
     console.log('categorias carregadas:', this.categories());
-    console.log('categoryId de cada parâmetro:', this.orderedAnswers().map((a) => ({ nome: a.nome, categoryId: a.categoryId })));
+    console.log(
+      'categoryId de cada parâmetro:',
+      this.orderedAnswers().map((a) => ({ nome: a.nome, categoryId: a.categoryId })),
+    );
 
     const catById = new Map(this.categories().map((c) => [String(c.id), c]));
     const indexByKey = new Map<string, number>();
     const result: { categoria: CategorieAnswer | null; label: string; answers: Answer[] }[] = [];
 
     for (const a of this.orderedAnswers()) {
+      if (Number(a.categoryId) === 6) continue; // categoria 6 só aparece no modal de envio
       const categoria = a.categoryId ? (catById.get(String(a.categoryId)) ?? null) : null;
-      const label = categoria?.nome ?? (a.categoryId ? `Categoria ${a.categoryId}` : 'Sem categoria');
+      const label =
+        categoria?.nome ?? (a.categoryId ? `Categoria ${a.categoryId}` : 'Sem categoria');
       const key = categoria?.id ?? label;
 
       let idx = indexByKey.get(key);
@@ -263,7 +393,20 @@ export class PainelComponent implements OnInit {
     return result;
   });
 
+  /**
+   * Answers que aparecem na tabela (modo com máquinas).
+   * Exclui answers de categoria 5.
+   */
+  readonly tableAnswers = computed<Answer[]>(() =>
+    this.orderedAnswers().filter((a) => Number(a.categoryId) !== 5 && Number(a.categoryId) !== 6),
+  );
 
+  /**
+   * Answers de categoria 5 (renderizados como inputs abaixo da tabela).
+   */
+  readonly extraInputAnswers = computed<Answer[]>(() =>
+    this.orderedAnswers().filter((a) => Number(a.categoryId) === 5),
+  );
 
   // ───────── filtros de busca (por campo das interfaces) ─────────
   readonly filtersOpen = signal(false);
@@ -475,10 +618,12 @@ export class PainelComponent implements OnInit {
     return map;
   });
 
-    ngOnInit(): void {
-    this.loadLocations();
-    this.loadCategories();
-  }
+  ngOnInit(): void {
+  this.loadLocations();
+  this.loadCategories();
+  this.loadConversionData();   // ← adicionar essa linha
+}
+
   private loadCategories(): void {
     this.categorieAnswerService
       .getAll(1000, 1)
@@ -488,7 +633,6 @@ export class PainelComponent implements OnInit {
         error: () => this.categories.set([]),
       });
   }
-
 
   // ============================================================
   //  CARREGAMENTO
@@ -1027,21 +1171,34 @@ export class PainelComponent implements OnInit {
    * Máquina pausada é ignorada da exigência (input travado, nunca seria respondida).
    */
   readonly missingActiveAnswers = computed<Answer[]>(() => {
-    const activeAnswers = this.answers().filter((a) => a.status === 1);
     const machines = this.machines();
+    const values = this.paramValues();
 
     if (machines.length > 0) {
       const machineValues = this.machineParamValues();
-      return activeAnswers.filter((a) =>
-        machines.some((m) => {
-          if (this.isPaused(m.id)) return false;
-          return !(machineValues[`${m.id}_${a.id}`] ?? '').trim();
-        }),
-      );
+
+      // categoria 5 (produção) é global ao formulário — não é por máquina
+      const missingExtra = this.extraInputAnswers()
+        .filter((a) => a.status === 1)
+        .filter((a) => !(values[a.id] ?? '').trim());
+
+      // demais answers (tableAnswers) seguem exigidos por máquina, como antes
+      const missingTable = this.tableAnswers()
+        .filter((a) => a.status === 1)
+        .filter((a) =>
+          machines.some((m) => {
+            if (this.isPaused(m.id)) return false;
+            return !(machineValues[`${m.id}_${a.id}`] ?? '').trim();
+          }),
+        );
+
+      return [...missingTable, ...missingExtra];
     }
 
-    const values = this.paramValues();
-    return activeAnswers.filter((a) => !(values[a.id] ?? '').trim());
+    // categoria 6 nunca bloqueia o envio: só recebe valor dentro do próprio enviar()
+    return this.answers().filter(
+      (a) => a.status === 1 && Number(a.categoryId) !== 6 && !(values[a.id] ?? '').trim(),
+    );
   });
 
   /** Existe pelo menos um alvo não-pausado pra responder? (evita liberar envio vazio). */
@@ -1304,6 +1461,12 @@ export class PainelComponent implements OnInit {
       return;
     }
 
+    // Calcula e grava o(s) "Total Produzido" (categoria 6) ANTES de montar o modal,
+    // pra que já saiam corretos em agrupados()/paramValues() usados a seguir.
+    for (const a of this.calculatedAnswers()) {
+      this.updateParam(a.id, this.totalProduzido(a.id));
+    }
+
     let ref: ComponentModalRef<ModalEnvioComponent, boolean> | undefined;
 
     ref = this.modalService.openComponent(ModalEnvioComponent, {
@@ -1482,6 +1645,31 @@ export class PainelComponent implements OnInit {
             ),
         );
       }
+
+      // Categoria 5 (produção) e categoria 6 (Total Produzido) não têm máquina
+      // específica — são gravadas em answer_result mesmo em formulário com máquina.
+      for (const a of [...this.extraInputAnswers(), ...this.calculatedAnswers()]) {
+        const valor = dados.respostas[a.id];
+        if (!valor?.trim()) continue;
+
+        if (!this.dentroDoLimite(a.id, valor)) algumForaDoLimite = true;
+
+        resultOps.push(
+          this.answerResultService
+            .create({
+              AnswerId: a.id,
+              controlId: control.id,
+              resposta: valor,
+              limitsAnswerId: this.limitsMap()[a.id] ?? null,
+            })
+            .pipe(
+              catchError((err) => {
+                console.error(`Falha ao salvar resposta do parâmetro ${a.id}:`, err);
+                return of(null);
+              }),
+            ),
+        );
+      }
     } else {
       for (const a of this.answers()) {
         const valor = dados.respostas[a.id];
@@ -1619,4 +1807,41 @@ export class PainelComponent implements OnInit {
     if (elapsed >= execMs * 0.75) return 'yellow'; // últimos 25% do TE
     return 'green'; // tranquilo
   }
+  private loadConversionData(): void {
+  this.packageTypesService.getAll(1000, 1)
+    .pipe(takeUntilDestroyed(this.destroyRef))
+    .subscribe({
+      next: (res) => this.packageTypes.set(this.unwrap<PackageTypes>(res)),
+      error: () => this.packageTypes.set([]),
+    });
+
+  this.inputUnitService.getAll(1000, 1)
+    .pipe(takeUntilDestroyed(this.destroyRef))
+    .subscribe({
+      next: (res) => this.inputUnits.set(this.unwrap<InputUnits>(res)),
+      error: () => this.inputUnits.set([]),
+    });
+
+  this.packageUnitConversionService.getAll(1000, 1)
+    .pipe(takeUntilDestroyed(this.destroyRef))
+    .subscribe({
+      next: (res) => this.packageUnitConversions.set(this.unwrap<PackageUnitConversion>(res)),
+      error: () => this.packageUnitConversions.set([]),
+    });
+
+  this.answerConversionService.getAll(1000, 1)
+    .pipe(takeUntilDestroyed(this.destroyRef))
+    .subscribe({
+      next: (res) => this.answerConversions.set(this.unwrap<AnswerConversion>(res)),
+      error: () => this.answerConversions.set([]),
+    });
+
+  this.answerCalculatedService.getAll(1000, 1)
+    .pipe(takeUntilDestroyed(this.destroyRef))
+    .subscribe({
+      next: (res) => this.answerCalculated.set(this.unwrap<AnswerCalculated>(res)),
+      error: () => this.answerCalculated.set([]),
+    });
+}
+
 }

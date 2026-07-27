@@ -11,43 +11,45 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin, firstValueFrom, from, Observable, of, range } from 'rxjs';
 import { catchError, map, mergeMap, switchMap, toArray } from 'rxjs/operators';
 
-import { Control, ControlUpdate } from '../../../core/models/control.model';
-import { Form } from '../../../core/models/form.model';
-import { UserProfile } from '../../../core/models/user-profile.model';
-import { Answer } from '../../../core/models/answer.model';
-import { Machine } from '../../../core/models/machine.model';
-import { Section } from '../../../core/models/section.model';
-import { Location } from '../../../core/models/location.model';
-import { AnswerResult } from '../../../core/models/answer-result.model';
-import { MachineAnswerResult } from '../../../core/models/machine-answer-result.model';
-import { LimitAnswer } from '../../../core/models/limit-answer.model';
-import { FormTime } from '../../../core/models/form-time.model';
-import { RepairerAnswerResult } from '../../../core/models/repairerAnswerResult.model';
-import { RepairerMachineAnswerResult } from '../../../core/models/repairerMachineAnswerResult.model';
-import { PaginatedResult } from '../../../core/models/paginated.model';
-import { File } from '../../../core/models/file.model';
+import { Control, ControlUpdate } from '../../core/models/control.model';
+import { Form } from '../../core/models/form.model';
+import { UserProfile } from '../../core/models/user-profile.model';
+import { Answer } from '../../core/models/answer.model';
+import { Machine } from '../../core/models/machine.model';
+import { Section } from '../../core/models/section.model';
+import { Location } from '../../core/models/location.model';
+import { AnswerResult } from '../../core/models/answer-result.model';
+import { MachineAnswerResult } from '../../core/models/machine-answer-result.model';
+import { LimitAnswer } from '../../core/models/limit-answer.model';
+import { FormTime } from '../../core/models/form-time.model';
+import { RepairerAnswerResult } from '../../core/models/repairerAnswerResult.model';
+import { RepairerMachineAnswerResult } from '../../core/models/repairerMachineAnswerResult.model';
+import { PaginatedResult } from '../../core/models/paginated.model';
+import { File } from '../../core/models/file.model';
+import { AnswerCalculated } from '../../core/models/answer-calculated.model';
 
-import { ControlService } from '../../../core/services/control.service';
-import { FormService } from '../../../core/services/form.service';
-import { UserService } from '../../../core/services/user.service';
-import { FileService } from '../../../core/services/file.service';
-import { AnswerService } from '../../../core/services/answer.service';
-import { MachineService } from '../../../core/services/machine.service';
-import { SectionService } from '../../../core/services/section.service';
-import { LocationService } from '../../../core/services/location.service';
-import { AnswerResultService } from '../../../core/services/answer-result.service';
-import { MachineAnswerResultService } from '../../../core/services/machine-answer-result.service';
-import { LimitAnswerService } from '../../../core/services/limit-answer.service';
-import { FormTimeService } from '../../../core/services/form-time.service';
-import { AuthService } from '../../../core/services/auth.service';
-import { ControlStatusService } from '../../../core/services/control-status.service';
-import { SignatureFileService } from '../../../core/services/signature-file.service';
-import { RepairerAnswerResultService } from '../../../core/services/repairerAnswerResult.service';
-import { RepairerMachineAnswerResultService } from '../../../core/services/repairerMachineAnswerResult.service';
-import { ModalService } from '../../../core/services/modal.service';
+import { ControlService } from '../../core/services/control.service';
+import { FormService } from '../../core/services/form.service';
+import { UserService } from '../../core/services/user.service';
+import { FileService } from '../../core/services/file.service';
+import { AnswerService } from '../../core/services/answer.service';
+import { MachineService } from '../../core/services/machine.service';
+import { SectionService } from '../../core/services/section.service';
+import { LocationService } from '../../core/services/location.service';
+import { AnswerResultService } from '../../core/services/answer-result.service';
+import { MachineAnswerResultService } from '../../core/services/machine-answer-result.service';
+import { LimitAnswerService } from '../../core/services/limit-answer.service';
+import { FormTimeService } from '../../core/services/form-time.service';
+import { AuthService } from '../../core/services/auth.service';
+import { ControlStatusService } from '../../core/services/control-status.service';
+import { SignatureFileService } from '../../core/services/signature-file.service';
+import { RepairerAnswerResultService } from '../../core/services/repairerAnswerResult.service';
+import { RepairerMachineAnswerResultService } from '../../core/services/repairerMachineAnswerResult.service';
+import { ModalService } from '../../core/services/modal.service';
+import { AnswerCalculatedService } from '../../core/services/answer-calculated.service';
 
-import { ScrollTopComponent } from '../../scroll-top/scroll-top.component';
-import { SignatureComponent } from '../../../core/components/signature/signature.component';
+import { ScrollTopComponent } from '../scroll-top/scroll-top.component';
+import { SignatureComponent } from '../../core/components/signature/signature.component';
 
 type FileWithMetadata = File & {
   nome?: string;
@@ -99,6 +101,7 @@ interface ParamRow {
   resposta: string;
   limitsAnswerId: string | null;
   answerResultId: string | null;
+  categoryId: number;
 }
 
 interface MachineData {
@@ -122,7 +125,7 @@ interface VersaoMaquina {
 }
 
 @Component({
-  selector: 'app-historico-inspetor',
+  selector: 'app-historico',
   standalone: true,
   imports: [CommonModule, FormsModule, ScrollTopComponent],
   templateUrl: './historico.component.html',
@@ -148,8 +151,10 @@ export class HistoricoComponent implements OnInit {
   private readonly repairerService = inject(RepairerAnswerResultService);
   private readonly repairerMachineService = inject(RepairerMachineAnswerResultService);
   private readonly modalService = inject(ModalService);
+  private readonly answerCalculatedService = inject(AnswerCalculatedService);
 
   readonly controls = signal<Control[]>([]);
+  readonly answerCalculated = signal<AnswerCalculated[]>([]);
   readonly forms = signal<Form[]>([]);
   readonly users = signal<UserProfile[]>([]);
   readonly files = signal<File[]>([]);
@@ -315,6 +320,30 @@ export class HistoricoComponent implements OnInit {
   private readonly machineNameById = computed(
     () => new Map(this.machines().map((m) => [m.id, m.nome])),
   );
+
+  /**
+   * Categoria 5 (produção) e 6 (Total Produzido) são globais ao formulário —
+   * nunca aparecem por máquina, mesmo em formulário com máquinas.
+   */
+  private isGlobalCategoria(a: Answer): boolean {
+    const cat = Number(a.categoryId);
+    return cat === 5 || cat === 6;
+  }
+
+  /** Configuração (antes/depois) de um parâmetro calculado (categoria 6). */
+  calcConfigFor(answerId: string): AnswerCalculated | undefined {
+    return this.answerCalculated().find((ac) => ac.answerId === answerId);
+  }
+
+  /** Answers de produção (tudo que não é categoria 6) — exibidos primeiro. */
+  paramsProducao(rows: ParamRow[]): ParamRow[] {
+    return rows.filter((p) => p.categoryId !== 6);
+  }
+
+  /** Answers calculados (categoria 6 — "Total Produzido") — exibidos numa linha abaixo. */
+  paramsCalculados(rows: ParamRow[]): ParamRow[] {
+    return rows.filter((p) => p.categoryId === 6);
+  }
 
   private readonly permittedEmployerIds = computed<Set<string> | null>(() => {
     const allowed = this.allowedLocations();
@@ -550,11 +579,14 @@ export class HistoricoComponent implements OnInit {
         const allMachine = this.unwrap<MachineAnswerResult>(machineResults).filter((r) =>
           answerIdSet.has(r.answerId),
         );
+        const allNormal = this.unwrap<AnswerResult>(answerResults).filter((r) =>
+          answerIdSet.has(r.AnswerId),
+        );
 
         if (allMachine.length > 0) {
-          this.montarModoMaquina(row.id, answers, allMachine);
+          this.montarModoMaquina(row.id, answers, allMachine, allNormal);
         } else {
-          this.montarModoNormal(row.id, answers, this.unwrap<AnswerResult>(answerResults));
+          this.montarModoNormal(row.id, answers, allNormal);
         }
 
         this.expandedLoading.set(null);
@@ -570,7 +602,12 @@ export class HistoricoComponent implements OnInit {
     controlId: string,
     answers: Answer[],
     allMachine: MachineAnswerResult[],
+    allNormal: AnswerResult[],
   ): void {
+    // Categoria 5/6 são globais ao formulário — nunca entram na grade por máquina.
+    const machineAnswers = answers.filter((a) => !this.isGlobalCategoria(a));
+    const globalAnswers = answers.filter((a) => this.isGlobalCategoria(a));
+
     const ordenados = this.sortByDataAsc(
       allMachine as unknown as (MachineAnswerResult & Record<string, unknown>)[],
     ) as unknown as MachineAnswerResult[];
@@ -592,7 +629,7 @@ export class HistoricoComponent implements OnInit {
       ...d,
       [controlId]: {
         maquinas,
-        answers: answers.map((a) => ({ id: a.id, nome: a.nome })),
+        answers: machineAnswers.map((a) => ({ id: a.id, nome: a.nome })),
         cells,
         cellLimits,
         cellResultIds,
@@ -607,15 +644,51 @@ export class HistoricoComponent implements OnInit {
 
     // ── operador = ÚLTIMO reparador (machine_answer_result mais recente) ──
     const opM = this.resolverUltimoOperador(
-      ordenados,
+      ordenados as unknown as Record<string, unknown>[],
       this.repairerByMachineAnswerResultId(),
       this.repairerObsByMachineAnswerResultId(),
     );
-    this.operatorByControl.update((m) => ({ ...m, [controlId]: opM?.nome ?? null }));
-    this.operatorObsByControl.update((m) => ({ ...m, [controlId]: opM?.obs ?? null }));
+
+    // Categoria 5/6 (globais, sem máquina) — monta em paralelo, igual ao modo normal.
+    let opG: { nome: string; obs: string | null; ts: number } | null = null;
+    if (globalAnswers.length > 0) {
+      const dadosGlobais = this.construirDadosNormais(globalAnswers, allNormal);
+      this.expandedData.update((d) => ({ ...d, [controlId]: dadosGlobais.linhas }));
+      this.expandedHistory.update((d) => ({ ...d, [controlId]: dadosGlobais.versoes }));
+      opG = dadosGlobais.operador;
+    }
+
+    // Reparador exibido = o mais recente entre máquina e global.
+    const melhor = [opM, opG].filter((o): o is NonNullable<typeof opM> => !!o).sort(
+      (a, b) => b.ts - a.ts,
+    )[0];
+    this.operatorByControl.update((m) => ({ ...m, [controlId]: melhor?.nome ?? null }));
+    this.operatorObsByControl.update((m) => ({ ...m, [controlId]: melhor?.obs ?? null }));
   }
 
   private montarModoNormal(controlId: string, answers: Answer[], results: AnswerResult[]): void {
+    const { linhas, versoes, operador } = this.construirDadosNormais(answers, results);
+
+    this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
+    this.expandedHistory.update((d) => ({ ...d, [controlId]: versoes }));
+    this.operatorByControl.update((m) => ({ ...m, [controlId]: operador?.nome ?? null }));
+    this.operatorObsByControl.update((m) => ({ ...m, [controlId]: operador?.obs ?? null }));
+  }
+
+  /**
+   * Monta as linhas (`ParamRow[]`), o histórico de versões e resolve o
+   * operador para um conjunto de answers do modo normal — reaproveitado
+   * tanto pelo modo normal "puro" quanto pelos answers globais (categoria
+   * 5/6) de um formulário com máquinas.
+   */
+  private construirDadosNormais(
+    answers: Answer[],
+    results: AnswerResult[],
+  ): {
+    linhas: ParamRow[];
+    versoes: VersaoResposta[];
+    operador: { nome: string; obs: string | null; ts: number } | null;
+  } {
     const allResults = results as (AnswerResult & {
       limitsAnswerId?: string | null;
       dataCriacao?: string;
@@ -637,44 +710,46 @@ export class HistoricoComponent implements OnInit {
         resposta: res?.resposta ?? '—',
         limitsAnswerId: res?.limitsAnswerId ?? null,
         answerResultId: res ? ((res as { id?: string }).id ?? null) : null,
+        categoryId: Number(a.categoryId),
       };
     });
-
-    this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
 
     const versoes = this.agruparVersoes(
       ordenados as unknown as (AnswerResult & Record<string, unknown>)[],
     );
-    this.expandedHistory.update((d) => ({ ...d, [controlId]: versoes }));
 
     // ── operador = ÚLTIMO reparador inserido (answer_result mais recente) ──
-    const opN = this.resolverUltimoOperador(
-      ordenados,
+    const operador = this.resolverUltimoOperador(
+      ordenados as unknown as Record<string, unknown>[],
       this.repairerByAnswerResultId(),
       this.repairerObsByAnswerResultId(),
     );
-    this.operatorByControl.update((m) => ({ ...m, [controlId]: opN?.nome ?? null }));
-    this.operatorObsByControl.update((m) => ({ ...m, [controlId]: opN?.obs ?? null }));
+
+    return { linhas, versoes, operador };
   }
 
   /**
    * Percorre os results do MAIS RECENTE ao mais antigo e devolve o nome + a
-   * observação do primeiro que tiver reparador vinculado — ou seja, o ÚLTIMO
-   * operador inserido. Recebe os mapas adequados (normal ou de máquina).
+   * observação + a data do primeiro que tiver reparador vinculado — ou seja,
+   * o ÚLTIMO operador inserido. Recebe os mapas adequados (normal ou de
+   * máquina). A data (`ts`) permite comparar qual dos dois lados (máquina vs
+   * global) é o mais recente quando um controle tem ambos.
    */
   private resolverUltimoOperador(
-    ordenadosAsc: { id?: string }[],
+    ordenadosAsc: Record<string, unknown>[],
     repMap: Record<string, string>,
     obsMap: Record<string, string>,
-  ): { nome: string; obs: string | null } | null {
+  ): { nome: string; obs: string | null; ts: number } | null {
     const userById = this.userByIdMap();
     for (let i = ordenadosAsc.length - 1; i >= 0; i--) {
-      const id = (ordenadosAsc[i] as { id?: string }).id;
+      const rec = ordenadosAsc[i];
+      const id = (rec as { id?: string }).id;
       const uid = id ? repMap[id] : undefined;
       if (uid) {
         return {
           nome: userById.get(uid)?.userUsername ?? uid,
           obs: id && obsMap[id] ? obsMap[id] : null,
+          ts: this.getDataCriacao(rec),
         };
       }
     }
@@ -721,14 +796,14 @@ export class HistoricoComponent implements OnInit {
     this.repairerQuery.set('');
     this.repairerObs.set('');
 
+    // Máquina e globais (categoria 5/6) podem coexistir no mesmo controle — mescla os dois.
     const vals: Record<string, string> = {};
     const md = this.expandedMachineData()[row.id];
     if (md) {
       for (const key of Object.keys(md.cells)) vals[key] = md.cells[key] ?? '';
-    } else {
-      for (const p of this.expandedData()[row.id] ?? []) {
-        vals[p.answerId] = p.resposta === '—' ? '' : p.resposta;
-      }
+    }
+    for (const p of this.expandedData()[row.id] ?? []) {
+      vals[p.answerId] = p.resposta === '—' ? '' : p.resposta;
     }
     this.editValues.set(vals);
   }
@@ -792,6 +867,8 @@ export class HistoricoComponent implements OnInit {
     if (this.podeEditarCampos(row.id)) {
       let tudoDentroDoLimite = true;
       const md = this.expandedMachineData()[row.id];
+
+      // Células da tabela por máquina (se houver).
       if (md) {
         for (const key of Object.keys(md.cells)) {
           const sep = key.indexOf('_');
@@ -824,35 +901,74 @@ export class HistoricoComponent implements OnInit {
             );
           }
         }
-      } else {
-        for (const p of this.expandedData()[row.id] ?? []) {
-          const novo = (vals[p.answerId] ?? '').trim();
-          const atual = (p.resposta === '—' ? '' : p.resposta).trim();
-          const finalVal = novo || atual;
+      }
 
-          if (finalVal && !this.dentroDoLimite(p.answerId, finalVal)) tudoDentroDoLimite = false;
+      // Answers globais (modo normal "puro" OU categoria 5/6 de um form com máquinas).
+      // Categoria 6 é sempre pulada aqui: nunca editável na mão, só recalculada abaixo.
+      for (const p of this.expandedData()[row.id] ?? []) {
+        if (p.categoryId === 6) continue;
 
-          if (novo && novo !== atual) {
-            camposMudaram = true;
-            changedNormal[p.answerId] = novo;
-            fieldOps.push(
-              this.answerResultService
-                .create({
-                  AnswerId: p.answerId,
-                  controlId: row.id,
-                  resposta: novo,
-                  limitsAnswerId: p.limitsAnswerId ?? null,
-                })
-                .pipe(
-                  switchMap((created) => this.linkRepairer(created, repairerId, repairerObsVal)),
-                ),
-            );
-          }
+        const novo = (vals[p.answerId] ?? '').trim();
+        const atual = (p.resposta === '—' ? '' : p.resposta).trim();
+        const finalVal = novo || atual;
+
+        if (finalVal && !this.dentroDoLimite(p.answerId, finalVal)) tudoDentroDoLimite = false;
+
+        if (novo && novo !== atual) {
+          camposMudaram = true;
+          changedNormal[p.answerId] = novo;
+          fieldOps.push(
+            this.answerResultService
+              .create({
+                AnswerId: p.answerId,
+                controlId: row.id,
+                resposta: novo,
+                limitsAnswerId: p.limitsAnswerId ?? null,
+              })
+              .pipe(
+                switchMap((created) => this.linkRepairer(created, repairerId, repairerObsVal)),
+              ),
+          );
         }
       }
 
       if (camposMudaram) {
         novoStatusId = tudoDentroDoLimite ? '1' : '2';
+
+        // Recalcula e reenvia (novo answer_result — nunca update) o(s) "Total
+        // Produzido" (categoria 6) do formulário, já que algo mudou. Categoria 5
+        // já está em sacos (valor final salvo), então soma direto, sem reconverter.
+        const answersForm = this.answersByForm().get(row.formId) ?? [];
+        const calculados = answersForm.filter((a) => Number(a.categoryId) === 6);
+
+        const valorAtual = (answerId: string): number => {
+          const novo = (vals[answerId] ?? '').trim();
+          const base = novo || this.expandedData()[row.id]?.find((p) => p.answerId === answerId)
+            ?.resposta;
+          const limpo = base === '—' ? '' : (base ?? '');
+          return parseFloat(limpo.replace(',', '.')) || 0;
+        };
+
+        for (const calc of calculados) {
+          const config = this.calcConfigFor(calc.id);
+          if (!config) continue;
+
+          const producao = answersForm
+            .filter((a) => Number(a.categoryId) === 5)
+            .reduce((soma, a) => soma + valorAtual(a.id), 0);
+          const antes = valorAtual(config.antesAnswerId);
+          const depois = valorAtual(config.depoisAnswerId);
+          const total = String(producao + depois - antes);
+
+          changedNormal[calc.id] = total;
+          fieldOps.push(
+            this.answerResultService
+              .create({ AnswerId: calc.id, controlId: row.id, resposta: total, limitsAnswerId: null })
+              .pipe(
+                switchMap((created) => this.linkRepairer(created, repairerId, repairerObsVal)),
+              ),
+          );
+        }
       }
     }
 
@@ -924,13 +1040,14 @@ export class HistoricoComponent implements OnInit {
         this.aplicarEdicaoLocal(
           row.id,
           obsMudou ? novaObs || null : row.observacao,
+          changedNormal,
           novoUserId,
           novoFileId,
         );
-        if (Object.keys(changedNormal).length && !this.expandedMachineData()[row.id]) {
+        if (Object.keys(changedNormal).length) {
           this.anexarVersao(row.id, changedNormal);
         }
-        if (Object.keys(changedMachine).length && this.expandedMachineData()[row.id]) {
+        if (Object.keys(changedMachine).length) {
           this.anexarVersaoMachine(row.id, changedMachine);
         }
         // Reflete imediatamente o ÚLTIMO operador (esta correção é a mais recente).
@@ -1069,6 +1186,7 @@ export class HistoricoComponent implements OnInit {
   private aplicarEdicaoLocal(
     controlId: string,
     obs: string | null,
+    changedNormal: Record<string, string>,
     novoUserId: string | null = null,
     novoFileId: string | null = null,
   ): void {
@@ -1094,13 +1212,16 @@ export class HistoricoComponent implements OnInit {
         if (v) cells[key] = v;
       }
       this.expandedMachineData.update((d) => ({ ...d, [controlId]: { ...md, cells } }));
-    } else {
-      const linhas = (this.expandedData()[controlId] ?? []).map((p) => {
-        const v = (vals[p.answerId] ?? '').trim();
-        return v ? { ...p, resposta: v } : p;
-      });
-      this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
     }
+
+    // Globais (modo normal puro OU categoria 5/6 de um form com máquinas). Usa
+    // `changedNormal` primeiro pois é onde está o total recalculado da
+    // categoria 6 (nunca vem de `editValues`, já que não é editável na mão).
+    const linhas = (this.expandedData()[controlId] ?? []).map((p) => {
+      const v = changedNormal[p.answerId] ?? (vals[p.answerId] ?? '').trim();
+      return v ? { ...p, resposta: v } : p;
+    });
+    this.expandedData.update((d) => ({ ...d, [controlId]: linhas }));
   }
 
   // ───────── linhas do histórico (mais recentes primeiro) ─────────
@@ -1389,6 +1510,9 @@ export class HistoricoComponent implements OnInit {
       formTimes: this.fetchAllPages<FormTime>((l, p) => this.formTimeService.getAll(l, p)).pipe(
         failLog('tempos de formulário'),
       ),
+      answerCalculated: this.fetchAllPages<AnswerCalculated>((l, p) =>
+        this.answerCalculatedService.getAll(l, p),
+      ).pipe(failLog('parâmetros calculados')),
     }).subscribe({
       next: ({
         controls,
@@ -1403,6 +1527,7 @@ export class HistoricoComponent implements OnInit {
         repairers,
         repairersMachine,
         formTimes,
+        answerCalculated,
       }) => {
         if (controls == null) {
           this.error.set('Não foi possível carregar o histórico.');
@@ -1458,6 +1583,8 @@ export class HistoricoComponent implements OnInit {
           if (fid && seg > 0) ftMap.set(fid, seg);
         }
         this.execSegByForm.set(ftMap);
+
+        this.answerCalculated.set(this.unwrap<AnswerCalculated>(answerCalculated));
 
         this.loading.set(false);
 

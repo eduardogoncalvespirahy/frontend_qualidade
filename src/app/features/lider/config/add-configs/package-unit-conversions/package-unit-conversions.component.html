@@ -1,0 +1,165 @@
+<section class="painel">
+  <header class="painel__head">
+    <div>
+      <span class="painel__eyebrow">Cadastro</span>
+      <h1 class="painel__title">Conversões de Unidades</h1>
+      <p class="painel__subtitle">Configure as conversões em cascata entre unidades e tipos de pacotes.</p>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error" role="alert">
+      <i class="bi bi-exclamation-triangle"></i> {{ error() }}
+    </div>
+  }
+  @if (success()) {
+    <div class="alert alert--success" role="status">
+      <i class="bi bi-check-circle"></i> {{ success() }}
+    </div>
+  }
+
+  <!-- Filtros -->
+  @if (!loading()) {
+    <div class="filters">
+      <div class="filters__bar">
+        <button
+          type="button"
+          class="filters__toggle"
+          [class.is-open]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <i class="bi bi-funnel"></i> <span>Filtros</span>
+          @if (activeFilterCount()) {
+            <span class="filters__count">{{ activeFilterCount() }}</span>
+          }
+          <i
+            class="bi"
+            [class.bi-chevron-down]="!filtersOpen()"
+            [class.bi-chevron-up]="filtersOpen()"
+          ></i>
+        </button>
+        @if (hasFilter()) {
+          <button type="button" class="filters__clear" (click)="resetFilters()">
+            <i class="bi bi-x-lg"></i> Limpar
+          </button>
+        }
+      </div>
+
+      @if (filtersOpen()) {
+        <div class="filters__grid">
+          <label class="ff">
+            <span class="ff__label">Unidade de Entrada</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().inputUnitId"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('inputUnitId', $event)"
+            >
+              <option value="">Todas</option>
+              @for (unit of inputUnits(); track unit.id) {
+                <option [value]="unit.id">{{ unit.nome }}</option>
+              }
+            </select>
+          </label>
+          <label class="ff">
+            <span class="ff__label">Tipo de Pacote</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().packageTypeId"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('packageTypeId', $event)"
+            >
+              <option value="">Todos</option>
+              @for (type of packageTypes(); track type.id) {
+                <option [value]="type.id">{{ type.nome }}</option>
+              }
+            </select>
+          </label>
+          <label class="ff">
+            <span class="ff__label">Ordem</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().ordem"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('ordem', $event)"
+            >
+              <option value="">Todas</option>
+              <option value="1">1º Nível</option>
+              <option value="2">2º Nível</option>
+              <option value="3">3º Nível</option>
+            </select>
+          </label>
+          <label class="ff">
+            <span class="ff__label">Status</span>
+            <select
+              class="ff__control"
+              [ngModel]="filters().status"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateFilter('status', $event)"
+            >
+              <option value="all">Todos</option>
+              <option value="active">Ativo</option>
+              <option value="inactive">Inativo</option>
+            </select>
+          </label>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Conteúdo -->
+  @if (loading()) {
+    <div class="grid">
+      @for (s of [1, 2, 3, 4, 5, 6]; track s) {
+        <div class="card card--skeleton"></div>
+      }
+    </div>
+  } @else {
+    <div class="grid">
+      <button type="button" class="card card--add" (click)="novo()">
+        <span class="card__icon card__icon--add"><i class="bi bi-plus-lg"></i></span>
+        <h3 class="card__title">Nova conversão</h3>
+        <p class="card__desc">Cadastrar uma nova conversão de unidade.</p>
+      </button>
+
+      @for (item of filtered(); track trackById($index, item)) {
+        <div class="card" (click)="editar(item)">
+          <div class="card__top">
+            <span class="card__icon"><i class="bi bi-arrow-left-right"></i></span>
+            <div class="card__top-right">
+              <span class="badge" [class.badge--on]="item.status === 1">
+                {{ item.status === 1 ? 'Ativo' : 'Inativo' }}
+              </span>
+              <button
+                type="button"
+                class="card__del"
+                title="Excluir"
+                (click)="$event.stopPropagation(); excluir(item)"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+          <h3 class="card__title">{{ getInputUnitName(item.inputUnitId) }} - {{ getPackageTypeName(item.packageTypeId) }}</h3>
+          <p class="card__desc">Ordem: {{ item.ordem }} | Quantidade: {{ item.quantidadePorSaco }}</p>
+        </div>
+      }
+    </div>
+
+    @if (filtered().length === 0) {
+      <div class="empty">
+        <i class="bi bi-inbox"></i>
+        <p>
+          {{ hasFilter() ? 'Nenhuma conversão corresponde aos filtros.' : 'Nenhuma conversão cadastrada.' }}
+        </p>
+        @if (hasFilter()) {
+          <button type="button" class="btn btn--ghost" (click)="resetFilters()">
+            Limpar filtros
+          </button>
+        }
+      </div>
+    }
+  }
+</section>
+
+<app-scroll-top />

@@ -1,0 +1,98 @@
+<div class="d-flex flex-column gap-3">
+  <p class="text-muted mb-0 small">
+    {{
+      mode() === 'new'
+        ? 'Encontre o formulário e selecione o parâmetro que vai receber a conversão.'
+        : 'Atualize o vínculo.'
+    }}
+  </p>
+
+  <!-- Cascata: Local → Seção → Formulário -->
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label for="locationId" class="form-label">Local *</label>
+      <select
+        id="locationId"
+        name="locationId"
+        class="form-select"
+        [ngModel]="locationId"
+        (ngModelChange)="onLocationChange($event)"
+        [disabled]="mode() === 'edit'"
+        required
+      >
+        <option value="">Selecione…</option>
+        @for (loc of locations(); track loc.id) {
+          <option [value]="loc.id">{{ loc.nome }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="col-md-4">
+      <label for="sectionId" class="form-label">Seção *</label>
+      <select
+        id="sectionId"
+        name="sectionId"
+        class="form-select"
+        [ngModel]="sectionId"
+        (ngModelChange)="onSectionChange($event)"
+        [disabled]="mode() === 'edit' || !locationId"
+        required
+      >
+        <option value="">Selecione…</option>
+        @for (sec of filteredSections(); track sec.id) {
+          <option [value]="sec.id">{{ sec.nome }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="col-md-4">
+      <label for="formId" class="form-label">Formulário *</label>
+      <select
+        id="formId"
+        name="formId"
+        class="form-select"
+        [ngModel]="formId"
+        (ngModelChange)="onFormChange($event)"
+        [disabled]="mode() === 'edit' || !sectionId"
+        required
+      >
+        <option value="">Selecione…</option>
+        @for (f of filteredForms(); track f.id) {
+          <option [value]="f.id">{{ f.nome }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label for="answerId" class="form-label">Parâmetro *</label>
+    <select
+      id="answerId"
+      name="answerId"
+      class="form-select"
+      [(ngModel)]="answerId"
+      [disabled]="mode() === 'edit' || !formId"
+      required
+    >
+      <option value="">Selecione um parâmetro</option>
+      @for (ans of answersDoFormulario(); track ans.id) {
+        <option [value]="ans.id">{{ ans.nome }}</option>
+      }
+    </select>
+    @if (mode() === 'new' && formId && answersDoFormulario().length === 0) {
+      <div class="form-text text-warning">
+        Este formulário não tem nenhum parâmetro de categoria 5 ainda.
+      </div>
+    }
+  </div>
+
+  <div>
+    <label for="conversionId" class="form-label">Conversão *</label>
+    <select id="conversionId" name="conversionId" class="form-select" [(ngModel)]="conversionId" required>
+      <option value="">Selecione uma conversão</option>
+      @for (conv of packageUnitConversions(); track conv.id) {
+        <option [value]="conv.id">{{ getConversionLabel(conv) }}</option>
+      }
+    </select>
+  </div>
+</div>

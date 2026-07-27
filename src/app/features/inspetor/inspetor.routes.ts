@@ -5,7 +5,7 @@ import { authGuard, roleGuard } from '../../core/guards/auth.guard';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { PainelComponent } from './painel/painel.component';
 import { RelatorioComponent } from './relatorio/relatorio.component';
-import { HistoricoComponent } from './historico/historico.component';
+import { HistoricoComponent } from '../historico/historico.component';
 
 export const InspetorRoutes: Routes = [
   {
